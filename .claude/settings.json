@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm:*)",
+      "Bash(npm:*)",
+      "Bash(yarn:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(ls:*)",
+      "Read(./**)",
+      "Edit(./**)",
+      "Write(./**)"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/secrets/**)",
+      "Bash(rm -rf:*)",
+      "Bash(git push --force:*)",
+      "Bash(git reset --hard:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/block-secrets.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "model": "claude-sonnet-4-6"
+}

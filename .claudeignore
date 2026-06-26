@@ -1,0 +1,43 @@
+# Patterns excluded from Claude's automatic file discovery context.
+# Note: this does not block access. For sensitive files, use permissions.deny in settings.json.
+
+# Build outputs
+.next/
+dist/
+build/
+out/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Logs and caches
+*.log
+.cache/
+coverage/
+
+# Lock files (large, rarely needed)
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Large binaries
+*.pdf
+*.zip
+*.tar.gz
+public/uploads/
+
+# Media assets
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.mp4
+*.webm
+
+# Session state
+.claude/agent-memory/
+.claude/projects/
+
+# OS
+.DS_Store

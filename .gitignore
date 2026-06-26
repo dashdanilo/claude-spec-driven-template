@@ -1,0 +1,32 @@
+# Personal Claude Code files (do not share)
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/agent-memory/
+
+# Claude Code session state
+.claude/projects/
+.claude/shell-snapshots/
+.claude/backups/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+dist/
+build/
+out/
+
+# Logs
+*.log
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Coverage
+coverage/
+.nyc_output/
