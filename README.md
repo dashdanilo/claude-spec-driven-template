@@ -340,26 +340,26 @@ The flow:
 
 ```mermaid
 flowchart TD
-    A[User has an idea] --> B[/skill explore]
-    B --> C{Idea clear?}
-    C -->|No, keep discussing| B
-    C -->|Yes| D[/skill write-spec]
-    D --> E[specs/YYYY-MM-DD-slug/spec.md]
-    E --> F[spec-reviewer subagent audits]
-    F --> G{Spec approved?}
-    G -->|Needs work| E
-    G -->|Yes| H[Fill plan.md<br/>architecture, tech, phases]
-    H --> I[Fill tasks.md<br/>atomic TDD checkboxes]
-    I --> J[Execute task N]
-    J --> K[Red: failing test]
-    K --> L[Green: minimal code]
-    L --> M[Refactor if needed]
-    M --> N[code-reviewer subagent<br/>gates between tasks]
-    N --> O{Approved?}
-    O -->|Needs changes| J
-    O -->|Yes, check box in tasks.md| P{More tasks?}
+    A["User has an idea"] --> B["/skill explore"]
+    B --> C{"Idea clear?"}
+    C -->|"No, keep discussing"| B
+    C -->|Yes| D["/skill write-spec"]
+    D --> E["specs/YYYY-MM-DD-slug/spec.md"]
+    E --> F["spec-reviewer subagent audits"]
+    F --> G{"Spec approved?"}
+    G -->|"Needs work"| E
+    G -->|Yes| H["Fill plan.md<br/>architecture, tech, phases"]
+    H --> I["Fill tasks.md<br/>atomic TDD checkboxes"]
+    I --> J["Execute task N"]
+    J --> K["Red: failing test"]
+    K --> L["Green: minimal code"]
+    L --> M["Refactor if needed"]
+    M --> N["code-reviewer subagent<br/>gates between tasks"]
+    N --> O{"Approved?"}
+    O -->|"Needs changes"| J
+    O -->|"Yes, check box in tasks.md"| P{"More tasks?"}
     P -->|Yes| J
-    P -->|No| Q[Merge]
+    P -->|No| Q["Merge"]
 
     style E fill:#dbeafe,stroke:#2563eb
     style H fill:#dbeafe,stroke:#2563eb
