@@ -1,4 +1,4 @@
-# Project name
+# claude-spec-driven-template
 
 > Cross-tool source of truth. Read by any AI coding agent: Codex, Cursor, Gemini CLI, GitHub Copilot, Windsurf, Aider, Claude Code, and others that support the AGENTS.md convention.
 >
@@ -8,113 +8,131 @@
 > - Gemini CLI: `GEMINI.md` (when present)
 > - Cursor: `.cursor/rules/` (when present)
 
-One sentence about what this project does and who it is for.
+A stack-agnostic template repository for structuring AI-enabled projects around spec-driven development. Provides folder layout, agent configuration, skills, subagents, hooks, and workflow patterns that work across Claude Code, GitHub Copilot, and other AGENTS.md-compatible tools.
+
+The repo you are working in **is the template itself**, not an application built from it. There is no runtime code to execute, no server to run, no build to compile. Contributions to this repo evolve the template that others clone and adopt.
+
+## Nature of this repository
+
+This is a documentation-heavy, code-light repository. Most files are markdown or configuration. Shell scripts implement lifecycle hooks. No source code beyond illustrative examples.
+
+Read [`docs/CONSTITUTION.md`](./docs/CONSTITUTION.md) for the full philosophy, principles, and boundaries of this project.
 
 ## Tech stack
 
-Replace with your actual stack:
-
-- Framework: (e.g., your web framework and version)
-- Language: (e.g., TypeScript strict mode)
-- Styling: (e.g., your CSS approach)
-- Database: (e.g., your DB and ORM)
-- Package manager: (e.g., pnpm, npm, yarn)
-- Testing: (e.g., your test runner)
-- External services: (list the third-party APIs your project depends on)
+- **Documentation:** Markdown
+- **Shell scripts:** Bash (POSIX-compatible where possible)
+- **Config:** JSON (`.claude/settings.json`)
+- **Diagrams:** Mermaid (renders natively on GitHub)
+- **Optional adopter tools tested against:** Repomix, Ponytail, OpenSpec, Superpowers
 
 ## Build, test, lint
 
+No build. No test suite. No linter. This is a template repository.
+
+Contributions are validated by:
+
+- Manual review against `CONTRIBUTING.md` checklist
+- Cross-checking directory tree in `README.md` against actual filesystem
+- Testing shell scripts standalone (see `CONTRIBUTING.md`)
+- Verifying internal links resolve
+
 ```bash
-# Development
-pnpm dev
+# Verify shell scripts run without syntax errors
+bash -n .claude/hooks/*.sh
+bash -n .claude/scripts/*.sh
 
-# Tests
-pnpm test
-pnpm test:watch
+# Verify JSON is valid
+python3 -m json.tool .claude/settings.json > /dev/null && echo "settings.json valid"
 
-# Quality
-pnpm lint
-pnpm typecheck
-
-# Build
-pnpm build
+# List all skill and agent files to spot missing pieces
+find .claude/skills -name "SKILL.md" | sort
+find .claude/agents -name "*.md" | sort
 ```
 
 ## Structure
 
-- `src/app/` routes
-- `src/lib/` server-side logic (each major folder may have its own nested CLAUDE.md)
-- `src/components/` UI
-- `specs/` feature specs and plans (source of truth for features)
-- `docs/` human-facing project documentation (constitution, architecture, ADRs, patterns)
-- `.claude/` Claude-specific config (other tools can ignore)
+- `.claude/` Claude Code configuration (skills, agents, hooks, rules, docs, scripts, context)
+- `.github/` GitHub-facing files (issue templates, PR template, Copilot instructions)
+- `docs/` human-facing project documentation
+- `specs/` example spec-driven artifacts (with `0000-example-feature/` as reference)
+- `src/example-module/` shows the nested CLAUDE.md pattern
+- Root: cross-tool config (`AGENTS.md`, `CLAUDE.md`, `ECOSYSTEM.md`) and standard docs (`README.md`, `LEARN.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `LICENSE`)
+
+See the tree diagram in `README.md` for the complete layout.
 
 ## Conventions
 
-- Named exports, never default
-- Functional components, no classes
-- Validate all external input with Zod (or equivalent)
-- Structured JSON logs, never raw `console.log` strings
-- API keys always server-side
-- Never call external APIs directly from the framework layer; use the orchestration layer
+Applied both to the template's own content and recommended for adopters:
+
+- English for all documentation
+- Markdown for all files (no MDX, no preprocessing)
+- No em-dashes in copy
+- One H1 per file, used as the title
+- Code blocks have language tags
+- File paths in inline code with backticks
+- Directory paths end with slash (`docs/`, not `docs`)
+- Dates in ISO format (`YYYY-MM-DD`)
 
 ## Feature workflow
 
-For non-trivial features:
+Even though this repo has no application code, feature additions to the template itself follow the same spec-driven flow that the template teaches:
 
-1. Brainstorm requirements before writing code
-2. Write `specs/YYYY-MM-DD-<slug>/spec.md` (WHAT + WHY, source of truth)
-3. Write `specs/YYYY-MM-DD-<slug>/plan.md` (HOW at high level: architecture, tech, phases)
-4. Write `specs/YYYY-MM-DD-<slug>/tasks.md` (HOW at execution level: atomic TDD checkboxes)
-5. Implement task by task, test first, update checkboxes as you go
-6. Review against spec before merging
+1. Discuss the change in an issue or discussion
+2. Optionally write `specs/YYYY-MM-DD-<slug>/spec.md` for larger changes
+3. Optionally break into `plan.md` (architecture) and `tasks.md` (atomic steps)
+4. Implement changes, updating relevant files
+5. Update `README.md` tree, `CHANGELOG.md`, and any affected docs
+6. Open PR referencing the spec or issue
 
-When code and spec diverge, the spec wins. Stop and ask.
-
-To resume mid-feature: open `tasks.md`, find the first unchecked `- [ ]`. That's where you stopped.
+For small changes (typo fix, single doc improvement), skip the spec and open the PR directly.
 
 ## Before writing new code
 
-Check what exists first:
+For this repo specifically, "new code" almost always means new markdown or shell scripts:
 
-- Search for existing implementations by name and synonyms
-- Look for related patterns in `docs/patterns/`
-- Check past specs in `specs/` for prior work in the area
-- Check `.claude/docs/libs/` for existing integrations (Claude Code) or equivalent
-
-Only create new when nothing suitable exists, and match the style of neighboring code.
+- Search for existing similar files (`grep`, `find`)
+- Look for related patterns in `docs/patterns/` and `LEARN.md`
+- Check the tree diagram in `README.md` to see if the location already exists
+- Prefer extending existing skills or agents over creating parallel ones
+- If creating a new skill, subagent, hook, or rule, follow the "Adding a new..." sections in `CONTRIBUTING.md`
 
 ## Where to look
 
 | Need | Place |
 |---|---|
-| Spec for the active feature | `specs/<latest>/spec.md` |
-| Project DNA (principles, boundaries) | `docs/CONSTITUTION.md` |
-| Style, naming, structure conventions | `docs/CONVENTIONS.md` |
-| System architecture overview | `docs/architecture/overview.md` |
-| Past decisions and their reasoning | `docs/decisions/` |
-| "How we solved X" living examples | `docs/patterns/` |
-| Shared schemas across services | `ECOSYSTEM.md` |
-| Operational procedures (deploy, incident) | `docs/runbooks/` |
-| Onboarding and tutorials | `docs/guides/` |
+| Constitution and philosophy | `docs/CONSTITUTION.md` |
+| Guided course through the structure | `LEARN.md` |
+| Contribution rules and checklists | `CONTRIBUTING.md` |
+| Version history | `CHANGELOG.md` |
+| Adoption walkthrough | `docs/guides/initial-setup.md` |
+| Recommended external tools | `README.md` section "Recommended ecosystem" |
+| Architecture decision records | `docs/decisions/` |
 
 ## Non-negotiables
 
-- Source of truth is always `specs/<feature>/spec.md`. When code diverges, stop and ask.
-- Before implementing a new feature: brainstorm, then spec, then plan, then code.
-- Before creating any new file, check whether it already exists (see "Before writing new code" above).
+Documented in full in `docs/CONSTITUTION.md`. The short version:
+
+- **Stack agnosticism.** No file may assume a specific framework, database, or vendor. Placeholders and examples only.
+- **Cross-tool compatibility.** Every workflow must be executable by any AGENTS.md-compatible agent.
+- **Documentation over code.** Structural decisions are described, not implemented.
+- **Attribution preserved.** Community contributions keep their author attribution inline.
+- **Context economy.** What loads always must be small. What is detailed must load on demand.
 
 ## Files agents should not touch
 
-- `.env*` and any file matching `**/secrets/**`
-- `node_modules/`, `.next/`, `dist/`, `build/`
-- `CLAUDE.local.md` and `.claude/settings.local.json` (personal)
-- `.claude/agent-memory/` (managed by Claude Code)
-- `.claude/context/` (generated, gitignored)
+- `.env*` and any file matching `**/secrets/**` (blocked by `block-secrets.sh` hook)
+- `node_modules/` (if any adopter creates it locally)
+- `CLAUDE.local.md` and `.claude/settings.local.json` (personal, gitignored)
+- `.claude/agent-memory/` (per-subagent memory, gitignored)
+- `.claude/context/` (Repomix snapshot and generated state, gitignored)
+- Applied migrations, lockfiles, generated code (blocked by `protect-critical.sh` hook)
 
 ## More context
 
-- [`README.md`](./README.md) human entry point
-- [`LEARN.md`](./LEARN.md) guided course for the AI structure
-- [`ECOSYSTEM.md`](./ECOSYSTEM.md) shared schemas
-- [`docs/`](./docs/) all human-facing project documentation
+- [`README.md`](./README.md) human entry point with tree, layers, brownfield, ecosystem
+- [`LEARN.md`](./LEARN.md) 12-chapter guided course
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md) how to contribute without breaking teaching value
+- [`docs/CONSTITUTION.md`](./docs/CONSTITUTION.md) project DNA
+- [`docs/guides/initial-setup.md`](./docs/guides/initial-setup.md) adoption walkthrough
+- [`CHANGELOG.md`](./CHANGELOG.md) release history
