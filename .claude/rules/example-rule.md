@@ -28,7 +28,7 @@ This is what a rule looks like. Replace the content with your actual conventions
 - Long documentation (use `.claude/docs/`)
 - Folder-specific conventions (use nested `src/<folder>/CLAUDE.md`)
 - Reusable workflows (use `.claude/skills/`)
-- Reasoning about why (decisions go in `.claude/docs/decisions/`)
+- Reasoning about why (decisions go in `docs/decisions/`)
 
 ## Keep it short
 

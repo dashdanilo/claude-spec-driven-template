@@ -4,7 +4,7 @@
 > Lib version: X.Y.Z
 > Official docs: <url>
 
-> This is a template. Rename the file to the actual lib (e.g., `stripe.md`, `postgres.md`) and replace the content.
+> This is a template. Rename the file to the actual lib (e.g., the name of the service or package) and replace the content.
 
 ## Why we use it
 

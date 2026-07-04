@@ -21,8 +21,8 @@ The `using-superpowers` skill auto-loads via a SessionStart hook after install.
 ## The canonical flow
 
 ```
-Brainstorm  →  spec.md   →  plan.md   →  TDD execution  →  Code review  →  Ship
-   (chat)      (commit)    (commit)      (subagents)        (agent)
+Brainstorm  →  spec.md   →  plan.md + tasks.md   →  TDD execution  →  Code review  →  Ship
+   (chat)      (commit)         (commit)             (subagents)         (agent)
 ```
 
 Each gate **blocks** the next until resolved.
@@ -37,27 +37,30 @@ Output: a design document presented in chunks for you to approve.
 
 After the brainstorm is approved, it becomes `specs/<date>-<slug>/spec.md`. This is the **source of truth**. Any future divergence between code and spec is resolved by reading the spec, not the code.
 
-### 3. Plan
+### 3. Plan and tasks
 
-The `writing-plans` skill breaks the spec into **2-5 minute tasks** with:
+The `writing-plans` skill (Superpowers) produces two files in this template:
 
-- File path
-- Exact commands
-- Failing test to write first
-- Minimal code to make it pass
+- `plan.md` covers the high-level HOW: architecture, tech choices, phases
+- `tasks.md` covers the atomic execution: one checkbox per task, with:
+  - File path
+  - Exact commands
+  - Failing test to write first
+  - Minimal code to make it pass
 
-Output: `specs/<date>-<slug>/plan.md`.
+Note: some older Superpowers versions generate a single `plan.md` with tasks inline. This template splits them for clarity. If you use Superpowers as-is, either configure it to split or manually extract the tasks into `tasks.md` after generation.
 
 ### 4. Execution via subagent-driven-development
 
 The `subagent-driven-development` skill dispatches a subagent **per task**, with fresh context. Each subagent:
 
-1. Reads the spec
-2. Reads the task in the plan
-3. Writes the failing test (red)
-4. Implements minimum to pass (green)
-5. Refactors if needed
-6. Reports back
+1. Reads the spec (context)
+2. Reads its phase in the plan (architecture context)
+3. Reads its task in `tasks.md` (execution steps)
+4. Writes the failing test (red)
+5. Implements minimum to pass (green)
+6. Refactors if needed
+7. Reports back and marks the box in `tasks.md`
 
 ### 5. Code review as gate
 
@@ -75,7 +78,7 @@ The `finishing-a-development-branch` skill verifies everything passes, then pres
 
 ## How this template integrates
 
-- **`specs/`** follows the Superpowers format (spec.md + plan.md per feature)
+- **`specs/`** follows the three-file format (spec.md + plan.md + tasks.md per feature)
 - **`.claude/agents/spec-reviewer.md`** complements brainstorming: audits the spec before it becomes a plan
 - **`.claude/agents/code-reviewer.md`** acts as the gate between tasks
 - **`src/<folder>/CLAUDE.md`** nested files provide conventions the code-reviewer uses

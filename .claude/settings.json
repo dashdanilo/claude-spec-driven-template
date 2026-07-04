@@ -4,9 +4,13 @@
       "Bash(pnpm:*)",
       "Bash(npm:*)",
       "Bash(yarn:*)",
+      "Bash(npx repomix:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
+      "Bash(git rev-list:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git cat-file:*)",
       "Bash(ls:*)",
       "Read(./**)",
       "Edit(./**)",
@@ -22,6 +26,16 @@
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/check-snapshot-on-session.sh"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -29,6 +43,19 @@
           {
             "type": "command",
             "command": ".claude/hooks/block-secrets.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/protect-main.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/protect-critical.sh"
           }
         ]
       }

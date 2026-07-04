@@ -12,7 +12,7 @@ Your job is to find issues a typical code review misses: secrets in places they 
 ## When invoked
 
 1. Identify the scope (single file, PR diff, or whole module)
-2. Read relevant `.claude/docs/architecture.md` for the trust model
+2. Read relevant `docs/architecture/overview.md` for the trust model
 3. Audit against the checklist
 4. Report findings by severity
 
