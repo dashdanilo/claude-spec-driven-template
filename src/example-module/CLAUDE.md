@@ -1,4 +1,4 @@
-# src/example-module — Nested CLAUDE.md template
+# src/example-module - Nested CLAUDE.md template
 
 > Global context in `/CLAUDE.md`. Active spec in `/specs/<latest>/spec.md`.
 
@@ -10,7 +10,7 @@
 
 One sentence describing the role of this module. Examples:
 
-- "Server-side lead capture logic, not client"
+- "Authentication and session management, server-side only"
 - "Reusable UI primitives, no business logic"
 - "API route handlers and request validation"
 

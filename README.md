@@ -24,12 +24,16 @@ It combines:
 
 - shared agent instructions in [`AGENTS.md`](./AGENTS.md)
 - Claude-specific guidance in [`CLAUDE.md`](./CLAUDE.md)
+- Copilot-specific guidance in [`.github/copilot-instructions.md`](./.github/copilot-instructions.md)
 - shared schemas and contracts in [`ECOSYSTEM.md`](./ECOSYSTEM.md)
 - contributor workflow in [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- change history in [`CHANGELOG.md`](./CHANGELOG.md)
 - internal Claude config in [`.claude/`](./.claude)
+- human-facing project docs in [`docs/`](./docs)
 - spec-driven features in [`specs/`](./specs)
 - nested CLAUDE.md examples in [`src/`](./src)
 - a guided course in [`LEARN.md`](./LEARN.md)
+- setup walkthrough in [`docs/guides/initial-setup.md`](./docs/guides/initial-setup.md)
 
 ---
 
@@ -45,10 +49,13 @@ It combines:
 - [Internal Claude layer](#internal-claude-layer)
 - [Spec-driven layer](#spec-driven-layer)
 - [Nested instructions in src](#nested-instructions-in-src)
+- [Preparing for brownfield](#preparing-for-brownfield)
+- [Recommended ecosystem](#recommended-ecosystem)
 - [Decision table: where does this instruction go?](#decision-table-where-does-this-instruction-go)
 - [What hooks are doing here](#what-hooks-are-doing-here)
 - [What this repo is demonstrating](#what-this-repo-is-demonstrating)
 - [Using this template](#using-this-template)
+- [Attributions](#attributions)
 
 ---
 
@@ -115,25 +122,29 @@ A simple reading order:
 
 - `README.md` introduces the repo and points to the right places
 - `LEARN.md` is the guided course
-- `AGENTS.md` gives shared guidance for any coding agent (Codex, Cursor, Gemini CLI, Claude Code)
-- `CLAUDE.md` gives Claude project-specific context that other tools ignore
+- `AGENTS.md` is the **shared source of truth** for any coding agent (Codex, Cursor, Gemini CLI, Claude Code, GitHub Copilot) - stack, commands, structure, conventions, workflow
+- `CLAUDE.md` is a **stub** pointing to AGENTS.md, with Claude Code-specific additions on top (skills, agents, hooks references)
+- `.github/copilot-instructions.md` is another **stub** for GitHub Copilot, same pattern (points to AGENTS.md, adds Copilot-specific extras)
 - `ECOSYSTEM.md` defines shared schemas across surfaces
 - `CONTRIBUTING.md` explains how to change things without breaking the teaching value
 - `.claude/` contains Claude-specific configuration: skills, agents, rules, docs, hooks
 - `specs/` contains the spec-driven artifacts: one folder per feature with spec + plan
-- `src/<module>/CLAUDE.md` adds nested instructions scoped to a single folder
+- `src/<module>/CLAUDE.md` adds nested instructions scoped to a single folder (still full content, not stub)
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ Root layer (always loaded)                                   │
-│   CLAUDE.md  AGENTS.md  ECOSYSTEM.md                         │
+│ Cross-tool source of truth (always loaded by all agents)     │
+│   AGENTS.md  ECOSYSTEM.md                                    │
 └────────────────────────┬─────────────────────────────────────┘
+                         │
+                         ↓
+                    CLAUDE.md (stub → AGENTS.md + Claude extras)
                          │
         ┌────────────────┼────────────────┐
         ↓                ↓                ↓
    .claude/         specs/             src/<module>/
    ├─ skills/     YYYY-MM-DD-slug/    └─ CLAUDE.md
-   ├─ agents/     ├─ spec.md             (nested, scoped)
+   ├─ agents/     ├─ spec.md             (nested, full content)
    ├─ rules/      └─ plan.md
    ├─ docs/
    └─ hooks/
@@ -151,41 +162,78 @@ claude-spec-driven-template/
 │  │  ├─ spec-reviewer.md                  # Audits spec.md before it becomes plan.md
 │  │  ├─ code-reviewer.md                  # Reviews code against plan and conventions
 │  │  ├─ researcher.md                     # Deep-dives on libs, accumulates MEMORY.md
+│  │  ├─ codebase-explorer.md              # Read-only archaeology, uses Repomix snapshot
 │  │  └─ security-auditor.md               # Audits auth, secrets, validation
 │  │
 │  ├─ skills/                              # Reusable workflows loaded on demand
-│  │  └─ example-skill/                    # Anatomy of a skill (rename and adapt)
-│  │     └─ SKILL.md                       # Frontmatter trigger + workflow
+│  │  ├─ example-skill/SKILL.md            # Anatomy of a skill (rename and adapt)
+│  │  ├─ analyze-codebase/SKILL.md         # First-time setup on existing projects
+│  │  ├─ refresh-snapshot/SKILL.md         # Manually regenerate Repomix snapshot
+│  │  ├─ explore/SKILL.md                  # Investigate before writing a spec
+│  │  ├─ find-existing-first/SKILL.md      # Reuse before create
+│  │  ├─ write-spec/SKILL.md               # Persist a shaped idea as spec.md
+│  │  └─ documenting-domains/              # Durable domain docs (attribution: douglasgomes98)
+│  │     ├─ SKILL.md
+│  │     └─ references/                    # Templates and checklists
 │  │
 │  ├─ rules/                               # Path-scoped conventions (auto-load by glob)
+│  │  ├─ git-workflow.md                   # Branch naming, Conventional Commits, PRs
 │  │  └─ example-rule.md                   # Rule template with paths: frontmatter
 │  │
-│  ├─ docs/                                # Static knowledge, loaded only when referenced
-│  │  ├─ architecture.md                   # System overview, trust model
+│  ├─ docs/                                # AI-only knowledge (loaded only when referenced)
 │  │  ├─ superpowers.md                    # How spec-driven flow works here
-│  │  ├─ libs/                             # One doc per external lib
-│  │  │  └─ example-lib.md                 # Lib template (endpoints, gotchas, troubleshooting)
-│  │  └─ decisions/                        # ADRs (architecture decision records)
-│  │     └─ 0001-example.md                # ADR template
+│  │  └─ libs/                             # One doc per external lib (as agents use them)
+│  │     └─ example-lib.md
 │  │
 │  ├─ hooks/                               # Scripts triggered on tool lifecycle events
-│  │  └─ block-secrets.sh                  # PreToolUse hook that blocks reading .env
+│  │  ├─ block-secrets.sh                  # Blocks reading .env via Bash
+│  │  ├─ protect-main.sh                   # Blocks commits/push on main/master
+│  │  ├─ protect-critical.sh               # Blocks edits to lockfiles, migrations, generated code
+│  │  └─ check-snapshot-on-session.sh      # SessionStart hook, warns on stale snapshot
+│  │
+│  ├─ scripts/                             # Utility scripts used by hooks and agents
+│  │  └─ check-snapshot.sh                 # Classifies Repomix snapshot staleness
+│  │
+│  ├─ context/                             # Generated context (gitignored)
+│  │  └─ repomix-snapshot.md               # Codebase pack (auto-refreshed when stale)
 │  │
 │  └─ settings.json                        # Permissions, hooks registration, model
 │
+├─ docs/                                   # Human-facing project docs
+│  ├─ README.md                            # Layout guide for docs/
+│  ├─ CONSTITUTION.md.example              # Project DNA template (rename and fill)
+│  ├─ architecture/overview.md             # System overview, trust model, data flows
+│  ├─ decisions/                           # ADRs (immutable, numbered)
+│  ├─ runbooks/                            # Operational procedures
+│  ├─ guides/
+│  │  ├─ README.md
+│  │  └─ initial-setup.md                  # Walkthrough for adopting the template
+│  └─ patterns/                            # "How we solved X" living examples
+│
 ├─ specs/                                  # Spec-driven development
-│  └─ 0000-example-feature/                # One folder per feature
-│     ├─ spec.md                           # WHAT to build (source of truth)
-│     └─ plan.md                           # HOW to build (2-5min TDD tasks)
+│  ├─ README.md                            # Explains the three-file pattern
+│  └─ 0000-example-feature/                # One folder per feature (any spec tool uses this)
+│     ├─ spec.md                           # WHAT + WHY (source of truth)
+│     ├─ plan.md                           # HOW at high level (architecture, phases)
+│     └─ tasks.md                          # HOW at execution level (atomic TDD checkboxes)
 │
 ├─ src/                                    # Application code
 │  └─ example-module/
 │     └─ CLAUDE.md                         # Nested instructions for this folder
 │
+├─ .github/                                # GitHub-facing files
+│  ├─ ISSUE_TEMPLATE/
+│  │  ├─ bug_report.md
+│  │  ├─ feature_request.md
+│  │  └─ question.md
+│  ├─ PULL_REQUEST_TEMPLATE.md
+│  └─ copilot-instructions.md              # Stub pointing to AGENTS.md + Copilot-specific extras
+│
 ├─ .claudeignore                           # Patterns excluded from auto context
 ├─ .gitignore                              # Standard + AI-specific entries
-├─ AGENTS.md                               # Cross-tool agent guidance (Codex, Cursor, etc)
-├─ CLAUDE.md                               # Claude-specific project context
+├─ AGENTS.md                               # Source of truth for all agents (Claude, Codex, Cursor, etc)
+├─ CHANGELOG.md                            # Version history
+├─ CLAUDE.md                               # Stub pointing to AGENTS.md + Claude-specific extras
 ├─ CLAUDE.local.md.example                 # Personal overrides template (rename to use)
 ├─ CONTRIBUTING.md                         # How to contribute without breaking teaching value
 ├─ ECOSYSTEM.md                            # Shared schemas and contracts
@@ -206,11 +254,17 @@ The human entry point. Explains what the repo is, how layers fit together, and h
 
 ### [`AGENTS.md`](./AGENTS.md)
 
-Cross-tool instructions. Read by Codex, Cursor, Gemini CLI, Claude Code, and any other coding agent that supports the AGENTS.md convention. Think of it as a README written for agents: setup, commands, conventions, boundaries.
+**Source of truth for all agents.** Cross-tool instructions read by Codex, Cursor, Gemini CLI, Claude Code, GitHub Copilot, and any other coding agent that supports the AGENTS.md convention. Contains the stack, commands, structure, conventions, workflow, and non-negotiables - everything an agent needs to be effective in this repo.
 
 ### [`CLAUDE.md`](./CLAUDE.md)
 
-Claude Code specific. Loaded automatically at the start of every Claude session. Keeps the stack, conventions, and where-to-look pointers tight. Other tools ignore this file.
+**Stub for Claude Code.** Points to AGENTS.md as the source of truth, then adds Claude-specific extras that don't apply to other agents: which skills, subagents, hooks, and rules ship in this project, plus the location of nested CLAUDE.md files. Loaded automatically at the start of every Claude Code session.
+
+This avoids duplication: the stack lives in AGENTS.md alone. Update it there, all agents see the change. CLAUDE.md never goes out of sync because it doesn't own that content.
+
+### [`.github/copilot-instructions.md`](./.github/copilot-instructions.md)
+
+**Stub for GitHub Copilot.** Same pattern as CLAUDE.md but for the Copilot ecosystem (VS Code, JetBrains, Copilot Chat, Copilot Coding Agent, Copilot on GitHub.com). Points to AGENTS.md as source of truth, then adds Copilot-specific guidance. Loaded automatically when Copilot generates suggestions.
 
 ### [`ECOSYSTEM.md`](./ECOSYSTEM.md)
 
@@ -284,20 +338,35 @@ specs/YYYY-MM-DD-feature-slug/
 
 The flow:
 
-```
-1. Brainstorm (chat)
-       ↓
-2. spec.md committed
-       ↓
-3. spec-reviewer subagent audits the spec
-       ↓
-4. plan.md committed (TDD tasks with red-green-refactor)
-       ↓
-5. subagent-driven execution (fresh subagent per task)
-       ↓
-6. code-reviewer subagent gates between tasks
-       ↓
-7. Merge
+```mermaid
+flowchart TD
+    A[User has an idea] --> B[/skill explore]
+    B --> C{Idea clear?}
+    C -->|No, keep discussing| B
+    C -->|Yes| D[/skill write-spec]
+    D --> E[specs/YYYY-MM-DD-slug/spec.md]
+    E --> F[spec-reviewer subagent audits]
+    F --> G{Spec approved?}
+    G -->|Needs work| E
+    G -->|Yes| H[Fill plan.md<br/>architecture, tech, phases]
+    H --> I[Fill tasks.md<br/>atomic TDD checkboxes]
+    I --> J[Execute task N]
+    J --> K[Red: failing test]
+    K --> L[Green: minimal code]
+    L --> M[Refactor if needed]
+    M --> N[code-reviewer subagent<br/>gates between tasks]
+    N --> O{Approved?}
+    O -->|Needs changes| J
+    O -->|Yes, check box in tasks.md| P{More tasks?}
+    P -->|Yes| J
+    P -->|No| Q[Merge]
+
+    style E fill:#dbeafe,stroke:#2563eb
+    style H fill:#dbeafe,stroke:#2563eb
+    style I fill:#dbeafe,stroke:#2563eb
+    style F fill:#fef3c7,stroke:#d97706
+    style N fill:#fef3c7,stroke:#d97706
+    style Q fill:#dcfce7,stroke:#16a34a
 ```
 
 When code and spec diverge, the spec wins. Code gets fixed.
@@ -320,24 +389,119 @@ See [`src/example-module/CLAUDE.md`](./src/example-module/CLAUDE.md) for the pat
 
 ---
 
+## Preparing for brownfield
+
+Most projects are not built from scratch. If you're adopting this template on a codebase that already exists, the challenge is different: the agent needs to **understand what's already there** before it starts creating things. Left alone, agents treat every codebase as greenfield and confidently introduce parallel implementations of things that already exist.
+
+This template ships six practices to counter that:
+
+**1. `analyze-codebase` skill (one-time setup)**
+Detects the tech stack, samples files to infer conventions, and generates `docs/CONSTITUTION.md`, `docs/architecture/overview.md`, `docs/CONVENTIONS.md`. For projects with 100+ files in `src/`, also generates a Repomix snapshot at `.claude/context/repomix-snapshot.md`.
+
+**2. Repomix snapshot (panoramic context)**
+[Repomix](https://github.com/yamadashy/repomix) packs the entire codebase into a single file that subagents read in isolated context. The `check-snapshot.sh` script classifies the snapshot as `fresh`, `stale-mild`, or `stale-major`. The `codebase-explorer` subagent refreshes automatically when stale-major. A `SessionStart` hook warns you when the snapshot is stale.
+
+**3. `codebase-explorer` subagent (deep read)**
+Read-only archaeology. Investigates the codebase, cross-references docs, returns findings without polluting the main context. Uses the snapshot when it's fresh; refreshes it when it's not.
+
+**4. `find-existing-first` skill (reuse before create)**
+Fires immediately before creating any new file. Searches synonyms, checks patterns, reports findings. Only proceeds to creation if nothing suitable exists.
+
+**5. `explore` skill (think before spec)**
+Free-form investigation and discussion before writing a spec. Reads the docs and codebase, weighs options, discusses tradeoffs. No files are created during exploration.
+
+**6. Optional: Ponytail plugin (project-agnostic)**
+[Ponytail](https://github.com/DietrichGebert/ponytail) is a cross-tool plugin that applies a YAGNI ladder before writing any code. Complements the template's own skills.
+
+### Adoption workflow on an existing project
+
+```
+1. Clone the template into the project
+2. Run /skill analyze-codebase (generates docs/ baseline)
+3. Review the generated docs and commit as baseline
+4. Optional: install Ponytail plugin
+5. Start using explore + write-spec for new features
+```
+
+The `codebase-explorer` subagent and the snapshot machinery run silently after that. You don't manage them.
+
+---
+
+## Recommended ecosystem
+
+The template works standalone. It also composes well with a small set of external tools that solve orthogonal problems. None are required, but they earn their place.
+
+### Plugins for Claude Code
+
+**[Ponytail](https://github.com/DietrichGebert/ponytail)** - cross-tool plugin that applies a YAGNI ladder before writing any code. Complements `find-existing-first`. Install:
+```
+/plugin marketplace add DietrichGebert/ponytail
+/plugin install ponytail@ponytail
+```
+
+**[Superpowers](https://github.com/obra/superpowers)** - Claude-only plugin with enforced brainstorm → spec → plan → TDD flow. Ships skills like `brainstorming`, `writing-plans`, `subagent-driven-development`, `finishing-a-development-branch`. Compatible with this template's `specs/` layout. Install:
+```
+/plugin install superpowers@claude-plugins-official
+```
+
+### Cross-tool spec frameworks
+
+**[OpenSpec](https://github.com/Fission-AI/OpenSpec)** - CLI plus skills spanning 30+ AI coding tools. Ships `/opsx:explore` for pre-spec investigation and delta specs designed for brownfield. Configure to write to this template's `specs/` folder instead of `openspec/changes/`. Install:
+```
+npm install -g @fission-ai/openspec@latest
+cd your-project && openspec init
+```
+
+### Context tools
+
+**[Repomix](https://github.com/yamadashy/repomix)** - packs the entire codebase into a single file that AI agents can consume in one read. Already wired into `analyze-codebase` and `codebase-explorer`. Install:
+```
+npm install -g repomix
+# or use via npx
+```
+
+**[Context7 MCP](https://github.com/upstash/context7)** - MCP server that serves versioned, always-current library documentation. Use instead of duplicating official docs into `.claude/docs/libs/`. Point to it in your Claude Code config once, agents query it on demand.
+
+### Choosing your spec-driven tooling
+
+Three sensible setups depending on the team:
+
+| Setup | Tools | Best for |
+|---|---|---|
+| Claude-only, opinionated | Template + Superpowers + Ponytail | Solo dev or all-Claude team wanting maximum enforcement |
+| Cross-tool, flexible | Template + OpenSpec + Ponytail | Team with Cursor/Codex/Gemini alongside Claude |
+| Template alone | Just the template's own skills | Trying it out before adding anything else |
+
+All three share the same `specs/YYYY-MM-DD-<slug>/` folder layout, so switching between them mid-project doesn't invalidate existing specs.
+
+---
+
 ## Decision table: where does this instruction go?
 
 | Question | Place |
 |---|---|
-| Should every session know this? | `CLAUDE.md` root (keep short) |
-| Cross-tool guidance for any agent? | `AGENTS.md` |
+| Cross-tool guidance for any agent (stack, commands, conventions)? | `AGENTS.md` |
+| Claude-specific extras (which skills/agents/hooks ship here)? | `CLAUDE.md` (stub + Claude-only content) |
 | Shared schemas across services? | `ECOSYSTEM.md` |
-| Only applies inside a specific folder? | `src/<folder>/CLAUDE.md` (nested) |
+| Project DNA and non-negotiable principles? | `docs/CONSTITUTION.md` |
+| Style, naming, structure conventions? | `docs/CONVENTIONS.md` |
+| System architecture overview? | `docs/architecture/overview.md` |
+| Only applies inside a specific folder? | `src/<folder>/CLAUDE.md` (nested, full content) |
 | Applies when editing a file type? | `.claude/rules/*.md` with `paths:` |
-| Long reference doc, read on demand? | `.claude/docs/` |
+| Long reference doc, AI-only? | `.claude/docs/` |
+| Human-facing project docs? | `docs/` |
 | Repeatable multi-step process? | `.claude/skills/<name>/SKILL.md` |
 | Specialist with its own perspective? | `.claude/agents/<name>.md` |
 | Knowledge that grows over time? | Subagent with `memory:` field |
-| What to build for this feature? | `specs/<slug>/spec.md` |
-| How to build it, step by step? | `specs/<slug>/plan.md` |
+| What to build for this feature? | `specs/YYYY-MM-DD-<slug>/spec.md` |
+| Architecture and phases for it? | `specs/YYYY-MM-DD-<slug>/plan.md` |
+| Where did I stop? Atomic tasks? | `specs/YYYY-MM-DD-<slug>/tasks.md` |
+| Operational procedure (deploy, incident)? | `docs/runbooks/` |
+| Tutorial or onboarding guide? | `docs/guides/` |
+| "How we solved X" pattern? | `docs/patterns/<pattern>.md` |
+| Permanent architectural choice? | `docs/decisions/NNNN-*.md` |
 | External lib docs that change often? | Context7 MCP, do not duplicate here |
 | Personal preferences? | `CLAUDE.local.md` (gitignored) |
-| Permanent architectural choice? | `.claude/docs/decisions/NNNN-*.md` |
 
 ---
 
@@ -345,9 +509,12 @@ See [`src/example-module/CLAUDE.md`](./src/example-module/CLAUDE.md) for the pat
 
 Hooks are deterministic side effects on tool lifecycle events. They do not load into context.
 
-This template ships one hook:
+This template ships four hooks:
 
 - **`block-secrets.sh`** intercepts `Bash` tool calls and blocks commands that try to read `.env` files or print secret-named environment variables
+- **`protect-main.sh`** intercepts `Bash` tool calls and blocks `commit`, `push`, `merge`, `rebase`, and `reset --hard` when the current branch is protected (main, master, trunk, develop, production, release)
+- **`protect-critical.sh`** intercepts `Edit` and `Write` calls and blocks modifications to lockfiles, applied migrations, generated code, and other critical files
+- **`check-snapshot-on-session.sh`** runs at session start, checks Repomix snapshot staleness, and warns you if it's stale-major
 
 That is a good fit for hooks because it is:
 
@@ -381,19 +548,25 @@ Bad fits for hooks:
 
 ## Using this template
 
+### Quick start
+
+For a step-by-step walkthrough (both new projects and existing codebases), read [`docs/guides/initial-setup.md`](./docs/guides/initial-setup.md).
+
 ### Option 1: Use as a GitHub template
 
 1. Click "Use this template" at the top of the GitHub page
 2. Create your new repository
-3. Edit `README.md`, `CLAUDE.md`, and `AGENTS.md` to match your project
-4. Delete `specs/0000-example-feature/` once you create your first real feature
-5. Customize `.claude/docs/libs/` for the libraries you actually use
+3. Follow [`docs/guides/initial-setup.md`](./docs/guides/initial-setup.md) Path 1 (New project)
 
-### Option 2: Adopt incrementally
+### Option 2: Adopt on an existing project (brownfield)
+
+Follow [`docs/guides/initial-setup.md`](./docs/guides/initial-setup.md) Path 2. Uses the `analyze-codebase` skill to generate a documentation baseline from your existing code.
+
+### Option 3: Adopt incrementally
 
 You do not need everything at once. Three adoption levels:
 
-**Minimal:** copy `CLAUDE.md`, `AGENTS.md`, `.gitignore`, `.claudeignore`. Start there.
+**Minimal:** copy `AGENTS.md`, `CLAUDE.md` (stub), `.gitignore`, `.claudeignore`. Start there.
 
 **Practical:** add `.claude/settings.json`, `.claude/agents/code-reviewer.md`, and one or two skills. Add `specs/` when you have your first non-trivial feature.
 
@@ -411,6 +584,14 @@ The spec-driven workflow in this template is compatible with the [Superpowers pl
 Superpowers ships brainstorming, writing-plans, subagent-driven-development, TDD, and code-review skills that enforce the spec-driven flow.
 
 ---
+
+## Attributions
+
+The template includes contributions from the broader Claude Code community:
+
+- **[documenting-domains](.claude/skills/documenting-domains/SKILL.md)** skill by [douglasgomes98](https://github.com/douglasgomes98) - creates durable local domain documentation
+
+Original attribution is preserved inline in each file. When you fork this template, keep the attribution intact if you keep the file.
 
 ## License
 

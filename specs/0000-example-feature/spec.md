@@ -75,7 +75,7 @@ How will we know this feature works?
 
 ## References
 
-- ADRs in `.claude/docs/decisions/`
+- ADRs in `docs/decisions/`
 - Related specs
 - External documentation
 - Conversations or issues that informed this spec

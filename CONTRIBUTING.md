@@ -57,7 +57,7 @@ Before submitting:
 
 - [ ] All internal links work (relative paths)
 - [ ] Directory tree in `README.md` matches `find . -type d`
-- [ ] No project-specific stack assumptions (Next.js, Stripe, etc) leak into core files
+- [ ] No project-specific stack assumptions (specific frameworks or vendors) leak into core files
 - [ ] Decision table in `README.md` includes any new file types you added
 - [ ] `LEARN.md` table of contents matches its sections
 
@@ -69,6 +69,40 @@ If you add a new example (rule, skill, agent, etc), follow this pattern:
 2. Add a short paragraph in `README.md` explaining what the example shows
 3. Reference the example in `LEARN.md` if it illustrates a concept
 4. Make sure the example file ITSELF teaches: comments inline that explain why the structure is the way it is
+
+## Adding a new skill, subagent, or hook
+
+The template ships several ready-to-use skills and subagents. If you add new ones:
+
+- Skills go in `.claude/skills/<name>/SKILL.md`. Descriptions must be triggering conditions (`Use when...`), not documentation.
+- Subagents go in `.claude/agents/<name>.md`. Set `tools:` narrowly to reduce surface area.
+- Hooks go in `.claude/hooks/<name>.sh` (or another executable). Register in `.claude/settings.json`.
+- Utility scripts shared by multiple hooks or agents go in `.claude/scripts/`.
+- Update the tree diagram in `README.md` to include the new file.
+
+## Changing paths
+
+Paths appear in many places (READMEs, CLAUDE.md, AGENTS.md, skills, subagents, hooks). If you rename or move a file:
+
+1. Run `grep -rn "<old-path>" .` to find all references
+2. Update each one
+3. Update the tree diagrams in `README.md` and any relevant README
+4. Test that hooks and scripts still work in the new location
+
+## Testing shell scripts
+
+Scripts in `.claude/scripts/` and `.claude/hooks/` should be tested standalone before merging:
+
+```bash
+# Simulate the JSON stdin a hook receives
+echo '{"tool_name":"Bash","tool_input":{"command":"ls"}}' | ./.claude/hooks/block-secrets.sh
+echo "Exit: $?"
+
+# Utility scripts should be runnable directly
+./.claude/scripts/check-snapshot.sh
+```
+
+Both should be deterministic. Random flakiness means users get random behavior.
 
 ## Questions
 

@@ -1,60 +1,77 @@
 # Plan: example-feature (rename this folder)
 
 **Spec:** ./spec.md
-**Total estimate:** N hours across small tasks
+**Tasks:** ./tasks.md
+**Total estimate:** N hours
 
-> This is the plan template. A plan breaks the spec into 2-5 minute tasks following TDD.
-> Each task: failing test first (red), minimal code to pass (green), refactor if needed.
-> Commit after each task with a clear message.
+> The plan describes HOW to build the feature at a high level: architecture, tech choices, decomposition into phases, migration if applicable.
+> The atomic executable checklist lives in `tasks.md`, not here.
+> If you find yourself writing "task 1, task 2..." in this file, it belongs in `tasks.md`.
 
-## Plan conventions
+## Approach
 
-- Every task starts with a failing test
-- Minimum implementation to make the test pass
-- Refactor only if needed
-- Commit at the end of each task
+Prose description of the technical approach. Which parts of the system will be touched, in what order, and why.
 
-## Tasks
+## Architecture
 
-### Task 1: <short description>
+If the feature introduces or changes architecture, describe:
 
-**Path:** `src/<area>/<file>.ts`
-**Estimate:** 15min
+- New components or modules
+- New data flows
+- New dependencies or integrations
+- Impact on existing modules
 
-1. Write the failing test in `src/<area>/<file>.test.ts`:
-   ```ts
-   import { describe, it, expect } from 'vitest';
-   import { yourFunction } from './your-file';
+Reference `docs/architecture/overview.md` if the overall system diagram changes.
 
-   describe('yourFunction', () => {
-     it('handles the basic case', () => {
-       expect(yourFunction(input)).toEqual(expected);
-     });
-   });
-   ```
-2. Verify it fails: `pnpm test your-file`
-3. Implement the minimum in `src/<area>/<file>.ts`:
-   ```ts
-   export function yourFunction(input: Input): Output {
-     // minimal implementation
-   }
-   ```
-4. Verify it passes
-5. Refactor if needed
-6. Commit: `feat(<area>): add yourFunction`
+## Tech choices
 
-### Task 2: <short description>
+Concrete choices with reasoning:
 
-**Path:** `src/<area>/<file>.ts`
-**Estimate:** 20min
+- Library or framework selections
+- Data model changes
+- API contract additions or changes
+- Storage or caching decisions
 
-(Same red-green-refactor structure)
+If a choice contradicts a past ADR, either link the new ADR that supersedes it or justify the exception.
 
-### Task 3: ...
+## Phases
+
+Break the feature into 2-5 phases. Each phase is a coherent unit of work that could ship independently (feature-flagged or not).
+
+### Phase 1: <name>
+
+**Goal:** what this phase achieves
+**Deliverable:** what is shippable at the end
+**Blockers:** what depends on this being done
+
+### Phase 2: <name>
+
+...
+
+### Phase N: <name>
+
+...
+
+## Migration and rollout
+
+If this feature changes existing behavior or data:
+
+- Migration strategy (backfill, dual-write, feature flag)
+- Rollout plan (percentage, canary, all-at-once)
+- Rollback plan
+
+## Testing strategy
+
+High-level approach, not individual test cases (those go in `tasks.md`):
+
+- Unit tests focus
+- Integration tests scope
+- E2E tests scope (if applicable)
+- Manual QA steps (if applicable)
 
 ## Done criteria
 
-- All tasks committed and tests green
+- All tasks in `tasks.md` completed
 - `pnpm typecheck` clean
 - `pnpm lint` clean
 - Coverage at acceptable level for the touched area
@@ -62,6 +79,6 @@
 - `security-auditor` approved if applicable (no CRITICAL or HIGH issues)
 - Spec status updated to "Done"
 
-## Notes
+## Open questions
 
-Document significant decisions made during execution here. If a decision changes the spec, update the spec and note it here.
+Anything that came up during planning that needs resolution. Move to spec if it changes what we're building; keep here if it changes only how.

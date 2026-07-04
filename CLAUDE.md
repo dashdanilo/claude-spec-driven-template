@@ -1,71 +1,60 @@
-# Project name
+# Project name (Claude Code)
 
-> Replace this with your actual project name and description.
+> **Read [`AGENTS.md`](./AGENTS.md) first.** It is the source of truth for project context (tech stack, commands, structure, conventions, workflow, and non-negotiables). The content below is only what is specific to Claude Code and would not apply to other agents.
 
-One sentence about what this project does and who it is for.
+## Claude Code specific: what this project ships
 
-## Tech stack
+### Skills available
 
-Replace these with your actual stack:
+The skills in `.claude/skills/` are workflows Claude Code auto-invokes based on their descriptions:
 
-- Framework: (e.g., Next.js 15 with App Router)
-- Language: (e.g., TypeScript strict mode)
-- Styling: (e.g., Tailwind v4)
-- Database: (e.g., Postgres via Drizzle)
-- Package manager: (e.g., pnpm)
-- Testing: (e.g., Vitest)
-- External services: (e.g., Stripe, Postmark, Cloudflare R2)
+- `analyze-codebase` - one-time setup when adopting the template on an existing project
+- `refresh-snapshot` - manually regenerates the Repomix snapshot
+- `explore` - free-form investigation before writing a spec
+- `find-existing-first` - reuse before create, invoked before any new file
+- `write-spec` - persists a shaped idea as `specs/YYYY-MM-DD-<slug>/` with `spec.md` filled and `plan.md`/`tasks.md` scaffolded
+- `documenting-domains` - creates durable local domain documentation (nested CLAUDE.md files) after a feature ships (attribution: [douglasgomes98](https://github.com/douglasgomes98))
 
-## Commands
+### Subagents available
 
-```bash
-# Development
-pnpm dev
+The subagents in `.claude/agents/` run in isolated context windows:
 
-# Tests
-pnpm test
-pnpm test:watch
+- `codebase-explorer` - read-only archaeology; uses the Repomix snapshot, refreshes when stale-major
+- `spec-reviewer` - audits `spec.md` before it becomes a plan
+- `code-reviewer` - reviews implementation against spec, plan, tasks and conventions (has persistent memory)
+- `researcher` - deep-dives on libs and APIs (persistent memory across projects)
+- `security-auditor` - audits auth, secrets, input validation
 
-# Quality
-pnpm lint
-pnpm typecheck
+### Hooks registered
 
-# Build
-pnpm build
-```
+Configured in `.claude/settings.json`:
 
-## Structure
+- `PreToolUse` on Bash: `block-secrets.sh` blocks commands that would read `.env` or print secret-named env vars
+- `PreToolUse` on Bash: `protect-main.sh` blocks commits, pushes, merges on protected branches (main, master, etc)
+- `PreToolUse` on Edit/Write: `protect-critical.sh` blocks modifications to lockfiles, applied migrations, generated code, and other critical files
+- `SessionStart`: `check-snapshot-on-session.sh` warns if the Repomix snapshot is stale-major
 
-- `src/app/` routes (App Router)
-- `src/lib/` server-side logic; each major folder has its own CLAUDE.md
-- `src/components/` shared UI
-- `specs/` feature specs and plans (source of truth)
-- `.claude/docs/` consultative knowledge (libs, decisions, architecture)
+### Rules with path scope
 
-## Conventions
+The files in `.claude/rules/` auto-load based on their `paths:` glob. Two ship with the template:
 
-- Named exports, never default
-- Functional components, no classes
-- Zod (or equivalent) on all external input
-- Structured JSON logs, never raw `console.log` strings
-- API keys always server-side
+- `git-workflow.md` (matches `**`, always loaded) - branch naming, Conventional Commits, PR conventions
+- `example-rule.md` - template rule showing the pattern for path-scoped conventions
 
-## Where to look
+See `.claude/rules/example-rule.md` for the anatomy.
 
-| Need | Place |
-|---|---|
-| Spec for active feature | `specs/<latest>/spec.md` |
-| File-type conventions | `.claude/rules/` |
-| External lib reference | `.claude/docs/libs/<name>.md` |
-| Architecture overview | `.claude/docs/architecture.md` |
-| Past decisions and why | `.claude/docs/decisions/` |
-| Shared schemas | `ECOSYSTEM.md` |
+### AI-only knowledge
 
-## Non-negotiables
+Documentation consulted only by agents (not humans) lives in `.claude/docs/`:
 
-- Source of truth is always `specs/<feature>/spec.md`. When code diverges, stop and ask.
-- Before implementing a new feature: brainstorm, then spec, then plan, then code.
-- See `.claude/docs/superpowers.md` for the full spec-driven flow.
+- `superpowers.md` - how the spec-driven flow integrates with the Superpowers plugin
+- `libs/` - how this project uses each external library (endpoints, gotchas, project-specific patterns)
+
+For human-facing docs (architecture, ADRs, runbooks, guides, patterns), see `docs/`.
+
+## Nested CLAUDE.md files
+
+Some folders under `src/` have their own `CLAUDE.md` with conventions specific to that folder. They auto-load only when Claude works inside that folder. See `src/example-module/CLAUDE.md` for the pattern.
 
 ## Personal preferences
 

@@ -1,0 +1,66 @@
+# Constitution
+
+> Rename this file to `CONSTITUTION.md` and fill in.
+> The `analyze-codebase` skill can generate a first draft when adopting the template on an existing project.
+
+The DNA of this project. What it is, what it is not, and the non-negotiable principles that shape decisions.
+
+Keep this file dense and stable. It should rarely change. When it does, that's a signal something fundamental shifted.
+
+## What this project is
+
+One paragraph describing the project's purpose, users, and value.
+
+## What this project is NOT
+
+Explicit boundaries. Things this project should never become or try to be. Reject scope creep before it starts.
+
+## Non-negotiable principles
+
+Principles that override convenience. Examples:
+
+- Every external input is validated
+- User data is never logged in clear
+- Migrations are always reversible
+- Deployments are atomic
+
+Keep this to 3-7 items. If you have more, some are conventions (belong in `CONVENTIONS.md`) rather than principles.
+
+## Domain vocabulary
+
+Terms specific to this project and their exact meaning. Fights ambiguity early.
+
+- **Term A**: definition
+- **Term B**: definition
+
+## Tech stack (summary)
+
+Full details in `CLAUDE.md` and `AGENTS.md`. Here, just the shape:
+
+- Frontend: ...
+- Backend: ...
+- Data store: ...
+- External integrations: ...
+
+## Constraints and non-goals
+
+Hard limits that shape design:
+
+- Budget: ...
+- Performance targets: ...
+- Compliance: ...
+- Explicit non-goals: ...
+
+## Where the sources of truth live
+
+- Specs: `specs/`
+- Architecture decisions: `docs/decisions/`
+- Runbooks: `docs/runbooks/`
+- External lib usage: `.claude/docs/libs/`
+- Shared schemas: `ECOSYSTEM.md`
+
+## Change log
+
+Updates to this file are rare. When they happen, note them:
+
+- YYYY-MM-DD — <what changed and why>
