@@ -42,10 +42,13 @@ Kept separate:
 3. spec-reviewer subagent      ← audits spec.md
 4. You fill plan.md            ← architecture, tech choices, phases
 5. You (or writing-plans) fill tasks.md   ← atomic TDD checkboxes
-6. Execute task by task        ← check boxes, add inline Notes when useful
-7. code-reviewer subagent      ← reviews each task, suggests tasks.md updates
-8. Ship                        ← spec status → Done
+6. /skill spec-worktree        ← (optional) isolate the feature in its own worktree
+7. Execute task by task        ← check boxes, add inline Notes when useful
+8. code-reviewer subagent      ← reviews each task, suggests tasks.md updates
+9. Ship                        ← spec status → Done
 ```
+
+Step 6 is optional but recommended when working several features in parallel: one worktree **per feature** (a flat sibling `../<repo>.<slug>` on branch `<type>/<slug>` from `main`), shared across all of that feature's plans. See the "Worktrees" section in `.claude/rules/git-workflow.md`.
 
 ## The example folder
 

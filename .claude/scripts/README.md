@@ -5,6 +5,7 @@ Utility scripts used by hooks, skills, and subagents. Not directly invoked by th
 ## Contents
 
 - **`check-snapshot.sh`** - Compares the current git HEAD against the Repomix snapshot metadata and classifies staleness. Returns JSON. Called by the `SessionStart` hook and by the `codebase-explorer` subagent.
+- **`spec-worktree.sh`** - Creates and manages one git worktree per feature (`../<repo>.<slug>`, branch from `main`), provisioning gitignored local files (symlinks config, copy-seeds the snapshot). Supports `--list`, `--remove <slug>`, `--prune`. Prints the worktree path on stdout; human messages on stderr. Used by the `spec-worktree` skill and runnable directly.
 
 ## Conventions
 

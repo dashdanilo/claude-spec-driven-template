@@ -36,6 +36,35 @@ Bad examples (avoid):
 - `feature-dark-mode` - uses hyphen instead of slash
 - `feature/2026-06-21-dark-mode` - date belongs in the spec folder, not the branch name
 
+## Worktrees
+
+Optional but recommended for parallel work: each feature branch lives in its own git worktree so you can work several features at once without switching branches in the main checkout.
+
+**One worktree per feature, not per plan.** A feature may span multiple specs/plans; they all share the one worktree and commit to the one branch.
+
+Convention:
+
+- Path: `../<repo>.<slug>` - a flat sibling directory (dot separator, no nesting), so git never sees it and it can't be committed by accident
+- Branch: `<type>/<slug>`, always created fresh from `main`
+- Not removed on merge - clean up deliberately later
+
+Use the helper (it also provisions gitignored local files - symlinks `CLAUDE.local.md` / `.claude/settings.local.json` / `.claude/context/config.json`, and copy-seeds the Repomix snapshot):
+
+```bash
+.claude/scripts/spec-worktree.sh <slug>            # create + branch from main
+.claude/scripts/spec-worktree.sh --list            # list worktrees
+.claude/scripts/spec-worktree.sh --remove <slug>   # remove one (keeps the branch)
+.claude/scripts/spec-worktree.sh --prune           # remove worktrees whose branch is merged
+```
+
+After creating, open the worktree as its own editor window and launch your agent from inside it:
+
+```bash
+cd "../<repo>.<slug>" && claude
+```
+
+Agents: the `spec-worktree` skill wraps this with the when/how. See also `.claude/scripts/README.md`.
+
 ## Commits
 
 **Format: Conventional Commits.**
