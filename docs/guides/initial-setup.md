@@ -4,7 +4,7 @@ Step-by-step walkthrough for using the template on a new or existing project. Re
 
 ## Prerequisites
 
-- Node.js 18+ (for Repomix and any npm-based tooling)
+- Node.js 20+ (Repomix v1.16+ requires Node 20; older Node produces an empty snapshot)
 - Git (any recent version)
 - At least one AI coding agent installed. Claude Code recommended, but the template works with Codex, Cursor, Copilot, and Gemini too.
 

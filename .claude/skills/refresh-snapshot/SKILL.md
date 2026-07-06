@@ -21,7 +21,13 @@ If you find yourself invoking this often, that's a signal the staleness threshol
 
 ```bash
 if ! command -v npx > /dev/null 2>&1; then
-  echo "npx not found. Install Node.js first."
+  echo "npx not found. Install Node.js 20+ first."
+  exit 1
+fi
+# Repomix v1.16+ requires Node 20. Node 18 passes the npx check but produces an empty snapshot.
+node_major=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null)
+if [ "${node_major:-0}" -lt 20 ]; then
+  echo "Node ${node_major} detected. Repomix needs Node 20+ (older Node yields an empty snapshot)."
   exit 1
 fi
 ```
