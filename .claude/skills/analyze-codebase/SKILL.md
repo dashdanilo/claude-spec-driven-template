@@ -63,6 +63,15 @@ For each, read the file and extract:
 
 Only if the file count from step 2 is ≥ 100 (threshold configurable in `.claude/context/config.json`).
 
+Repomix v1.16+ requires Node 20+. On Node 18 the command runs but yields an empty snapshot, so verify the version first:
+
+```bash
+node_major=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null)
+if [ "${node_major:-0}" -lt 20 ]; then
+  echo "Node ${node_major} detected. Repomix needs Node 20+; skipping snapshot until Node is upgraded."
+fi
+```
+
 Run: `npx repomix --output .claude/context/repomix-snapshot.md.tmp`
 
 Then prepend the metadata header:
