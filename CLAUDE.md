@@ -13,6 +13,7 @@ The skills in `.claude/skills/` are workflows Claude Code auto-invokes based on 
 - `explore` - free-form investigation before writing a spec
 - `find-existing-first` - reuse before create, invoked before any new file
 - `write-spec` - persists a shaped idea as `specs/YYYY-MM-DD-<slug>/` with `spec.md` filled and `plan.md`/`tasks.md` scaffolded
+- `spec-worktree` - one git worktree per feature (`../<repo>.<slug>`, branch from `main`); wraps `.claude/scripts/spec-worktree.sh`
 - `documenting-domains` - creates durable local domain documentation (nested CLAUDE.md files) after a feature ships (attribution: [douglasgomes98](https://github.com/douglasgomes98))
 
 ### Subagents available
