@@ -12,9 +12,11 @@ Never commit directly to `main` or `master`. Create a feature branch first.
 
 Format: `<type>/<short-slug>` in kebab-case.
 
+The `<type>` mirrors the Conventional Commits / commitlint types (see the Commits section), so a branch and its commits share the same vocabulary.
+
 Valid types:
 
-- `feature/` - new functionality
+- `feat/` - new functionality
 - `fix/` - bug fix
 - `hotfix/` - urgent production fix
 - `refactor/` - change that doesn't alter behavior
@@ -24,7 +26,7 @@ Valid types:
 
 Good examples:
 
-- `feature/dark-mode`
+- `feat/dark-mode`
 - `fix/lead-form-validation`
 - `refactor/extract-auth-lib`
 - `chore/upgrade-nextjs-15`
@@ -33,8 +35,8 @@ Bad examples (avoid):
 
 - `dev`, `working`, `temp` - not descriptive
 - `<username>/dark-mode` - personal prefix doesn't scale in a team
-- `feature-dark-mode` - uses hyphen instead of slash
-- `feature/2026-06-21-dark-mode` - date belongs in the spec folder, not the branch name
+- `feat-dark-mode` - uses hyphen instead of slash
+- `feat/2026-06-21-dark-mode` - date belongs in the spec folder, not the branch name
 
 ## Worktrees
 

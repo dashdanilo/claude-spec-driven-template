@@ -33,9 +33,10 @@
 
 set -euo pipefail
 
-DEFAULT_TYPE="feature"
-# Types accepted for the branch prefix (mirrors .claude/rules/git-workflow.md)
-VALID_TYPES="feature fix hotfix refactor docs chore test"
+DEFAULT_TYPE="feat"
+# Types accepted for the branch prefix. Mirrors the Conventional Commits /
+# commitlint types documented in .claude/rules/git-workflow.md.
+VALID_TYPES="feat fix hotfix refactor docs chore test"
 
 log()  { echo "$@" >&2; }
 die()  { echo "error: $*" >&2; exit "${2:-2}"; }

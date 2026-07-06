@@ -25,7 +25,7 @@ Do NOT create a worktree per `plan.md`. If a feature has multiple plans, they al
 ```
 
 - `<slug>` is the feature slug in kebab-case (same slug family as the spec folder, without the date prefix).
-- `--type` defaults to `feature`. Valid: `feature fix hotfix refactor docs chore test` (mirrors `.claude/rules/git-workflow.md`).
+- `--type` defaults to `feat`. Valid: `feat fix hotfix refactor docs chore test` (the Conventional Commits / commitlint types; see `.claude/rules/git-workflow.md`).
 - The branch is always created **from the latest `main`** (the script fetches first).
 - The script provisions gitignored local files into the new worktree: it **symlinks** `CLAUDE.local.md`, `.claude/settings.local.json`, `.claude/context/config.json` (single source of truth), and **copy-seeds** `.claude/context/repomix-snapshot.md` (regenerable per-branch cache).
 
