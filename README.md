@@ -292,7 +292,7 @@ Subagents are specialists with isolated context windows. When invoked, they expl
 
 Four templates included:
 
-- **`spec-reviewer.md`** audits a spec before it becomes a plan
+- **`spec-reviewer.md`** audits every spec before it becomes a plan (mandatory; `write-spec` runs it automatically)
 - **`code-reviewer.md`** reviews implementation against the plan
 - **`researcher.md`** investigates libraries and accumulates a persistent `MEMORY.md`
 - **`security-auditor.md`** audits auth, secrets, and input validation
