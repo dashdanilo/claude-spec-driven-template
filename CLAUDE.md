@@ -21,7 +21,7 @@ The skills in `.claude/skills/` are workflows Claude Code auto-invokes based on 
 The subagents in `.claude/agents/` run in isolated context windows:
 
 - `codebase-explorer` - read-only archaeology; uses the Repomix snapshot, refreshes when stale-major
-- `spec-reviewer` - audits `spec.md` before it becomes a plan
+- `spec-reviewer` - mandatory audit of `spec.md` before it becomes a plan (`write-spec` runs it automatically)
 - `code-reviewer` - reviews implementation against spec, plan, tasks and conventions (has persistent memory)
 - `researcher` - deep-dives on libs and APIs (persistent memory across projects)
 - `security-auditor` - audits auth, secrets, input validation

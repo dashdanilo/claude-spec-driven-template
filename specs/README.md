@@ -39,7 +39,7 @@ Kept separate:
 ```
 1. /skill explore             ← discuss, no files yet
 2. /skill write-spec           ← creates spec.md (filled) + plan.md + tasks.md (scaffolds)
-3. spec-reviewer subagent      ← audits spec.md
+3. spec-reviewer subagent      ← audits spec.md (mandatory — write-spec auto-runs it)
 4. You fill plan.md            ← architecture, tech choices, phases
 5. You (or writing-plans) fill tasks.md   ← atomic TDD checkboxes
 6. /skill spec-worktree        ← (optional) isolate the feature in its own worktree
