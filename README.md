@@ -212,7 +212,7 @@ claude-spec-driven-template/
 │
 ├─ specs/                                  # Spec-driven development
 │  ├─ README.md                            # Explains the three-file pattern
-│  └─ 0000-example-feature/                # One folder per feature (any spec tool uses this)
+│  └─ YYYY-MM-DD-<slug>/                   # One folder per feature (created by write-spec)
 │     ├─ spec.md                           # WHAT + WHY (source of truth)
 │     ├─ plan.md                           # HOW at high level (architecture, phases)
 │     └─ tasks.md                          # HOW at execution level (atomic TDD checkboxes)
@@ -371,7 +371,7 @@ flowchart TD
 
 When code and spec diverge, the spec wins. Code gets fixed.
 
-The example folder [`0000-example-feature/`](./specs/0000-example-feature/) shows the format.
+The `write-spec` skill ships the `spec.md` / `plan.md` / `tasks.md` templates in [`.claude/skills/write-spec/references/`](./.claude/skills/write-spec/references/) and copies them into `specs/YYYY-MM-DD-<slug>/` for you.
 
 ---
 

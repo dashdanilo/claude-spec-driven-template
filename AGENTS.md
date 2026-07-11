@@ -55,7 +55,7 @@ find .claude/agents -name "*.md" | sort
 - `.claude/` Claude Code configuration (skills, agents, hooks, rules, docs, scripts, context)
 - `.github/` GitHub-facing files (issue templates, PR template, Copilot instructions)
 - `docs/` human-facing project documentation
-- `specs/` example spec-driven artifacts (with `0000-example-feature/` as reference)
+- `specs/` spec-driven artifacts (one folder per feature; the `spec.md`/`plan.md`/`tasks.md` templates ship with the `write-spec` skill)
 - `src/example-module/` shows the nested CLAUDE.md pattern
 - Root: cross-tool config (`AGENTS.md`, `CLAUDE.md`, `ECOSYSTEM.md`) and standard docs (`README.md`, `LEARN.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `LICENSE`)
 
