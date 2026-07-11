@@ -52,7 +52,6 @@ Replace the project name and description. Keep the structural sections (they exp
 
 Once you understand the patterns:
 
-- Delete `specs/0000-example-feature/` (create your first real feature spec instead)
 - Delete or replace `src/example-module/CLAUDE.md`
 - Rename `.claude/skills/example-skill/` to your first real skill (or delete)
 - Rename `.claude/rules/example-rule.md` to your first real rule (or delete)

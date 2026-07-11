@@ -50,11 +50,9 @@ Kept separate:
 
 Step 6 is optional but recommended when working several features in parallel: one worktree **per feature** (a flat sibling `../<repo>.<slug>` on branch `<type>/<slug>` from `main`), shared across all of that feature's plans. See the "Worktrees" section in `.claude/rules/git-workflow.md`.
 
-## The example folder
+## The templates
 
-`0000-example-feature/` ships as a reference. Copy the three files, rename the folder to `YYYY-MM-DD-<slug>`, and fill in your feature.
-
-Delete `0000-example-feature/` once you have your first real feature and understand the pattern.
+The `spec.md`, `plan.md`, and `tasks.md` templates are the single source of truth, shipped inside the `write-spec` skill at `.claude/skills/write-spec/references/`. Running `write-spec` copies them into `specs/YYYY-MM-DD-<slug>/` and fills the headers. You can also copy them by hand and rename.
 
 ## Interop
 

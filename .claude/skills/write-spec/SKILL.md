@@ -46,7 +46,13 @@ mkdir -p "$folder"
 
 ### 4. Write spec.md
 
-Use the template at `specs/0000-example-feature/spec.md` as a starting point. Fill in what you know from the exploration. Leave `TODO` markers for anything the exploration did not settle.
+Start from the template shipped with this skill. Copy it, then fill it in:
+
+```bash
+cp .claude/skills/write-spec/references/spec-template.md "$folder/spec.md"
+```
+
+Fill in what you know from the exploration. Leave `TODO` markers for anything the exploration did not settle.
 
 Required sections:
 
@@ -80,8 +86,8 @@ At the top of `spec.md`, add pointers so future readers (and other agents) know 
 The spec is only the first of three artifacts. Create empty scaffolds for the others so the folder structure is complete and later steps know where to write:
 
 ```bash
-cp specs/0000-example-feature/plan.md "$folder/plan.md"
-cp specs/0000-example-feature/tasks.md "$folder/tasks.md"
+cp .claude/skills/write-spec/references/plan-template.md "$folder/plan.md"
+cp .claude/skills/write-spec/references/tasks-template.md "$folder/tasks.md"
 ```
 
 Then update the headers in the copied files:
