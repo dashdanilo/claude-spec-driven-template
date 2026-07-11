@@ -109,7 +109,18 @@ This feature touches multiple areas. When implementing:
 - The Repomix snapshot at `.claude/context/repomix-snapshot.md` should be current
 ```
 
-### 8. Report
+### 8. Run the spec-reviewer (mandatory — do NOT ask permission)
+
+The spec is not "done" until it has been audited. This is a **standard, non-optional step of the flow** — as soon as you finish writing (or substantially revising) `spec.md`, **invoke the `spec-reviewer` subagent automatically, without asking the user whether to run it.** The flow already prescribes it; asking permission is noise.
+
+Give the reviewer the path to the new `spec.md` and ask it to verify claims against the actual codebase, flag ambiguities / scope creep / factual errors, and return a verdict (ready for plan vs. needs changes).
+
+- If the verdict is **needs changes**: resolve the blocking findings (revise `spec.md`), then **run the `spec-reviewer` again**. Repeat until it returns ready-to-plan — or the only remaining items are explicit, documented decisions the author has signed off on.
+- Only after a passing review is the spec ready to move to `plan.md`.
+
+This applies every time a spec is created or materially changed, in this repo and anywhere else the template is used.
+
+### 9. Report
 
 ```
 ## write-spec complete
@@ -119,12 +130,14 @@ This feature touches multiple areas. When implementing:
 - specs/YYYY-MM-DD-<slug>/plan.md (scaffold, to be filled after spec approval)
 - specs/YYYY-MM-DD-<slug>/tasks.md (scaffold, to be filled after plan is written)
 
+### Review
+- spec-reviewer verdict: <ready for plan | needs changes → what was fixed / re-run>
+
 ### Status
-- spec: Draft, needs review before writing the plan
+- spec: Draft (reviewed), ready for plan — or "needs changes" if the review is still open
 
 ### Next steps
-- Review the spec (invoke `spec-reviewer` subagent if you want a formal audit)
-- When approved, fill in plan.md (architecture, phases, tech choices)
+- When the review passes, fill in plan.md (architecture, phases, tech choices)
 - Then break the plan into atomic tasks in tasks.md (2-5min each, TDD)
 - Change spec status to "Approved" before moving on
 ```
@@ -136,6 +149,7 @@ This feature touches multiple areas. When implementing:
 - Do not write plan.md or tasks.md contents at the same time as spec.md. Create scaffolds, fill them later (after review).
 - Do not merge plan.md and tasks.md into one file. They serve different purposes and update at different rates.
 - Do not invent facts. If exploration did not settle something, mark it TODO explicitly.
+- Do not treat the `spec-reviewer` as optional, and do not ask the user for permission to run it. Running it after writing/revising the spec is a required step of the flow (see step 8).
 
 ## Interop with other tools
 
