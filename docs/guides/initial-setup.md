@@ -84,53 +84,30 @@ Then fill in `plan.md` (architecture, tech, phases) and `tasks.md` (atomic TDD c
 
 You already have code and want to adopt this template.
 
-### 1. Copy the template into your repo
+### 1. Install the scaffolding
 
-Manually copy the files, or:
+Use the installer. Run it from inside your repo (it pulls the template fresh):
 
 ```bash
-# In a separate directory, clone the template
-git clone https://github.com/dashdanilo/claude-spec-driven-template /tmp/template
-
-# Copy the AI-relevant parts into your existing repo
 cd /path/to/your-project
-cp -r /tmp/template/.claude .
-cp -r /tmp/template/docs .
-cp -r /tmp/template/specs .
-cp /tmp/template/AGENTS.md .
-cp /tmp/template/CLAUDE.md .
-cp /tmp/template/CLAUDE.local.md.example .
-cp /tmp/template/ECOSYSTEM.md .
-mkdir -p .github/ISSUE_TEMPLATE
-cp -r /tmp/template/.github/* .github/
-cp /tmp/template/.claudeignore .
-cp /tmp/template/CHANGELOG.md .
+curl -fsSL https://raw.githubusercontent.com/dashdanilo/claude-spec-driven-template/main/install.sh | bash
 ```
 
-Do NOT overwrite your existing `README.md` or `.gitignore`. Merge them manually.
+Or, from a local template clone, target your repo:
 
-### 2. Update your `.gitignore`
-
-Add these entries:
-
-```
-# Personal Claude Code files
-CLAUDE.local.md
-.claude/settings.local.json
-.claude/agent-memory/
-
-# Generated context
-.claude/context/repomix-snapshot.md
-.claude/context/last-analyze.log
-.claude/context/config.json
-
-# Claude Code session state
-.claude/projects/
-.claude/shell-snapshots/
-.claude/backups/
+```bash
+./install.sh --to /path/to/your-project
 ```
 
-### 3. Run `analyze-codebase` for the baseline
+The installer copies the agent scaffolding (`.claude/`, `docs/`, `specs/`, `AGENTS.md`, `CLAUDE.md`, `ECOSYSTEM.md`, `.claudeignore`, `.github/`, `CLAUDE.local.md.example`), and:
+
+- **Never overwrites** files that already exist in your repo - it skips and warns (use `--force` to override). Your `README.md`, `.gitignore`, and any existing `docs/` files are safe.
+- **Merges** the required entries into your `.gitignore` (appends what is missing).
+- Copies only git-tracked template files (no local/generated cruft) and makes the hooks executable.
+
+Preview without writing anything using `--dry-run`.
+
+### 2. Run `analyze-codebase` for the baseline
 
 This is the critical step for brownfield. Open Claude Code and run:
 
@@ -146,7 +123,7 @@ The skill will:
 - If your project has 100+ files in `src/`, generate a Repomix snapshot at `.claude/context/repomix-snapshot.md`
 - Update `AGENTS.md` and `CLAUDE.md` with the detected stack
 
-### 4. Review generated docs
+### 3. Review generated docs
 
 Look for `TODO` markers in the generated files. Those are where the analysis was uncertain. Fill them in with your knowledge.
 
@@ -156,20 +133,20 @@ Also review:
 - The conventions in `docs/CONVENTIONS.md` (are these really your team's conventions?)
 - The architecture overview in `docs/architecture/overview.md` (does the diagram reflect reality?)
 
-### 5. Commit the baseline
+### 4. Commit the baseline
 
 ```bash
 git add .
 git commit -m "chore: adopt claude-spec-driven-template with generated baseline"
 ```
 
-### 6. Optional: install recommended plugins
+### 5. Optional: install recommended plugins
 
 - [Ponytail](https://github.com/DietrichGebert/ponytail) for cross-tool YAGNI enforcement
 - [Superpowers](https://github.com/obra/superpowers) for enforced spec-driven flow (Claude-only)
 - [OpenSpec](https://github.com/Fission-AI/OpenSpec) for cross-tool spec workflow
 
-### 7. First feature using the template
+### 6. First feature using the template
 
 ```
 /skill explore                    # discuss what to build
