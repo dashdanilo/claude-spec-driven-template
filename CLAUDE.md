@@ -37,9 +37,10 @@ Configured in `.claude/settings.json`:
 
 ### Rules with path scope
 
-The files in `.claude/rules/` auto-load based on their `paths:` glob. Two ship with the template:
+The files in `.claude/rules/` auto-load based on their `paths:` glob. Three ship with the template:
 
 - `git-workflow.md` (matches `**`, always loaded) - branch naming, Conventional Commits, PR conventions
+- `code-quality.md` (matches `**`, always loaded) - language-agnostic naming, structure, error handling, and import conventions
 - `example-rule.md` - template rule showing the pattern for path-scoped conventions
 
 See `.claude/rules/example-rule.md` for the anatomy.
