@@ -354,7 +354,7 @@ flowchart TD
     J --> K["Red: failing test"]
     K --> L["Green: minimal code"]
     L --> M["Refactor if needed"]
-    M --> N["code-reviewer subagent<br/>gates between tasks"]
+    M --> N["code-reviewer subagent<br/>auto-gates each phase"]
     N --> O{"Approved?"}
     O -->|"Needs changes"| J
     O -->|"Yes, check box in tasks.md"| P{"More tasks?"}

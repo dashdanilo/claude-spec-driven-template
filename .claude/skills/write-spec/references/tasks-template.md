@@ -16,6 +16,10 @@
 - Use inline `Notes:` under a task to capture blockers, decisions, or discoveries during that task
 - If a task grows too big, split it in place (add sub-tasks)
 
+## Phase gate (automatic)
+
+At the end of each phase - not each task - the `code-reviewer` subagent runs **automatically, without asking permission**, reviews the phase against spec/plan/tasks/conventions, and reports a verdict. A phase does not advance until the review is `APPROVED` (or its `NEEDS_CHANGES` items are resolved and it re-runs). It is a standard gate, like CI - it reports, it does not ask.
+
 ## Tasks
 
 ### Phase 1: <name from plan.md>

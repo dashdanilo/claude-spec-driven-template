@@ -338,7 +338,7 @@ If you collapse them into one file, you lose the ability to answer "where did I 
        ↓
 6. Execute task by task (subagent-driven or manual)
        ↓
-7. code-reviewer subagent gates between tasks
+7. code-reviewer subagent auto-gates each phase
        ↓
 8. Merge when all boxes are checked
 ```
@@ -653,7 +653,7 @@ The fix: `.claude/docs/libs/` should only contain the project-specific subset an
 
 The symptom: code drifts from spec, nobody notices until QA.
 
-The fix: when code and spec diverge, stop and ask which is right. Use the `code-reviewer` subagent between tasks to catch drift early.
+The fix: when code and spec diverge, stop and ask which is right. The `code-reviewer` subagent auto-runs at each phase boundary to catch drift early.
 
 ### 6. Subagent memory becomes outdated
 
