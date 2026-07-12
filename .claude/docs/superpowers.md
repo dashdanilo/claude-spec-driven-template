@@ -64,7 +64,7 @@ The `subagent-driven-development` skill dispatches a subagent **per task**, with
 
 ### 5. Code review as gate
 
-Between each task, the `code-reviewer` subagent (in `.claude/agents/`) reviews against:
+At each phase boundary, the `code-reviewer` subagent (in `.claude/agents/`) runs automatically (no permission prompt) and reviews against:
 
 - Spec
 - Plan
@@ -80,7 +80,7 @@ The `finishing-a-development-branch` skill verifies everything passes, then pres
 
 - **`specs/`** follows the three-file format (spec.md + plan.md + tasks.md per feature)
 - **`.claude/agents/spec-reviewer.md`** complements brainstorming: audits the spec before it becomes a plan
-- **`.claude/agents/code-reviewer.md`** acts as the gate between tasks
+- **`.claude/agents/code-reviewer.md`** acts as the automatic gate between phases
 - **`src/<folder>/CLAUDE.md`** nested files provide conventions the code-reviewer uses
 
 ## When NOT to use the full flow

@@ -44,7 +44,7 @@ Kept separate:
 5. You (or writing-plans) fill tasks.md   ← atomic TDD checkboxes
 6. /skill spec-worktree        ← (optional) isolate the feature in its own worktree
 7. Execute task by task        ← check boxes, add inline Notes when useful
-8. code-reviewer subagent      ← reviews each task, suggests tasks.md updates
+8. code-reviewer subagent      ← auto-gates each phase (no permission), reports a verdict
 9. Ship                        ← spec status → Done
 ```
 
