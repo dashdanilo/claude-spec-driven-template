@@ -19,9 +19,8 @@ The skills in `.claude/skills/` are workflows Claude Code auto-invokes based on 
 - `the-fool` - stress-tests a spec/plan/decision before committing (devil's advocacy, pre-mortem, red-team) (CC-BY-4.0, adapted from [tech-leads-club/agent-skills](https://github.com/tech-leads-club/agent-skills))
 - `documenting-domains` - creates durable local domain documentation (nested CLAUDE.md files) after a feature ships (attribution: [douglasgomes98](https://github.com/douglasgomes98))
 - `skill-best-practices` - authoring standards for skills (frontmatter, progressive disclosure, descriptions)
-- `feature-sliced-design` - Feature-Sliced Design architecture knowledge for React SPAs (frontend-oriented)
-- `react-best-practices` - React component design patterns for TypeScript SPAs (frontend-oriented)
-- `storybook-stories` - Storybook CSF3 component documentation (frontend-oriented)
+
+> Stack-specific skills (e.g. React SPA conventions) are **not** part of the baseline — they come from a stack plugin in the [njord marketplace](https://github.com/njord-app/marketplace), installed per project (`/plugin install frontend-react@njord`).
 
 ### Subagents available
 
