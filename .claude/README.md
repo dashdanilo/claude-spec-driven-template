@@ -23,10 +23,11 @@ Also: `scripts/` (shell helpers, e.g. `spec-worktree.sh`, `check-index.sh`), `co
 - **Portable (adapt to any repo):** `reviewer`, `tester`, `code-reviewer`, `codebase-explorer`, `spec-reviewer`, `researcher`, `security-auditor` — they read `AGENTS.md` + `.claude/rules/` and run the repo's own verification.
 - **Stack specialists:** none in the baseline — they arrive via stack plugins (e.g. `backend` / `database` / `graphql` for a NestJS/Prisma stack).
 
-## Two principles
+## Three principles
 
 1. **One home per topic.** A fact lives in exactly one skill/rule; others cross-link, never copy.
 2. **Rule vs skill.** A **rule** states *what* (one line, path-scoped, always in context for that path). A **skill** shows *how + why + example* (loads by task). Project-specific conventions are rules; the richer teaching is skills.
+3. **One owner per document.** When `/orchestrate` runs specialists in parallel, each writes only its own outputs — `tasks.md` belongs to the orchestrator (it checks the boxes), `spec.md`/`plan.md` to the author, and a specialist never edits another wave's files. ADRs are append-only (`.claude/rules/adr.md`). This is what keeps parallel agents from clobbering each other.
 
 ## Where things point
 

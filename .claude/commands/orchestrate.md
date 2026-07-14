@@ -31,6 +31,8 @@ For each task, in the approved order:
 5. **Check the box** for that task in `tasks.md` (Edit). Add a short inline `Note:` if useful.
 6. Next task.
 
+**Document ownership** (so parallel specialists don't clobber): a specialist edits only its own task's files; `tasks.md` is **yours** to check off, not theirs; ADRs are append-only (`.claude/rules/adr.md`). See the three principles in `.claude/README.md`.
+
 ## Step 4 — Finish
 
 When every box is checked: dispatch `reviewer` to review the whole branch, run the gate once more, and open a **PR to the repo's integration branch** (`main` / `develop`). **Never merge** (`protect-main` blocks it). Report the PR link.
