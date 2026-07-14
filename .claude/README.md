@@ -16,7 +16,7 @@ Also: `scripts/` (shell helpers, e.g. `spec-worktree.sh`, `check-index.sh`), `co
 ## Skills: two kinds
 
 - **Workflow skills (portable / stack-agnostic):** the spec-driven flow (`explore`, `write-spec`, `spec-worktree`, `find-existing-first`, `documenting-domains`, `refresh-snapshot`), plus `verify-before-done` (the anti-error gate), `skill-architect`, and `the-fool`. They discover the stack from `AGENTS.md` / tooling, so they fit any repo.
-- **Topic skills (stack-assumed):** knowledge tied to a framework. This template ships frontend-oriented ones (`feature-sliced-design`, `react-best-practices`, `storybook-stories`). In the marketplace model, most topic skills arrive from **stack plugins** rather than the baseline.
+- **Topic skills (stack-assumed):** knowledge tied to a framework. The baseline ships **none** — they arrive from **stack plugins** in the [njord marketplace](https://github.com/njord-app/marketplace) (e.g. `frontend-react`, `backend-nest`), installed per project.
 
 ## Agents: two kinds
 
