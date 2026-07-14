@@ -35,6 +35,12 @@ The subagents in `.claude/agents/` run in isolated context windows:
 - `researcher` - deep-dives on libs and APIs (persistent memory across projects)
 - `security-auditor` - audits auth, secrets, input validation
 
+### Commands available
+
+Slash commands in `.claude/commands/` are drivers that orchestrate a multi-step flow in the main thread:
+
+- `orchestrate` - drives a spec's `tasks.md` to completion: plans waves, gets approval, dispatches specialists, gates each task with `verify-before-done`, runs `tester`/`code-reviewer`, opens a PR; halts for a human on anything ambiguous. Portable (stack specialists come from a plugin). See `docs/workflows/feature-pipeline.md`.
+
 ### Hooks registered
 
 Configured in `.claude/settings.json`:
