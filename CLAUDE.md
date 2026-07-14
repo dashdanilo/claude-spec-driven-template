@@ -39,6 +39,9 @@ The subagents in `.claude/agents/` run in isolated context windows:
 Slash commands in `.claude/commands/` are drivers that orchestrate a multi-step flow in the main thread:
 
 - `orchestrate` - drives a spec's `tasks.md` to completion: plans waves, gets approval, dispatches specialists, gates each task with `verify-before-done`, runs `tester`/`code-reviewer`, opens a PR; halts for a human on anything ambiguous. Portable (stack specialists come from a plugin). See `docs/workflows/feature-pipeline.md`.
+- `handover` - compact, high-signal session handover (done / in-progress / open decisions / next steps) so a fresh session continues without re-deriving context
+- `checkpoint` - safe-save: runs `verify-before-done`, then commits the work on the feature branch (never on a red gate)
+- `status` - read-only project health card: active spec/phase, unchecked tasks, gate status, branch, snapshot staleness
 
 ### Hooks registered
 
@@ -53,9 +56,10 @@ Configured in `.claude/settings.json`:
 
 ### Rules with path scope
 
-The files in `.claude/rules/` auto-load based on their `paths:` glob. Two ship with the template:
+The files in `.claude/rules/` auto-load based on their `paths:` glob. Three ship with the template:
 
 - `git-workflow.md` (matches `**`, always loaded) - branch naming, Conventional Commits, PR conventions
+- `adr.md` (matches `docs/decisions/**`) - Architecture Decision Records are append-only; supersede, don't rewrite
 - `example-rule.md` - template rule showing the pattern for path-scoped conventions
 
 See `.claude/rules/example-rule.md` for the anatomy.
