@@ -14,7 +14,14 @@ The skills in `.claude/skills/` are workflows Claude Code auto-invokes based on 
 - `find-existing-first` - reuse before create, invoked before any new file
 - `write-spec` - persists a shaped idea as `specs/YYYY-MM-DD-<slug>/` with `spec.md` filled and `plan.md`/`tasks.md` scaffolded
 - `spec-worktree` - one git worktree per feature (`../<repo>.<slug>`, branch from `main`); wraps `.claude/scripts/spec-worktree.sh`
+- `verify-before-done` - runs the repo's own verification (install, codegen, typecheck, build, tests) and confirms green before claiming done; the gate for automated loops (stack-agnostic)
+- `skill-architect` - guided workflow to author a new skill or agent the way this repo does it (CC-BY-4.0, adapted from [tech-leads-club/agent-skills](https://github.com/tech-leads-club/agent-skills))
+- `the-fool` - stress-tests a spec/plan/decision before committing (devil's advocacy, pre-mortem, red-team) (CC-BY-4.0, adapted from [tech-leads-club/agent-skills](https://github.com/tech-leads-club/agent-skills))
 - `documenting-domains` - creates durable local domain documentation (nested CLAUDE.md files) after a feature ships (attribution: [douglasgomes98](https://github.com/douglasgomes98))
+- `skill-best-practices` - authoring standards for skills (frontmatter, progressive disclosure, descriptions)
+- `feature-sliced-design` - Feature-Sliced Design architecture knowledge for React SPAs (frontend-oriented)
+- `react-best-practices` - React component design patterns for TypeScript SPAs (frontend-oriented)
+- `storybook-stories` - Storybook CSF3 component documentation (frontend-oriented)
 
 ### Subagents available
 
@@ -22,9 +29,17 @@ The subagents in `.claude/agents/` run in isolated context windows:
 
 - `codebase-explorer` - read-only archaeology; uses the Repomix snapshot, refreshes when stale-major
 - `spec-reviewer` - mandatory audit of `spec.md` before it becomes a plan (`write-spec` runs it automatically)
-- `code-reviewer` - reviews implementation against spec, plan, tasks and conventions (has persistent memory)
+- `code-reviewer` - reviews implementation against spec, plan, tasks and conventions; auto-gates each phase (has persistent memory)
+- `reviewer` - portable staff-level review of a whole diff/branch; runs the repo's verification and can open the PR (adapts to any stack)
+- `tester` - portable; writes and runs tests using the repo's own framework, discovered from AGENTS.md/tooling
 - `researcher` - deep-dives on libs and APIs (persistent memory across projects)
 - `security-auditor` - audits auth, secrets, input validation
+
+### Commands available
+
+Slash commands in `.claude/commands/` are drivers that orchestrate a multi-step flow in the main thread:
+
+- `orchestrate` - drives a spec's `tasks.md` to completion: plans waves, gets approval, dispatches specialists, gates each task with `verify-before-done`, runs `tester`/`code-reviewer`, opens a PR; halts for a human on anything ambiguous. Portable (stack specialists come from a plugin). See `docs/workflows/feature-pipeline.md`.
 
 ### Hooks registered
 
@@ -34,6 +49,8 @@ Configured in `.claude/settings.json`:
 - `PreToolUse` on Bash: `protect-main.sh` blocks commits, pushes, merges on protected branches (main, master, etc)
 - `PreToolUse` on Edit/Write: `protect-critical.sh` blocks modifications to lockfiles, applied migrations, generated code, and other critical files
 - `SessionStart`: `check-snapshot-on-session.sh` warns if the Repomix snapshot is stale-major
+- `SessionStart`: `check-index.sh` warns when `CLAUDE.md` has drifted from the `.claude/` machinery (a skill/agent/rule exists but is not listed)
+- `SubagentStop`: `log-agent.sh` appends one audit line per subagent run to the gitignored `.claude/agent-log.txt`
 
 ### Rules with path scope
 
@@ -49,6 +66,7 @@ See `.claude/rules/example-rule.md` for the anatomy.
 Documentation consulted only by agents (not humans) lives in `.claude/docs/`:
 
 - `superpowers.md` - how the spec-driven flow integrates with the Superpowers plugin
+- `context-engineering.md` - context discipline every agent should follow (return conclusions not raw material, isolate bulky work in subagents, externalize state)
 - `libs/` - how this project uses each external library (endpoints, gotchas, project-specific patterns)
 
 For human-facing docs (architecture, ADRs, runbooks, guides, patterns), see `docs/`.

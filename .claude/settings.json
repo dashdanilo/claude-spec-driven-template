@@ -32,6 +32,20 @@
           {
             "type": "command",
             "command": ".claude/hooks/check-snapshot-on-session.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/scripts/check-index.sh"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/log-agent.sh"
           }
         ]
       }
