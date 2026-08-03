@@ -118,6 +118,7 @@ Documented in full in `docs/CONSTITUTION.md`. The short version:
 - **Documentation over code.** Structural decisions are described, not implemented.
 - **Attribution preserved.** Community contributions keep their author attribution inline.
 - **Context economy.** What loads always must be small. What is detailed must load on demand.
+- **Delegation.** The main thread coordinates; specialists implement. Never write feature code from the main thread — dispatch it. Full rule (with the narrow exceptions) in `.claude/rules/delegation.md`.
 
 ## Files agents should not touch
 

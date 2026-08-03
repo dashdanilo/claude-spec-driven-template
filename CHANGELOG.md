@@ -6,6 +6,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+**Delegation and dispatch discipline** — from telemetry on a real project running this template (22 sessions, 54 subagent dispatches):
+- `.claude/rules/delegation.md` (always loaded) — the main thread coordinates, specialists implement. The rule previously existed only inside `/orchestrate`, a command that ran twice in 729 prompts; meanwhile 71% of `Edit` calls happened in the main thread while `Grep`/`Glob` were 100% delegated. Also added to `AGENTS.md` non-negotiables.
+- `.claude/docs/dispatching.md` — how to fan out: parallel means several agent calls **in one message** (measured: 54 of 54 dispatches went out one per message, so the wave plan never actually fanned out); background only for long work collected in the same turn (two background agents were found still open after 16 days); never background a gate; concurrency ceiling; diversity over redundancy; agent memory.
+- `/wave` command — the low-ceremony half of `/orchestrate`: one batch of independent tasks, dispatched in parallel, gated once, then stop. No spec, no approval table, no PR.
+
+### Changed
+
+- `/handover` — new **Step 0**: reconcile `tasks.md` against reality before writing the narrative, and check `lessons.md` for a class of failure worth promoting to a rule. Prose and checkboxes are two states of the same file and only one is machine-readable; a handover written over stale boxes documents a fiction that the next wave plan then executes. New **last step**: end with an explicit cut (state is on disk → `/clear` → resume with `/status`) and stop, instead of rolling into the next task. Measured: 19 sessions, several past 400 hours, 8 handovers written and **zero** `/clear` — the note was being written and the session rolled on anyway. Cache makes a long window cheap, not good.
+- `/status` — now flags a task count it does not believe, permanently-red gates, promotable lessons, and uncollected background agents.
+- `.claude/docs/context-engineering.md` — two additions: continue a live agent instead of re-dispatching it for a second pass on the same artifact (measured: three fresh dispatches of the same spec review in 12 minutes, ~57k tokens each); and a declared `memory:` is not a used memory.
+- `.claude/hooks/log-agent.sh` — now logs agent type, description, tokens, duration and tool count by falling back to the subagent's own transcript. The `SubagentStop` payload omitted the agent type in 183 of 238 real events (77%), which made the log countable but not attributable.
+
 ## [0.1.0] - 2026-07-04
 
 Initial release.

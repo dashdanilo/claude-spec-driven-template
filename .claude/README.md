@@ -27,7 +27,11 @@ Also: `scripts/` (shell helpers, e.g. `spec-worktree.sh`, `check-index.sh`), `co
 
 1. **One home per topic.** A fact lives in exactly one skill/rule; others cross-link, never copy.
 2. **Rule vs skill.** A **rule** states *what* (one line, path-scoped, always in context for that path). A **skill** shows *how + why + example* (loads by task). Project-specific conventions are rules; the richer teaching is skills.
-3. **One owner per document.** When `/orchestrate` runs specialists in parallel, each writes only its own outputs — `tasks.md` belongs to the orchestrator (it checks the boxes), `spec.md`/`plan.md` to the author, and a specialist never edits another wave's files. ADRs are append-only (`.claude/rules/adr.md`). This is what keeps parallel agents from clobbering each other.
+3. **One owner per document.** When `/orchestrate` or `/wave` runs specialists in parallel, each writes only its own outputs — `tasks.md` belongs to the orchestrator (it checks the boxes), `spec.md`/`plan.md` to the author, and a specialist never edits another wave's files. ADRs are append-only (`.claude/rules/adr.md`). This is what keeps parallel agents from clobbering each other.
+
+## Delegation and dispatch
+
+Who writes the code is a rule, not a preference: `.claude/rules/delegation.md` (always loaded — the main thread coordinates, specialists implement). *How* to dispatch — parallel means several agent calls in **one** message, background only for long work you collect this turn, never background a gate — is `.claude/docs/dispatching.md`. What to send and take back is `.claude/docs/context-engineering.md`.
 
 ## Where things point
 
