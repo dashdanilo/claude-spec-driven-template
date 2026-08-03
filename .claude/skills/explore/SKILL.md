@@ -55,6 +55,8 @@ Bias toward reuse (see `find-existing-first`). Options that build on existing pa
 
 Ask the user which option resonates. Push back if the choice contradicts existing conventions or ADRs. Refine until the picture is clear.
 
+When the choice hinges on several interdependent decisions, invoke `grilling` to resolve them one at a time in dependency order, instead of settling them in loose back-and-forth.
+
 Signs the exploration is done:
 
 - User can describe the feature in one paragraph without hedging
@@ -97,3 +99,4 @@ When ready, tell the user:
 - Alternative to `explore`: `/opsx:explore` if OpenSpec is installed, or Superpowers' `brainstorming` skill
 - After `explore`: `write-spec` to persist the shaped idea
 - Sibling: `codebase-explorer` subagent for deep reads during exploration
+- Sibling: `grilling` for decision-by-decision rigor within step 4
