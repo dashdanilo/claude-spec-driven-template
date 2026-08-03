@@ -58,9 +58,10 @@ Configured in `.claude/settings.json`:
 
 ### Rules with path scope
 
-The files in `.claude/rules/` auto-load based on their `paths:` glob. Four ship with the template:
+The files in `.claude/rules/` auto-load based on their `paths:` glob. Five ship with the template:
 
 - `delegation.md` (matches `**`, always loaded) - the main thread coordinates, specialists implement; never write feature code from the main thread
+- `specs.md` (matches `specs/**`) - claims are verified against code/git when written, never copied from existing prose; a hand-written spec still goes through `spec-reviewer`
 - `git-workflow.md` (matches `**`, always loaded) - branch naming, Conventional Commits, PR conventions
 - `adr.md` (matches `docs/decisions/**`) - Architecture Decision Records are append-only; supersede, don't rewrite
 - `example-rule.md` - template rule showing the pattern for path-scoped conventions
