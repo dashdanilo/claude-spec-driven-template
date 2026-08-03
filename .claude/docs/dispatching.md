@@ -4,6 +4,98 @@
 
 AI-only. Portable: no stack assumptions.
 
+## Pick the shape before the mechanics
+
+Six shapes cover almost every dispatch you will plan. Choose the shape from the *work*, then apply the mechanics below. Picking the wrong shape is more expensive than any mechanic can fix: a fan-out over dependent tasks wastes every parallel run, and a pipeline over independent ones wastes wall-clock.
+
+### 1. Pipeline
+
+```
+[A] → [B] → [C] → [D]
+```
+
+Each stage consumes the previous stage's output.
+
+- **Fits when** each step depends strongly on the artifact before it.
+- **Watch out:** one slow stage delays everything behind it. Design stages to be as independent as they can be.
+- **With sub-agents:** natural. One dispatch per stage; you pass each result into the next prompt. The cost is that every handoff goes through you.
+
+### 2. Fan-out / Fan-in
+
+```
+        ┌→ [A] ─┐
+[split] ┼→ [B] ─┼→ [merge]
+        └→ [C] ─┘
+```
+
+Same input, several independent angles, then one merge.
+
+- **Fits when** the same artifact needs different lenses (correctness, security, tests, performance).
+- **Watch out:** the **merge** decides the quality. A lazy merge throws away everything the parallel runs found.
+- **With sub-agents:** dispatch all of them **in one message** — this is the shape where that rule pays most. Do the merge yourself, or give it its own dispatch when it is heavy.
+
+### 3. Expert pool
+
+```
+[router] → { [A] | [B] | [C] }
+```
+
+A router picks the one specialist the input needs.
+
+- **Fits when** the input type decides the handling.
+- **Watch out:** the router's classification accuracy *is* the pattern. Everything downstream inherits its mistake.
+- **With sub-agents:** ideal. You call only the specialist you need and nothing sits idle.
+
+### 4. Producer-Reviewer
+
+```
+[produce] → [review] → (findings) → [produce again]
+```
+
+- **Fits when** quality matters and there is an objective criterion to check against.
+- **Watch out:** **cap the retries at 2-3.** Without a cap this loops forever, and each turn costs a full pass.
+- **With sub-agents:** two dispatches per round, feeding the reviewer's findings into the producer's next prompt. Same loop the gate already runs. Prefer continuing the live reviewer for round 2 (see below) instead of dispatching a fresh one.
+
+### 5. Supervisor
+
+```
+          ┌→ [worker A]
+[super]  ─┼→ [worker B]     ← assigns as it watches progress
+          └→ [worker C]
+```
+
+- **Fits when** the workload is variable or only knowable at runtime — a migration where you learn the real shape as you go.
+- **Differs from fan-out:** fan-out fixes the split up front; the supervisor adjusts mid-flight.
+- **Watch out:** the supervisor becomes the bottleneck if the delegated unit is too small. Delegate in chunks big enough to be worth the round-trip.
+- **With sub-agents:** the main thread is the supervisor. Keep the assignment state in the shared task list, not in your context — that is what stops the supervisor from bloating.
+
+### 6. Hierarchical delegation
+
+```
+[coordinator] → [lead A] → [worker A1] [worker A2]
+              → [lead B] → [worker B1]
+```
+
+- **Fits when** the problem decomposes hierarchically on its own.
+- **Watch out:** **beyond two levels, latency and context loss dominate.** Keep it to two.
+- **With sub-agents:** possible (a dispatched agent may dispatch its own), but prefer flattening to one level plus a merge. Depth buys less than it costs.
+
+### Composites are the norm
+
+| Composite | Shape | Example |
+|---|---|---|
+| Fan-out + Producer-Reviewer | parallel production, each output reviewed | several modules built in parallel, each reviewed on its own |
+| Pipeline + Fan-out | sequential stages with one parallel stage inside | analyze (serial) → implement (parallel) → integration test (serial) |
+| Supervisor + Expert pool | supervisor classifies, then calls the right specialist | triage a backlog, route each item to its layer |
+
+### A mode this harness does not have
+
+There is a second execution mode — **agent teams** — where members are independent instances that message each other directly and self-coordinate through a shared task list. It changes the answer for fan-out and producer-reviewer, because one member's discovery can redirect another mid-flight instead of after both have finished.
+
+It is **not available here** (no team-creation tool), so every row above is written for sub-agents. If it ever is, the rule of thumb is one question: *does one worker's discovery change what another should be doing?* Yes → team. No → sub-agents, and the communication would be pure overhead.
+
+> Pattern catalogue adapted from [revfactory/harness](https://github.com/revfactory/harness) (Apache-2.0), rewritten for sub-agent execution.
+
 ## Parallel means one message, several dispatches
 
 Independent work runs **concurrently only when the dispatches go out in a single message**. Several agent calls in one message run at the same time; one call per message runs one after another, no matter how independent the tasks are.
@@ -22,7 +114,7 @@ Before dispatching a wave, ask: *are these tasks touching disjoint files?* If ye
 
 - **Use background** for a long, self-contained run you will collect before the turn ends.
 - **Never background a gate.** The gate's whole job is to block; a gate you do not wait for blocks nothing.
-- **Collect what you launch.** A background agent nobody reads is pure spend. On the same real project, two background agents stayed open for **16 days** because nothing ever collected them.
+- **Collect what you launch, in the turn that launched it.** On a real project, two background dispatches were only collected **16 days** after being launched — the session was suspended and resumed, and the agents picked up where they left off. They worked for about 40 minutes each; the other 16 days were a session that never closed. Nothing leaked, but nobody was waiting for that result either, which means it was not a gate on anything.
 
 If you launch background work, say in the same message what you will do with the result and when.
 

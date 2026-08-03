@@ -73,7 +73,7 @@ Documentation consulted only by agents (not humans) lives in `.claude/docs/`:
 
 - `superpowers.md` - how the spec-driven flow integrates with the Superpowers plugin
 - `context-engineering.md` - context discipline every agent should follow (return conclusions not raw material, isolate bulky work in subagents, externalize state, continue agents instead of re-dispatching)
-- `dispatching.md` - how to dispatch: parallel means one message with several agent calls; background only for long work collected this turn; never background a gate; concurrency ceiling; agent memory
+- `dispatching.md` - how to dispatch: the six topology shapes (pipeline, fan-out/fan-in, expert pool, producer-reviewer, supervisor, hierarchical) and how to run each with sub-agents; then the mechanics - parallel means one message with several agent calls; background only for long work collected this turn; never background a gate; concurrency ceiling; agent memory
 - `libs/` - how this project uses each external library (endpoints, gotchas, project-specific patterns)
 
 For human-facing docs (architecture, ADRs, runbooks, guides, patterns), see `docs/`.
