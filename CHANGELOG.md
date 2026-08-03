@@ -6,6 +6,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+**Delegation and dispatch discipline** — from telemetry on a real project running this template (22 sessions, 54 subagent dispatches):
+- `.claude/rules/delegation.md` (always loaded) — the main thread coordinates, specialists implement. The rule previously existed only inside `/orchestrate`, a command that ran twice in 729 prompts; meanwhile 71% of `Edit` calls happened in the main thread while `Grep`/`Glob` were 100% delegated. Also added to `AGENTS.md` non-negotiables.
+- `.claude/docs/dispatching.md` — opens with the **six topology shapes** (pipeline, fan-out/fan-in, expert pool, producer-reviewer, supervisor, hierarchical delegation): what each fits, what to watch for, and how to run each with sub-agents, since picking the wrong shape costs more than any mechanic recovers. Catalogue adapted from [revfactory/harness](https://github.com/revfactory/harness) (Apache-2.0). Then the mechanics: parallel means several agent calls **in one message** (measured: 54 of 54 dispatches went out one per message, so the wave plan never actually fanned out); background only for long work collected in the same turn (measured: two dispatches collected 16 days after launch, across a suspended session); never background a gate; concurrency ceiling; diversity over redundancy; agent memory.
+- `.claude/rules/specs.md` (`paths: specs/**`) — claims about the current state of the system are verified against code/git when written, never copied from existing prose; a hand-written spec still goes through `spec-reviewer`. Includes the cheapest check for a referenced "pending fix": a `git cherry-pick` that comes back **empty** means the content is already in your base, re-applied under a different PR number. Measured: a follow-ups spec was written from a three-week-old header claiming two tests were failing; they had been fixed and merged under another PR, and the block was ranked priority 1. The defense already existed (`write-spec` hands the spec to `spec-reviewer` to verify claims against the codebase) and was skipped because the spec was written by hand — a guard that only fires on the happy path is not a guard.
+- `/wave` command — the low-ceremony half of `/orchestrate`: one batch of independent tasks, dispatched in parallel, gated once, then stop. No spec, no approval table, no PR.
+
+### Changed
+
+- `/handover` — new **Step 0**: reconcile `tasks.md` against reality before writing the narrative, and check `lessons.md` for a class of failure worth promoting to a rule. Prose and checkboxes are two states of the same file and only one is machine-readable; a handover written over stale boxes documents a fiction that the next wave plan then executes. New **last step**: end with an explicit cut (state is on disk → `/clear` → resume with `/status`) and stop, instead of rolling into the next task. Measured: 19 sessions, several past 400 hours, 8 handovers written and **zero** `/clear` — the note was being written and the session rolled on anyway. Cache makes a long window cheap, not good.
+- `/status` — now flags a task count it does not believe, permanently-red gates, promotable lessons, and uncollected background agents.
+- `.claude/docs/context-engineering.md` — two additions: continue a live agent instead of re-dispatching it for a second pass on the same artifact (measured: three fresh dispatches of the same spec review in 12 minutes, ~57k tokens each); and a declared `memory:` is not a used memory.
+- `.claude/hooks/log-agent.sh` — now logs agent type, description, tokens, duration and tool count by falling back to the subagent's own transcript. The `SubagentStop` payload omitted the agent type in 183 of 238 real events (77%), which made the log countable but not attributable.
+
 ## [0.1.0] - 2026-07-04
 
 Initial release.

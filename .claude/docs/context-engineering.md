@@ -12,6 +12,10 @@ Portable — applies to any repo. Every agent here should follow it.
 - **Externalize state.** Use `tasks.md`, `lessons.md`, or short notes as durable memory instead of carrying everything in the conversation.
 - **Re-fetchable beats stored.** If you can re-read a file or re-run a query later, don't keep its full output around — keep the pointer (path, id) and re-fetch on demand.
 - **Steer the output shape when you dispatch.** Tell the worker exactly the minimal shape you need back (e.g. "return the files changed and a one-paragraph summary", not "show your work").
+- **Continue an agent instead of re-dispatching it.** First pass on an artifact → fresh dispatch. Second and third pass on the **same** artifact → continue the live agent. A re-dispatch re-reads everything from zero and has forgotten what it already flagged; a continuation costs a fraction and still remembers its own findings.
+- **A declared memory is not a used memory.** An agent with `memory:` in its frontmatter has a durable notebook across runs. Tell it to read that notebook first and append what it learned — otherwise the config is decoration and the agent re-derives the same conventions every run.
+
+Mechanics of dispatching — parallelism, background, concurrency ceiling — live in `.claude/docs/dispatching.md`. Who writes the code lives in `.claude/rules/delegation.md`.
 
 ## Quick checklist
 

@@ -40,7 +40,8 @@ The subagents in `.claude/agents/` run in isolated context windows:
 Slash commands in `.claude/commands/` are drivers that orchestrate a multi-step flow in the main thread:
 
 - `orchestrate` - drives a spec's `tasks.md` to completion: plans waves, gets approval, dispatches specialists, gates each task with `verify-before-done`, runs `tester`/`code-reviewer`, opens a PR; halts for a human on anything ambiguous. Portable (stack specialists come from a plugin). See `docs/workflows/feature-pipeline.md`.
-- `handover` - compact, high-signal session handover (done / in-progress / open decisions / next steps) so a fresh session continues without re-deriving context
+- `wave` - the low-ceremony half of `orchestrate`: dispatches **one** batch of independent tasks to specialists in parallel (single message = concurrent), gates once, reports, stops. No spec, no approval table, no PR. Use when `orchestrate` is more process than the work deserves.
+- `handover` - compact, high-signal session handover (done / in-progress / open decisions / next steps) so a fresh session continues without re-deriving context. **Reconciles `tasks.md` against reality before writing the narrative, and ends with an explicit cut** — state is on disk, clear the session and resume in a fresh one
 - `checkpoint` - safe-save: runs `verify-before-done`, then commits the work on the feature branch (never on a red gate)
 - `status` - read-only project health card: active spec/phase, unchecked tasks, gate status, branch, snapshot staleness
 
@@ -53,12 +54,14 @@ Configured in `.claude/settings.json`:
 - `PreToolUse` on Edit/Write: `protect-critical.sh` blocks modifications to lockfiles, applied migrations, generated code, and other critical files
 - `SessionStart`: `check-snapshot-on-session.sh` warns if the Repomix snapshot is stale-major
 - `SessionStart`: `check-index.sh` warns when `CLAUDE.md` has drifted from the `.claude/` machinery (a skill/agent/rule exists but is not listed)
-- `SubagentStop`: `log-agent.sh` appends one audit line per subagent run to the gitignored `.claude/agent-log.txt`
+- `SubagentStop`: `log-agent.sh` appends one audit line per subagent run to the gitignored `.claude/agent-log.txt` — agent type, task description, tokens, duration and tool count, recovered from the subagent's own transcript when the hook payload omits them
 
 ### Rules with path scope
 
-The files in `.claude/rules/` auto-load based on their `paths:` glob. Three ship with the template:
+The files in `.claude/rules/` auto-load based on their `paths:` glob. Five ship with the template:
 
+- `delegation.md` (matches `**`, always loaded) - the main thread coordinates, specialists implement; never write feature code from the main thread
+- `specs.md` (matches `specs/**`) - claims are verified against code/git when written, never copied from existing prose; a hand-written spec still goes through `spec-reviewer`
 - `git-workflow.md` (matches `**`, always loaded) - branch naming, Conventional Commits, PR conventions
 - `adr.md` (matches `docs/decisions/**`) - Architecture Decision Records are append-only; supersede, don't rewrite
 - `example-rule.md` - template rule showing the pattern for path-scoped conventions
@@ -70,7 +73,8 @@ See `.claude/rules/example-rule.md` for the anatomy.
 Documentation consulted only by agents (not humans) lives in `.claude/docs/`:
 
 - `superpowers.md` - how the spec-driven flow integrates with the Superpowers plugin
-- `context-engineering.md` - context discipline every agent should follow (return conclusions not raw material, isolate bulky work in subagents, externalize state)
+- `context-engineering.md` - context discipline every agent should follow (return conclusions not raw material, isolate bulky work in subagents, externalize state, continue agents instead of re-dispatching)
+- `dispatching.md` - how to dispatch: the six topology shapes (pipeline, fan-out/fan-in, expert pool, producer-reviewer, supervisor, hierarchical) and how to run each with sub-agents; then the mechanics - parallel means one message with several agent calls; background only for long work collected this turn; never background a gate; concurrency ceiling; agent memory
 - `libs/` - how this project uses each external library (endpoints, gotchas, project-specific patterns)
 
 For human-facing docs (architecture, ADRs, runbooks, guides, patterns), see `docs/`.
