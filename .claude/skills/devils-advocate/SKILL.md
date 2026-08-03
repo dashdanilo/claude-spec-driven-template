@@ -1,5 +1,5 @@
 ---
-name: the-fool
+name: devils-advocate
 description: Stress-test a plan, spec, decision, or approach before committing to it — devil's advocacy, pre-mortem, red-teaming, assumption-falsification. Use when finalizing a spec.md/plan.md, weighing an ADR or architecture choice, or before a risky/expensive change; or when the user says "poke holes in this", "what could go wrong", "pre-mortem", "challenge this", "red team it". NOT for building the solution.
 license: CC-BY-4.0
 metadata:
@@ -8,7 +8,7 @@ metadata:
   version: 1
 ---
 
-# The Fool — challenge it before you commit
+# Devil's Advocate — challenge it before you commit
 
 Make a plan/decision **stronger** by attacking it honestly, then synthesizing. Not to build the solution; not to nitpick for its own sake. Portable — works on any decision.
 
@@ -40,4 +40,4 @@ Make a plan/decision **stronger** by attacking it honestly, then synthesizing. N
 
 ## In our flow
 
-Pairs with `spec-reviewer` (which checks a spec is *complete/clear*): the-fool checks whether the plan is *right*. Feed the riskiest-assumption + experiment back into `plan.md`, or record the decision (and why it survived) as an ADR in `docs/decisions/`.
+Pairs with `spec-reviewer` (which checks a spec is *complete/clear*): `devils-advocate` checks whether the plan is *right*. It is the opposite pole of `grilling` — `grilling` *builds* a decision, `devils-advocate` *attacks* it once built. Feed the riskiest-assumption + experiment back into `plan.md`, or record the decision (and why it survived) as an ADR in `docs/decisions/`.

@@ -11,12 +11,13 @@ The skills in `.claude/skills/` are workflows Claude Code auto-invokes based on 
 - `analyze-codebase` - one-time setup when adopting the template on an existing project
 - `refresh-snapshot` - manually regenerates the Repomix snapshot
 - `explore` - free-form investigation before writing a spec
+- `grilling` - relentless one-question-at-a-time interview that walks a decision tree to lock open decisions; called by `explore` for decision rigor (MIT, adapted from [mattpocock/skills](https://github.com/mattpocock/skills))
 - `find-existing-first` - reuse before create, invoked before any new file
 - `write-spec` - persists a shaped idea as `specs/YYYY-MM-DD-<slug>/` with `spec.md` filled and `plan.md`/`tasks.md` scaffolded
 - `spec-worktree` - one git worktree per feature (`../<repo>.<slug>`, branch from `main`); wraps `.claude/scripts/spec-worktree.sh`
 - `verify-before-done` - runs the repo's own verification (install, codegen, typecheck, build, tests) and confirms green before claiming done; the gate for automated loops (stack-agnostic)
 - `skill-architect` - guided workflow to author a new skill or agent the way this repo does it (CC-BY-4.0, adapted from [tech-leads-club/agent-skills](https://github.com/tech-leads-club/agent-skills))
-- `the-fool` - stress-tests a spec/plan/decision before committing (devil's advocacy, pre-mortem, red-team) (CC-BY-4.0, adapted from [tech-leads-club/agent-skills](https://github.com/tech-leads-club/agent-skills))
+- `devils-advocate` - stress-tests a spec/plan/decision before committing (devil's advocacy, pre-mortem, red-team) (CC-BY-4.0, adapted from [tech-leads-club/agent-skills](https://github.com/tech-leads-club/agent-skills))
 - `diagnosing-bugs` - disciplined diagnosis loop for hard bugs and perf regressions; the gate is a tight, red-capable feedback loop before any hypothesis (MIT, adapted from [mattpocock/skills](https://github.com/mattpocock/skills))
 - `documenting-domains` - creates durable local domain documentation (nested CLAUDE.md files) after a feature ships (attribution: [douglasgomes98](https://github.com/douglasgomes98))
 - `skill-best-practices` - authoring standards for skills (frontmatter, progressive disclosure, descriptions)
