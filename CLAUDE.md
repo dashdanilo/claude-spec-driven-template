@@ -45,6 +45,7 @@ Slash commands in `.claude/commands/` are drivers that orchestrate a multi-step 
 - `handover` - compact, high-signal session handover (done / current state / open decisions / not started) so a fresh session continues without re-deriving context. **State, not instructions** — it describes what is true, never what to do next, because a fact outlives an instruction. **Reconciles `tasks.md` against reality before writing the narrative, prints a copyable block, and ends with an explicit cut** — state is on disk, clear the session and resume in a fresh one
 - `checkpoint` - safe-save: runs `verify-before-done`, then commits the work on the feature branch (never on a red gate)
 - `status` - read-only project health card: active spec/phase, unchecked tasks, gate status, branch, snapshot staleness
+- `harness-report` - read-only report on the **harness itself**: how much implementation is actually delegated, how dispatches are distributed, how many are unattributed — judged against `.claude/docs/harness-baseline.md`. Answers "is this being used the way it is designed", which a rule cannot answer about itself
 
 ### Hooks registered
 
@@ -53,6 +54,7 @@ Configured in `.claude/settings.json`:
 - `PreToolUse` on Bash: `block-secrets.sh` blocks commands that would read `.env` or print secret-named env vars
 - `PreToolUse` on Bash: `protect-main.sh` blocks commits, pushes, merges on protected branches (main, master, etc)
 - `PreToolUse` on Edit/Write: `protect-critical.sh` blocks modifications to lockfiles, applied migrations, generated code, and other critical files
+- `PreToolUse` on Edit/Write: `log-edit.sh` appends one line per file edit to the gitignored `.claude/tool-log.txt`, recording **which thread** did it (main or specialist) — the raw material for `/harness-report`. Never blocks
 - `SessionStart`: `check-snapshot-on-session.sh` warns if the Repomix snapshot is stale-major
 - `SessionStart`: `check-index.sh` warns when `CLAUDE.md` and the `.claude/` machinery have drifted apart — not listed, listed but gone, or malformed (bad frontmatter, name/filename mismatch, hook without `+x`). `--strict` exits 1 for CI
 - `SubagentStop`: `log-agent.sh` appends one audit line per subagent run to the gitignored `.claude/agent-log.txt` — agent type, task description, tokens, duration and tool count, recovered from the subagent's own transcript when the hook payload omits them
@@ -76,6 +78,7 @@ Documentation consulted only by agents (not humans) lives in `.claude/docs/`:
 - `superpowers.md` - how the spec-driven flow integrates with the Superpowers plugin
 - `context-engineering.md` - context discipline every agent should follow (return conclusions not raw material, isolate bulky work in subagents, externalize state, continue agents instead of re-dispatching)
 - `dispatching.md` - how to dispatch: the six topology shapes (pipeline, fan-out/fan-in, expert pool, producer-reviewer, supervisor, hierarchical) and how to run each with sub-agents; then the mechanics - parallel means one message with several agent calls; background only for long work collected this turn; never background a gate; concurrency ceiling; agent memory
+- `harness-baseline.md` - the measured numbers the harness is judged against (delegation 29%, main-thread token share 71%, 1.0 dispatches per message, from 22 sessions and 54 dispatches on a real project), plus what each correction claims and which number would confirm it. Read by `harness-report`
 - `libs/` - how this project uses each external library (endpoints, gotchas, project-specific patterns)
 
 For human-facing docs (architecture, ADRs, runbooks, guides, patterns), see `docs/`.

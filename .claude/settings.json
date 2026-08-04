@@ -65,11 +65,15 @@
         ]
       },
       {
-        "matcher": "Edit|Write",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
             "command": ".claude/hooks/protect-critical.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/log-edit.sh"
           }
         ]
       }
