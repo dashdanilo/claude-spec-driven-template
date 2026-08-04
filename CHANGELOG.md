@@ -21,6 +21,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `.claude/docs/harness-baseline.md` records what was actually measured before the corrections (Edit delegated **29%**, main thread carrying **71%** of tokens, **1.0** dispatches per message, `/orchestrate` run twice in 729 prompts) and states, per correction, which number would confirm it — including the honest possibility that delegation does not move, in which case prose is the wrong mechanism and a sentence will not fix it.
 
 Why this exists: `rules/delegation.md` was written to fix inverted delegation, and the 29% was measured with that rule already in place inside `/orchestrate`. A rule nobody can see being broken decays silently. Making it countable is what gives it teeth — and what lets the four corrections shipped in this release be judged rather than assumed.
+**Baseline drift detection** — `.claude/scripts/check-baseline.sh` + `.claude/baseline.lock`:
+- When the harness is delivered by symlink from a sibling repo, every consumer tracks that repo's working tree. That is the point (a fix is live everywhere with no update step) and it is the risk (a mistake is live everywhere with no staged rollout). This hook gives the missing half: on `SessionStart` it compares the shared repo's `HEAD` against the SHA this repo last verified, reports how far it moved and which consumed files changed, and offers `--accept`. Silent when there is no lock file, so a repo that does not consume a shared baseline is unaffected.
+- **It does not pin, and says so.** Pinning would freeze a version, which is the property the symlink model trades away deliberately. This is detection: you always run the current baseline, and you are told when it moved past what you looked at.
 
 ### Changed
 
