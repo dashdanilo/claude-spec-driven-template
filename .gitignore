@@ -37,3 +37,4 @@ out/
 # Coverage
 coverage/
 .nyc_output/
+.claude/tool-log.txt
