@@ -55,6 +55,7 @@ Configured in `.claude/settings.json`:
 - `PreToolUse` on Edit/Write: `protect-critical.sh` blocks modifications to lockfiles, applied migrations, generated code, and other critical files
 - `SessionStart`: `check-snapshot-on-session.sh` warns if the Repomix snapshot is stale-major
 - `SessionStart`: `check-index.sh` warns when `CLAUDE.md` and the `.claude/` machinery have drifted apart — not listed, listed but gone, or malformed (bad frontmatter, name/filename mismatch, hook without `+x`). `--strict` exits 1 for CI
+- `SessionStart`: `check-baseline.sh` warns when the shared harness (a sibling repo the `.claude/` machinery is symlinked from) moved past what this repo last verified, listing what changed and offering `--accept`. Silent when there is no `.claude/baseline.lock`. It detects drift; it does **not** pin
 - `SubagentStop`: `log-agent.sh` appends one audit line per subagent run to the gitignored `.claude/agent-log.txt` — agent type, task description, tokens, duration and tool count, recovered from the subagent's own transcript when the hook payload omits them
 
 ### Rules with path scope
