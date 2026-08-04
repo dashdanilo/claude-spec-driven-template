@@ -40,9 +40,9 @@ The subagents in `.claude/agents/` run in isolated context windows:
 
 Slash commands in `.claude/commands/` are drivers that orchestrate a multi-step flow in the main thread:
 
-- `orchestrate` - drives a spec's `tasks.md` to completion: plans waves, gets approval, dispatches specialists, gates each task with `verify-before-done`, runs `tester`/`code-reviewer`, opens a PR; halts for a human on anything ambiguous. Portable (stack specialists come from a plugin). See `docs/workflows/feature-pipeline.md`.
+- `orchestrate` - drives a spec's `tasks.md` to completion: reconciles the boxes against the code, classifies each task to select its gates, plans waves, gets approval, then executes **one wave at a time** (whole wave dispatched in a single message, collected, gated once with `verify-before-done` plus the reviewers that wave needs), and opens a PR; halts for a human on anything ambiguous. Portable (stack specialists come from a plugin). See `docs/workflows/feature-pipeline.md`.
 - `wave` - the low-ceremony half of `orchestrate`: dispatches **one** batch of independent tasks to specialists in parallel (single message = concurrent), gates once, reports, stops. No spec, no approval table, no PR. Use when `orchestrate` is more process than the work deserves.
-- `handover` - compact, high-signal session handover (done / in-progress / open decisions / next steps) so a fresh session continues without re-deriving context. **Reconciles `tasks.md` against reality before writing the narrative, and ends with an explicit cut** — state is on disk, clear the session and resume in a fresh one
+- `handover` - compact, high-signal session handover (done / current state / open decisions / not started) so a fresh session continues without re-deriving context. **State, not instructions** — it describes what is true, never what to do next, because a fact outlives an instruction. **Reconciles `tasks.md` against reality before writing the narrative, prints a copyable block, and ends with an explicit cut** — state is on disk, clear the session and resume in a fresh one
 - `checkpoint` - safe-save: runs `verify-before-done`, then commits the work on the feature branch (never on a red gate)
 - `status` - read-only project health card: active spec/phase, unchecked tasks, gate status, branch, snapshot staleness
 
@@ -54,7 +54,7 @@ Configured in `.claude/settings.json`:
 - `PreToolUse` on Bash: `protect-main.sh` blocks commits, pushes, merges on protected branches (main, master, etc)
 - `PreToolUse` on Edit/Write: `protect-critical.sh` blocks modifications to lockfiles, applied migrations, generated code, and other critical files
 - `SessionStart`: `check-snapshot-on-session.sh` warns if the Repomix snapshot is stale-major
-- `SessionStart`: `check-index.sh` warns when `CLAUDE.md` has drifted from the `.claude/` machinery (a skill/agent/rule exists but is not listed)
+- `SessionStart`: `check-index.sh` warns when `CLAUDE.md` and the `.claude/` machinery have drifted apart — not listed, listed but gone, or malformed (bad frontmatter, name/filename mismatch, hook without `+x`). `--strict` exits 1 for CI
 - `SubagentStop`: `log-agent.sh` appends one audit line per subagent run to the gitignored `.claude/agent-log.txt` — agent type, task description, tokens, duration and tool count, recovered from the subagent's own transcript when the hook payload omits them
 
 ### Rules with path scope

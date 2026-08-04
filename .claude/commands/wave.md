@@ -38,6 +38,8 @@ Wait for all of them. Then run `verify-before-done` **once, in the foreground** 
 
 One short card: what each specialist changed, gate result, what is left. Then **stop** — do not roll into the next wave on your own. The human decides whether to run `/wave` again.
 
+If a spec is active and this wave left the agreed plan — an assumption taken, a blocker worked around, a task done differently than written — append it to `specs/<slug>/deviations.md` (format in `.claude/rules/specs.md`) before reporting. A free-form `/wave` with no spec has nowhere durable to put this, so say it in the card instead.
+
 ## STOP and ask when
 
 - A task needs a decision: an irreversible target (migration, new secret/env var) or a product question.

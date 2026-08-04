@@ -11,6 +11,7 @@ Report a compact status card. Read state; change nothing.
 - **Gates** — last known: spec-reviewer verdict, `verify-before-done` result (run it only if cheap, else report the last known), and any open PR for this branch.
   - Flag any **known-red** test that everyone has learned to ignore. A gate with permanent red is not a gate.
 - **Lessons** — `lessons.md` entries for the active spec, and any class of failure that appears 3+ times across specs (candidate for promotion to `.claude/rules/`).
+- **Deviations** — open entries in `deviations.md`: count them, and list every `needs decision` in full. Those are things the run did that nobody approved, and they age badly — an unresolved deviation is a spec that no longer describes the code.
 - **Background agents** — any dispatched in the background and never collected. They cost tokens and block nothing.
 - **Snapshot** — Repomix snapshot staleness (`.claude/scripts/check-snapshot.sh`).
 - **Uncommitted** — a one-line `git status --short` summary (count of changed files).
