@@ -7,12 +7,16 @@ Spec-driven development artifacts. Each feature lives in its own folder with thr
 ```
 specs/
 └── YYYY-MM-DD-feature-slug/
-    ├── spec.md      # WHAT + WHY (source of truth)
-    ├── plan.md      # HOW at high level (architecture, tech choices, phases)
-    └── tasks.md     # HOW at execution level (atomic checkboxes, TDD)
+    ├── spec.md        # WHAT + WHY (source of truth)
+    ├── plan.md        # HOW at high level (architecture, tech choices, phases)
+    ├── tasks.md       # HOW at execution level (atomic checkboxes, TDD)
+    ├── lessons.md     # what broke → the fix          (created on demand)
+    └── deviations.md  # where execution left the plan (created on demand)
 ```
 
 The date prefix keeps features ordered chronologically. The slug is short kebab-case (max 5 words).
+
+The first three are written before execution. The last two are **written during it** and only exist if something happened — `write-spec` does not scaffold them, and an absent file is the honest state.
 
 ## Why three files instead of one
 
@@ -23,6 +27,12 @@ Each file has a different purpose, audience, and update rate:
 | `spec.md` | WHAT to build and WHY | Rarely, only if the feature changes | `spec-reviewer`, human reviewers |
 | `plan.md` | HOW: architecture, tech, phases | Occasionally, if approach changes | `code-reviewer` for context, human reviewers |
 | `tasks.md` | Atomic checkboxes with TDD steps | Constantly during execution | `code-reviewer` for progress, agents doing work |
+| `lessons.md` | What broke and how it was fixed | On every failure+fix | `/status`, `/handover`, whoever promotes a lesson to a rule |
+| `deviations.md` | Where execution left the agreed plan, and why | On every departure | `/handover` (open decisions), `spec-reviewer`, human reviewers |
+
+`lessons.md` and `deviations.md` are both execution logs and they answer different questions. A lesson is *"this broke, here is the fix"* — it is about the **system**, and if the same class shows up 3+ times it gets promoted to a `.claude/rules/` rule. A deviation is *"we agreed X and did Y"* — it is about **this feature's plan**, and it never gets promoted; it gets read, accepted or reverted, and closed.
+
+Keeping them apart matters because a deviation with nowhere to go ends up written **inside the artifact it contaminated**: phases executed straight from `plan.md` without becoming tasks, or a whole block built on a premise nobody checked, get narrated in `tasks.md` as prose competing with the checkboxes. That is how a task file turns into a state dump.
 
 If you collapse them:
 - Merging spec into plan mixes "what to build" with "how to build"

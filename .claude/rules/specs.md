@@ -33,6 +33,25 @@ git cherry-pick <sha>     # empty result = the content is already in your base
 
 Same idea without applying anything: `git log --oneline <base> -- <the file>` and read what actually landed.
 
+## Deviations go in `deviations.md`, not in the artifact they contaminated
+
+Long or autonomous runs depart from the plan. That is not a failure — silently absorbing it is. When execution leaves what was agreed, append to `specs/<slug>/deviations.md`:
+
+```markdown
+## <date> — <one-line what changed>
+- **Agreed:** <what the plan/tasks said>
+- **Did:** <what actually happened>
+- **Why:** <the reason, including the blocker or assumption that forced it>
+- **Consequence:** <what is now true that the plan does not describe>
+- **Status:** accepted | to revert | needs decision
+```
+
+Four things belong here: an **assumption** taken without confirmation, a **blocker** worked around, a **scope change** decided mid-flight, and work executed **outside the pipeline** (phases run straight from `plan.md`, edits made in the main thread — neither ever gets a checkbox ticked by anyone).
+
+Do not write them into `tasks.md`. Checkboxes are machine-readable and prose is not; a narrative wedged between boxes is read by humans and ignored by the next wave plan, which is the worst of both.
+
+`needs decision` is the only status that blocks. It is the one a `/handover` must surface and a reviewer must resolve.
+
 ## Why this is a rule
 
 Measured, on this template's own work: a follow-ups spec was written from a three-week-old header that said two tests were failing. They had been fixed and merged under a different PR number. The spec, its task list, and a published PR description all carried the wrong premise — and the block was ranked priority 1, so it would have been the next thing built.

@@ -23,7 +23,7 @@ The main thread **coordinates**; specialists **implement**. This rule loads alwa
 ## Narrow exceptions
 
 - A one-line fix the gate verifies immediately — cheaper inline than a round-trip.
-- The orchestrator's own documents: `tasks.md`, `spec.md`, `plan.md`, `lessons.md`, ADRs.
+- The orchestrator's own documents: `tasks.md`, `spec.md`, `plan.md`, `lessons.md`, `deviations.md`, ADRs.
 - The human explicitly asked you to make the edit yourself.
 
 Anything else is a dispatch.
