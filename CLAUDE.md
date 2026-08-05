@@ -6,7 +6,7 @@
 
 ### Skills available
 
-The skills in `.claude/skills/` are workflows Claude Code auto-invokes based on their descriptions:
+The skills in `baseline/skills/` are workflows Claude Code auto-invokes based on their descriptions. Linked into a project with `./install-harness.sh` (opt-in, per repo), they land in that project's `.claude/skills/`:
 
 - `analyze-codebase` - one-time setup when adopting the template on an existing project
 - `refresh-snapshot` - manually regenerates the Repomix snapshot
@@ -26,7 +26,7 @@ The skills in `.claude/skills/` are workflows Claude Code auto-invokes based on 
 
 ### Subagents available
 
-The subagents in `.claude/agents/` run in isolated context windows:
+The subagents in `baseline/agents/` run in isolated context windows:
 
 - `codebase-explorer` - read-only archaeology; uses the Repomix snapshot, refreshes when stale-major
 - `spec-reviewer` - mandatory audit of `spec.md` before it becomes a plan (`write-spec` runs it automatically)
@@ -36,9 +36,9 @@ The subagents in `.claude/agents/` run in isolated context windows:
 - `researcher` - deep-dives on libs and APIs (persistent memory across projects)
 - `security-auditor` - audits auth, secrets, input validation
 
-### Commands available
+### Drivers (also skills)
 
-Slash commands in `.claude/commands/` are drivers that orchestrate a multi-step flow in the main thread:
+These are skills too — `baseline/skills/<name>/SKILL.md` — but they *drive* a multi-step flow in the main thread rather than teaching one thing. A command file and a skill produce the same `/name`, so they are authored as skills and nothing depends on a personal `commands/` path:
 
 - `orchestrate` - drives a spec's `tasks.md` to completion: reconciles the boxes against the code, classifies each task to select its gates, plans waves, gets approval, then executes **one wave at a time** (whole wave dispatched in a single message, collected, gated once with `verify-before-done` plus the reviewers that wave needs), and opens a PR; halts for a human on anything ambiguous. Portable (stack specialists come from a plugin). See `docs/workflows/feature-pipeline.md`.
 - `wave` - the low-ceremony half of `orchestrate`: dispatches **one** batch of independent tasks to specialists in parallel (single message = concurrent), gates once, reports, stops. No spec, no approval table, no PR. Use when `orchestrate` is more process than the work deserves.
@@ -49,20 +49,20 @@ Slash commands in `.claude/commands/` are drivers that orchestrate a multi-step 
 
 ### Hooks registered
 
-Configured in `.claude/settings.json`:
+For this repo, in `.claude/settings.json`. For a project that linked the harness, `./install-harness.sh` registers the portable ones in that project's gitignored `.claude/settings.local.json`, pointing at absolute paths in this checkout — the repo's committed `settings.json` is never touched. `protect-critical.sh` and `check-snapshot-on-session.sh` are **deliberately excluded** from the global set: the first knows about lockfiles and migrations, the second about a per-repo snapshot, so both belong to a repo and not to a machine.
 
 - `PreToolUse` on Bash: `block-secrets.sh` blocks commands that would read `.env` or print secret-named env vars
 - `PreToolUse` on Bash: `protect-main.sh` blocks commits, pushes, merges on protected branches (main, master, etc)
 - `PreToolUse` on Edit/Write: `protect-critical.sh` blocks modifications to lockfiles, applied migrations, generated code, and other critical files
 - `PreToolUse` on Edit/Write: `log-edit.sh` appends one line per file edit to the gitignored `.claude/tool-log.txt`, recording **which thread** did it (main or specialist) — the raw material for `/harness-report`. Never blocks
 - `SessionStart`: `check-snapshot-on-session.sh` warns if the Repomix snapshot is stale-major
-- `SessionStart`: `check-index.sh` warns when `CLAUDE.md` and the `.claude/` machinery have drifted apart — not listed, listed but gone, or malformed (bad frontmatter, name/filename mismatch, hook without `+x`). `--strict` exits 1 for CI
-- `SessionStart`: `check-baseline.sh` warns when the shared harness (a sibling repo the `.claude/` machinery is symlinked from) moved past what this repo last verified, listing what changed and offering `--accept`. Silent when there is no `.claude/baseline.lock`. It detects drift; it does **not** pin
+- `SessionStart`: `check-index.sh` warns when `CLAUDE.md` and the machinery (`baseline/`, `.claude/`, and `~/.claude/` for names only) have drifted apart — not listed, listed but gone, or malformed (bad frontmatter, name/filename mismatch, hook without `+x`). `--strict` exits 1 for CI
+- `SessionStart`: `check-baseline.sh` warns when your harness checkout is behind its remote, or has **uncommitted** edits under `baseline/` — those are live in every project on the machine, unreviewed. Does not fetch and does not pin
 - `SubagentStop`: `log-agent.sh` appends one audit line per subagent run to the gitignored `.claude/agent-log.txt` — agent type, task description, tokens, duration and tool count, recovered from the subagent's own transcript when the hook payload omits them
 
 ### Rules with path scope
 
-The files in `.claude/rules/` auto-load based on their `paths:` glob. Five ship with the template:
+The files in `baseline/rules/` auto-load based on their `paths:` glob, and land in `.claude/rules/harness/` when linked into a project — rules are discovered recursively, so the repo's own rules coexist. **Project rules win over personal ones**, so a repo can always override. Five ship with the template:
 
 - `delegation.md` (matches `**`, always loaded) - the main thread coordinates, specialists implement; never write feature code from the main thread
 - `specs.md` (matches `specs/**`) - claims are verified against code/git when written, never copied from existing prose; a hand-written spec still goes through `spec-reviewer`
@@ -70,11 +70,11 @@ The files in `.claude/rules/` auto-load based on their `paths:` glob. Five ship 
 - `adr.md` (matches `docs/decisions/**`) - Architecture Decision Records are append-only; supersede, don't rewrite
 - `example-rule.md` - template rule showing the pattern for path-scoped conventions
 
-See `.claude/rules/example-rule.md` for the anatomy.
+See `baseline/rules/example-rule.md` for the anatomy.
 
 ### AI-only knowledge
 
-Documentation consulted only by agents (not humans) lives in `.claude/docs/`:
+Documentation consulted only by agents (not humans) lives in `baseline/docs/`:
 
 - `superpowers.md` - how the spec-driven flow integrates with the Superpowers plugin
 - `context-engineering.md` - context discipline every agent should follow (return conclusions not raw material, isolate bulky work in subagents, externalize state, continue agents instead of re-dispatching)

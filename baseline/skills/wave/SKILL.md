@@ -1,4 +1,5 @@
 ---
+name: wave
 description: Fan out one batch of independent tasks to specialists, in parallel, in a single message — the useful half of /orchestrate without the spec, the approval table, or the PR. Stack-agnostic.
 argument-hint: <what to do — free-form, or a spec folder to take the next unchecked tasks from>
 ---

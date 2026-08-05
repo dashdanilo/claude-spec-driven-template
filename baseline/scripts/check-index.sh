@@ -10,6 +10,14 @@
 # (2) and (3) are the silent ones. A stale index entry sends an agent looking for
 # something that is not there; a hook without +x never runs and never says so.
 #
+# Where it looks, in order of what exists:
+#   baseline/     — the harness repo itself, where the machinery is authored
+#   .claude/      — a consumer repo's own machinery
+#   ~/.claude/    — personal scope (ADR 0002). Counted only as "exists", never
+#                   reported as unlisted: a repo's CLAUDE.md is not supposed to
+#                   index your personal harness. Without this, every consumer
+#                   would report /orchestrate as missing.
+#
 # Informational by default — always exits 0, so it is safe on SessionStart.
 # Pass --strict to exit 1 when anything is found (for CI).
 #
@@ -24,6 +32,14 @@ STRICT=0
 CLAUDE="CLAUDE.md"
 [[ -f "$CLAUDE" ]] || exit 0
 
+# Roots that this repo owns, and are therefore expected to be indexed.
+OWNED=()
+[[ -d baseline/agents || -d baseline/skills || -d baseline/rules ]] && OWNED+=("baseline")
+[[ -d .claude/agents  || -d .claude/skills  || -d .claude/rules  ]] && OWNED+=(".claude")
+# Personal scope contributes names, never expectations.
+EXTRA=()
+[[ -d "$HOME/.claude/skills" || -d "$HOME/.claude/rules" || -d "$HOME/.claude/agents" ]] && EXTRA+=("$HOME/.claude")
+
 unlisted=""   # 1. on disk, not in the index
 stale=""      # 2. in the index, not on disk
 broken=""     # 3. malformed
@@ -37,7 +53,8 @@ $1"; }
 fm() { sed -n '/^---$/,/^---$/p' "$1" 2>/dev/null | grep -m1 "^$2:" | sed "s/^$2:[[:space:]]*//"; }
 
 # ---------------------------------------------------------------- agents
-for f in .claude/agents/*.md; do
+for root in ${OWNED[@]+"${OWNED[@]}"}; do
+for f in "$root"/agents/*.md; do
   [[ -e "$f" ]] || continue
   base=$(basename "$f" .md)
   name=$(fm "$f" name)
@@ -47,10 +64,11 @@ for f in .claude/agents/*.md; do
   [[ "$name" == "$base" ]] || add broken "agent    $base — frontmatter name is '$name'; dispatch by name will not find the file"
   know "$name"
   grep -q "\`$name\`" "$CLAUDE" || add unlisted "agent    $name"
-done
+done; done
 
 # ---------------------------------------------------------------- skills
-for d in .claude/skills/*/; do
+for root in ${OWNED[@]+"${OWNED[@]}"}; do
+for d in "$root"/skills/*/; do
   [[ -d "$d" ]] || continue
   dir=$(basename "$d")
   if [[ ! -f "${d}SKILL.md" ]]; then
@@ -64,40 +82,52 @@ for d in .claude/skills/*/; do
   [[ "$name" == "$dir" ]] || add broken "skill    $dir — frontmatter name is '$name'"
   know "$name"
   grep -q "\`$name\`" "$CLAUDE" || add unlisted "skill    $name"
-done
+done; done
 
 # ---------------------------------------------------------------- rules
-for f in .claude/rules/*.md; do
+for root in ${OWNED[@]+"${OWNED[@]}"}; do
+for f in "$root"/rules/*.md; do
   [[ -e "$f" ]] || continue
   base=$(basename "$f")
   [[ -n "$(fm "$f" paths)" ]] || add broken "rule     $base — no 'paths:' in frontmatter; it will never scope to anything"
   know "$base"; know "${base%.md}"
   grep -q "$base" "$CLAUDE" || add unlisted "rule     $base"
-done
+done; done
 
 # ---------------------------------------------------------------- commands
-for f in .claude/commands/*.md; do
+for root in ${OWNED[@]+"${OWNED[@]}"}; do
+for f in "$root"/commands/*.md; do
   [[ -e "$f" ]] || continue
   base=$(basename "$f" .md)
   [[ -n "$(fm "$f" description)" ]] || add broken "command  /$base — no 'description:'; it lists without help text"
   know "$base"
   grep -q "\`$base\`" "$CLAUDE" || add unlisted "command  /$base"
-done
+done; done
 
 # ---------------------------------------------------------------- docs
-for f in .claude/docs/*.md; do
+for root in ${OWNED[@]+"${OWNED[@]}"}; do
+for f in "$root"/docs/*.md; do
   [[ -e "$f" ]] || continue
   base=$(basename "$f")
   know "$base"; know "${base%.md}"
-done
+done; done
 
 # ---------------------------------------------------------------- hooks
 # A hook without the executable bit is registered, never runs, and reports nothing.
-for f in .claude/hooks/*.sh; do
+for root in ${OWNED[@]+"${OWNED[@]}"}; do
+for f in "$root"/hooks/*.sh; do
   [[ -e "$f" ]] || continue
   base=$(basename "$f")
   [[ -x "$f" ]] || add broken "hook     $base — not executable (chmod +x); it will silently never run"
   know "$base"
+done; done
+
+# ------------------------------------------------- personal scope (names only)
+for root in ${EXTRA[@]+"${EXTRA[@]}"}; do
+  for f in "$root"/agents/*.md; do [[ -e "$f" ]] || continue; n=$(fm "$f" name); know "${n:-$(basename "$f" .md)}"; done
+  for d in "$root"/skills/*/; do [[ -f "${d}SKILL.md" ]] || continue; n=$(fm "${d}SKILL.md" name); know "${n:-$(basename "$d")}"; done
+  for f in "$root"/rules/*.md; do [[ -e "$f" ]] || continue; b=$(basename "$f"); know "$b"; know "${b%.md}"; done
+  for f in "$root"/commands/*.md; do [[ -e "$f" ]] || continue; know "$(basename "$f" .md)"; done
 done
 
 # ---------------------------------------------------------------- reverse

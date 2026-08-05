@@ -1,4 +1,5 @@
 ---
+name: harness-report
 description: Is the harness actually being used the way it is designed? Reports delegation, dispatch and attribution from the observability logs, and judges them against the recorded baseline. Read-only.
 ---
 
