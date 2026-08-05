@@ -6,7 +6,7 @@
 
 ### Skills available
 
-The skills in `baseline/skills/` are workflows Claude Code auto-invokes based on their descriptions. Installed with `./install-global.sh`, they land in `~/.claude/skills/` and are available in **every** project on the machine (see ADR 0002 in the njord marketplace):
+The skills in `baseline/skills/` are workflows Claude Code auto-invokes based on their descriptions. Linked into a project with `./install-harness.sh` (opt-in, per repo), they land in that project's `.claude/skills/`:
 
 - `analyze-codebase` - one-time setup when adopting the template on an existing project
 - `refresh-snapshot` - manually regenerates the Repomix snapshot
@@ -49,7 +49,7 @@ These are skills too — `baseline/skills/<name>/SKILL.md` — but they *drive* 
 
 ### Hooks registered
 
-For this repo, in `.claude/settings.json`. For every project on your machine, `./install-global.sh` registers the portable ones in `~/.claude/settings.json`, pointing at absolute paths in this checkout. `protect-critical.sh` and `check-snapshot-on-session.sh` are **deliberately excluded** from the global set: the first knows about lockfiles and migrations, the second about a per-repo snapshot, so both belong to a repo and not to a machine.
+For this repo, in `.claude/settings.json`. For a project that linked the harness, `./install-harness.sh` registers the portable ones in that project's gitignored `.claude/settings.local.json`, pointing at absolute paths in this checkout — the repo's committed `settings.json` is never touched. `protect-critical.sh` and `check-snapshot-on-session.sh` are **deliberately excluded** from the global set: the first knows about lockfiles and migrations, the second about a per-repo snapshot, so both belong to a repo and not to a machine.
 
 - `PreToolUse` on Bash: `block-secrets.sh` blocks commands that would read `.env` or print secret-named env vars
 - `PreToolUse` on Bash: `protect-main.sh` blocks commits, pushes, merges on protected branches (main, master, etc)
@@ -62,7 +62,7 @@ For this repo, in `.claude/settings.json`. For every project on your machine, `.
 
 ### Rules with path scope
 
-The files in `baseline/rules/` auto-load based on their `paths:` glob, and land in `~/.claude/rules/` when installed globally. **Project rules win over personal ones**, so a repo can always override. Five ship with the template:
+The files in `baseline/rules/` auto-load based on their `paths:` glob, and land in `.claude/rules/harness/` when linked into a project — rules are discovered recursively, so the repo's own rules coexist. **Project rules win over personal ones**, so a repo can always override. Five ship with the template:
 
 - `delegation.md` (matches `**`, always loaded) - the main thread coordinates, specialists implement; never write feature code from the main thread
 - `specs.md` (matches `specs/**`) - claims are verified against code/git when written, never copied from existing prose; a hand-written spec still goes through `spec-reviewer`
