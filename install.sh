@@ -1,15 +1,30 @@
 #!/usr/bin/env bash
 # install.sh
-# Install the claude-spec-driven-template agent scaffolding into an existing repo.
+# Sets up a repo's own CONTEXT — the files that describe that project and must
+# be committed with it. It does NOT install the harness.
 #
-# Copies the AI-relevant files (.claude/, docs/, specs/, AGENTS.md, CLAUDE.md,
-# ECOSYSTEM.md, .claudeignore, .github/, CLAUDE.local.md.example) into a target
-# repo. It NEVER overwrites files that already exist there (skips and warns,
+# Two things, two commands, and the split matters:
+#
+#   ./install.sh --to <repo>     the project's context: AGENTS.md, CLAUDE.md,
+#                                docs/, specs/, .claude/settings.json. Committed,
+#                                shared with the team, different in every repo.
+#
+#   ./install-harness.sh         the machinery: skills, agents, rules, hooks.
+#                                Symlinked from this checkout, never committed,
+#                                identical everywhere, opt-in per repo.
+#
+# Before ADR 0003 this script copied `.claude/` wholesale, because the machinery
+# lived there. It does not any more — it lives in baseline/ and is linked, not
+# copied — so copying `.claude/` would now deliver almost nothing and imply it
+# had delivered a harness.
+#
+# It NEVER overwrites files that already exist in the target (skips and warns,
 # unless --force), and merges the required entries into the target .gitignore.
 # Only git-tracked template files are copied, so local/generated cruft
-# (settings.local.json, the Repomix snapshot, etc.) never leaks in.
+# (settings.local.json, the Repomix snapshot, the logs) never leaks in.
 #
-# After running, personalize AGENTS.md and run `/skill analyze-codebase`.
+# After running: personalize AGENTS.md, run `/skill analyze-codebase`, and link
+# the harness with install-harness.sh if you want it in this repo.
 #
 # Usage:
 #   # from a template clone, targeting another repo:
@@ -36,7 +51,7 @@ TEMPLATE_REPO="https://github.com/dashdanilo/claude-spec-driven-template"
 # Deliberately excludes README.md, LICENSE, CONTRIBUTING.md, LEARN.md,
 # CHANGELOG.md, src/ and .gitignore (the target keeps its own).
 ITEMS=(
-  ".claude"
+  ".claude/settings.json"
   "docs"
   "specs"
   "AGENTS.md"
@@ -187,13 +202,71 @@ merge_gitignore() {
 }
 merge_gitignore
 
-# --- Ensure hook/script shell files are executable ---
-# settings.json invokes hooks directly (.claude/hooks/foo.sh), so they must be
-# executable. git does not always carry the bit and cp does not always preserve
-# it, so set it explicitly on the target (even for files that were skipped).
+# --- Repo-owned guards -------------------------------------------------------
+# These are guards, not method: they must hold for everyone who touches the
+# repo, including a teammate who never installed the harness and CI. So they are
+# COPIED and committed, unlike the machinery, which is linked. install-harness.sh
+# deliberately does not register them for exactly this reason.
+#
+# The settings.json we just copied lists hooks at baseline/..., which is where
+# they live in the harness checkout and nowhere else. Rewrite it to the repo's
+# own paths and drop the portable hooks, which arrive via settings.local.json
+# when someone links the harness.
+REPO_HOOKS=(protect-critical.sh check-snapshot-on-session.sh)
+REPO_SCRIPTS=(check-snapshot.sh)
+
 if ! $DRY_RUN; then
-  find "$TARGET/.claude/hooks" "$TARGET/.claude/scripts" -name '*.sh' -type f \
-    -exec chmod +x {} + 2>/dev/null || true
+  mkdir -p "$TARGET/.claude/hooks" "$TARGET/.claude/scripts"
+  for h in "${REPO_HOOKS[@]}"; do
+    if [[ -e "$TARGET/.claude/hooks/$h" ]] && [[ "$FORCE" != true ]]; then
+      log "  skip   .claude/hooks/$h (already present)"
+    else
+      cp "$SRC/baseline/hooks/$h" "$TARGET/.claude/hooks/$h" && log "  copy   .claude/hooks/$h"
+    fi
+  done
+  for f in "${REPO_SCRIPTS[@]}"; do
+    if [[ -e "$TARGET/.claude/scripts/$f" ]] && [[ "$FORCE" != true ]]; then
+      log "  skip   .claude/scripts/$f (already present)"
+    else
+      cp "$SRC/baseline/scripts/$f" "$TARGET/.claude/scripts/$f" && log "  copy   .claude/scripts/$f"
+    fi
+  done
+  find "$TARGET/.claude/hooks" "$TARGET/.claude/scripts" -name '*.sh' -type f -exec chmod +x {} + 2>/dev/null || true
+
+  python3 - "$TARGET/.claude/settings.json" <<'PYEOF'
+import json, sys, os, collections
+p = sys.argv[1]
+if not os.path.exists(p):
+    sys.exit(0)
+try:
+    d = json.load(open(p), object_pairs_hook=collections.OrderedDict)
+except Exception:
+    sys.exit(0)
+
+KEEP = {"protect-critical.sh", "check-snapshot-on-session.sh"}
+hooks = d.get("hooks", {})
+for event in list(hooks):
+    groups = []
+    for g in hooks[event]:
+        kept = []
+        for h in g.get("hooks", []):
+            base = os.path.basename(h.get("command", ""))
+            if base in KEEP:
+                h["command"] = ".claude/hooks/" + base
+                kept.append(h)
+        if kept:
+            g["hooks"] = kept
+            groups.append(g)
+    if groups:
+        hooks[event] = groups
+    else:
+        del hooks[event]
+if not hooks:
+    d.pop("hooks", None)
+with open(p, "w") as f:
+    json.dump(d, f, indent=2); f.write("\n")
+PYEOF
+  log "  wrote  .claude/settings.json (repo-owned hooks only)"
 fi
 
 # --- Summary ---
@@ -203,6 +276,8 @@ log ""
 log "Next steps:"
 log "  1. Personalize AGENTS.md (project name, tech stack, commands, structure)"
 log "  2. Update the project name at the top of CLAUDE.md"
-log "  3. In Claude Code, run:  /skill analyze-codebase"
-log "  4. Review generated docs for TODO markers, then commit the baseline"
+log "  3. Link the harness here, if you want it in this repo:"
+log "       $(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/install-harness.sh --to $TARGET"
+log "  4. In Claude Code, run:  /skill analyze-codebase"
+log "  5. Review generated docs for TODO markers, then commit the context"
 if $DRY_RUN; then log ""; log "(dry run: nothing was written)"; fi
