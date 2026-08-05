@@ -1,4 +1,5 @@
 ---
+name: handover
 description: Produce a session handover — a compact, high-signal statement of what is true now: what changed, where it stands, what is undecided, so a new session or agent can continue without re-deriving context. Ends by closing the session.
 ---
 

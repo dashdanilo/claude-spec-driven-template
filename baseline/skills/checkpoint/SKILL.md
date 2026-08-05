@@ -1,4 +1,5 @@
 ---
+name: checkpoint
 description: Safe-save with verification — run the project's verification gate, then commit the current work on the feature branch. A durable, known-good checkpoint you can return to.
 argument-hint: [optional commit subject]
 ---

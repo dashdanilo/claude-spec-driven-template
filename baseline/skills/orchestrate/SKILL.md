@@ -1,4 +1,5 @@
 ---
+name: orchestrate
 description: Drive a spec's tasks.md to completion — reconcile the boxes against the code, classify each task to pick its gates, plan waves, get approval, dispatch specialists, gate with verify-before-done, open a PR. Halts on anything that needs a human. Stack-agnostic.
 argument-hint: <spec folder, e.g. specs/2026-07-13-my-feature>
 ---

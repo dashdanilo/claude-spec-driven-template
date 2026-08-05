@@ -31,15 +31,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/check-snapshot-on-session.sh"
+            "command": "baseline/hooks/check-snapshot-on-session.sh"
           },
           {
             "type": "command",
-            "command": ".claude/scripts/check-index.sh"
+            "command": "baseline/scripts/check-index.sh"
           },
           {
             "type": "command",
-            "command": ".claude/scripts/check-baseline.sh"
+            "command": "baseline/scripts/check-baseline.sh"
           }
         ]
       }
@@ -49,7 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/log-agent.sh"
+            "command": "baseline/hooks/log-agent.sh"
           }
         ]
       }
@@ -60,11 +60,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/block-secrets.sh"
+            "command": "baseline/hooks/block-secrets.sh"
           },
           {
             "type": "command",
-            "command": ".claude/hooks/protect-main.sh"
+            "command": "baseline/hooks/protect-main.sh"
           }
         ]
       },
@@ -73,11 +73,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/protect-critical.sh"
+            "command": "baseline/hooks/protect-critical.sh"
           },
           {
             "type": "command",
-            "command": ".claude/hooks/log-edit.sh"
+            "command": "baseline/hooks/log-edit.sh"
           }
         ]
       }

@@ -1,6 +1,0 @@
-# Copy to .claude/baseline.lock in a repo that consumes the shared harness.
-# Commit it: it is the record of what this repo has actually looked at.
-# The template itself has no lock — it is the source, not a consumer.
-source = ../marketplace
-sha    = 0000000000000000000000000000000000000000
-date   = YYYY-MM-DD

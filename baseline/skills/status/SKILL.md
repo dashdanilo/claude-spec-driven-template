@@ -1,4 +1,5 @@
 ---
+name: status
 description: Project health card — the active spec/phase, unchecked tasks, gate status, branch, and snapshot staleness at a glance. Read-only.
 ---
 
