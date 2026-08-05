@@ -7,6 +7,7 @@
 #   ~/Sites/harness/install-harness.sh --unlink     # take it back out
 #   ~/Sites/harness/install-harness.sh --status     # what is linked here
 #   ~/Sites/harness/install-harness.sh --dry-run    # show, change nothing
+#   ~/Sites/harness/install-harness.sh --adopt      # set aside what is already there
 #   ~/Sites/harness/install-harness.sh --global     # every project on this machine
 #
 # It symlinks, it does not copy — so `git pull` in this checkout updates every
@@ -35,6 +36,17 @@
 #
 # Idempotent. It never replaces a real directory: if .claude/skills exists and
 # is not our link, it stops and says so rather than deleting what you wrote.
+#
+# --adopt is for a repo that already has a copied harness. Instead of stopping,
+# it renames what is in the way to .claude/<name>.pre-harness and links over it.
+# --unlink then puts it back, so the whole thing is reversible with one command
+# and you can try the new model on a real repository without losing the old one.
+#
+# While adopted, git reports the set-aside files as DELETED, because they are
+# tracked and the symlink does not expose them. That is expected and harmless as
+# long as you do not commit in that state. --unlink restores them and leaves the
+# working tree exactly as it was; deleting the .pre-harness copies for good is a
+# separate, deliberate commit.
 
 set -uo pipefail
 
@@ -43,11 +55,13 @@ BASE="$HERE/baseline"
 
 MODE=link
 SCOPE=repo
+ADOPT=0
 TARGET="$PWD"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --unlink)  MODE=unlink ;;
+    --adopt)   ADOPT=1 ;;
     --status)  MODE=status ;;
     --dry-run) MODE=dryrun ;;
     --global)  SCOPE=global ;;
@@ -115,6 +129,12 @@ for i in 0 1 2; do
     else
       say "left alone .claude/$n (not ours)"
     fi
+    kept="$dst.pre-harness"
+    if [[ -e "$kept" && ! -e "$dst" ]]; then
+      mv "$kept" "$dst"; say "restored   .claude/$n (from .pre-harness)"
+    elif [[ -e "$kept" ]]; then
+      warn "note       $kept kept — something else now occupies .claude/$n"
+    fi
     continue
   fi
 
@@ -126,9 +146,20 @@ for i in 0 1 2; do
   fi
 
   if [[ -e "$dst" ]]; then
-    warn "STOP       .claude/$n exists and is not a link."
-    warn "           Move or merge it yourself, then re-run. Nothing was changed."
-    exit 2
+    if [[ $ADOPT -eq 1 ]]; then
+      kept="$dst.pre-harness"
+      if [[ -e "$kept" ]]; then
+        warn "STOP       $kept already exists — refusing to bury a second copy."
+        exit 2
+      fi
+      say "set aside  .claude/$n -> .claude/$n.pre-harness"
+      [[ $MODE == dryrun ]] || mv "$dst" "$kept"
+    else
+      warn "STOP       .claude/$n exists and is not a link."
+      warn "           Re-run with --adopt to set it aside and link over it,"
+      warn "           or move it yourself. Nothing was changed."
+      exit 2
+    fi
   fi
 
   say "link       .claude/$n -> $src"
@@ -235,7 +266,7 @@ PY
     if [[ $MODE == dryrun ]]; then
       say "would      add the links to .git/info/exclude"
     else
-      { echo ""; echo "$MARK"; echo ".claude/skills"; echo ".claude/agents"; echo ".claude/rules/harness"; echo ".claude/settings.local.json"; } >> "$EXCLUDE"
+      { echo ""; echo "$MARK"; echo ".claude/skills"; echo ".claude/agents"; echo ".claude/rules/harness"; echo ".claude/settings.local.json"; echo ".claude/*.pre-harness"; echo ".claude/rules/*.pre-harness"; } >> "$EXCLUDE"
       say "excluded   from git via .git/info/exclude"
     fi
   else
@@ -248,7 +279,14 @@ say ""
 case $MODE in
   dryrun) say "dry run — nothing changed." ;;
   unlink) say "removed. The repo keeps whatever lives in its own .claude/." ;;
-  *)      say "linked. Update everything that opted in with: git -C $HERE pull" ;;
+  *)      say "linked. Update everything that opted in with: git -C $HERE pull"
+          if [[ $ADOPT -eq 1 ]]; then
+            say ""
+            say "NOTE: the files you set aside are tracked, so git now reports them as"
+            say "      deleted. Do not commit while adopted — run --unlink to put them"
+            say "      back, or delete the .pre-harness copies deliberately once you are"
+            say "      satisfied and commit that as its own change."
+          fi ;;
 esac
 
 exit 0
