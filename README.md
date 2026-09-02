@@ -37,7 +37,9 @@ It combines:
 
 ---
 
-## Quick navigation
+> **Adopting this on your own machine?** Start with [`ADOPTING.md`](./ADOPTING.md) (in Portuguese) — install, and which skill to reach for when. This file explains the structure; that one gets you running.
+
+## Quick navigation## Quick navigation
 
 - [Who this is for](#who-this-is-for)
 - [Learn this repo](#learn-this-repo)
