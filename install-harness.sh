@@ -37,6 +37,12 @@
 # Idempotent. It never replaces a real directory: if .claude/skills exists and
 # is not our link, it stops and says so rather than deleting what you wrote.
 #
+# --adopt also handles the collisions a directory link cannot: a repo that
+# copied the harness has its own .claude/rules/delegation.md next to the linked
+# .claude/rules/harness/delegation.md (loaded twice), and its own
+# .claude/commands/orchestrate.md shadowed by the linked skill. Those individual
+# files are set aside too, and restored the same way.
+#
 # --adopt is for a repo that already has a copied harness. Instead of stopping,
 # it renames what is in the way to .claude/<name>.pre-harness and links over it.
 # --unlink then puts it back, so the whole thing is reversible with one command
@@ -56,6 +62,7 @@ BASE="$HERE/baseline"
 MODE=link
 SCOPE=repo
 ADOPT=0
+IS_WORKTREE=0
 TARGET="$PWD"
 
 while [[ $# -gt 0 ]]; do
@@ -86,8 +93,22 @@ else
   [[ "$TARGET" != "$HERE" ]] || { warn "that is the harness itself — it already has baseline/"; exit 2; }
   DEST="$TARGET/.claude"
   SETTINGS="$DEST/settings.local.json"
-  EXCLUDE="$TARGET/.git/info/exclude"
-  [[ -d "$TARGET/.git" ]] || warn "note: $TARGET is not a git repo — the links cannot be excluded from anything"
+  # Resolve via git, not by guessing: in a worktree .git is a FILE, so a -d test
+  # reports "not a repo" and silently skips the exclude. rev-parse handles a
+  # plain checkout, a worktree and a submodule alike.
+  EXCLUDE=$(git -C "$TARGET" rev-parse --git-path info/exclude 2>/dev/null)
+  if [[ -n "$EXCLUDE" ]]; then
+    [[ "$EXCLUDE" = /* ]] || EXCLUDE="$TARGET/$EXCLUDE"
+    # info/exclude lives in the COMMON git dir, so it is shared by every worktree
+    # of this repo. Harmless — the paths it lists are tracked in the other
+    # worktrees, and gitignore does not affect tracked files — but say it, since
+    # a surprise is worse than a caveat.
+    if [[ -f "$TARGET/.git" ]]; then
+      IS_WORKTREE=1
+    fi
+  else
+    warn "note: $TARGET is not a git repo — the links cannot be excluded from anything"
+  fi
 fi
 
 NAMES=(skills agents "rules/harness")
@@ -166,6 +187,39 @@ for i in 0 1 2; do
   [[ $MODE == dryrun ]] || ln -s "$src" "$dst"
 done
 
+# --------------------------------------------------- per-file collisions
+# A directory link replaces a folder wholesale, but rules and commands MERGE:
+# a repo that copied the harness ends up with its own delegation.md beside the
+# linked one (loaded twice), and its own orchestrate.md shadowed by the linked
+# skill. Set those specific files aside; leave anything the repo actually owns.
+collide() {
+  local t="$1" action="$2"
+  if [[ $action == aside ]]; then
+    [[ -f "$t" && ! -L "$t" && ! -e "$t.pre-harness" ]] || return 0
+    say "set aside  ${t#$DEST/} -> $(basename "$t").pre-harness"
+    [[ $MODE == dryrun ]] || mv "$t" "$t.pre-harness"
+  else
+    [[ -f "$t.pre-harness" && ! -e "$t" ]] || return 0
+    mv "$t.pre-harness" "$t"; say "restored   ${t#$DEST/}"
+  fi
+}
+
+if [[ $MODE == unlink ]]; then
+  for f in "$DEST"/rules/*.pre-harness "$DEST"/commands/*.pre-harness; do
+    [[ -e "$f" ]] || continue
+    collide "${f%.pre-harness}" back
+  done
+elif [[ $ADOPT -eq 1 ]]; then
+  for f in "$BASE"/rules/*.md; do
+    [[ -e "$f" ]] || continue
+    collide "$DEST/rules/$(basename "$f")" aside
+  done
+  for d in "$BASE"/skills/*/; do
+    [[ -d "$d" ]] || continue
+    collide "$DEST/commands/$(basename "$d").md" aside
+  done
+fi
+
 # ------------------------------------------------------------------ hooks
 python3 - "$SETTINGS" "$HERE" "$MODE" <<'PY'
 import json, sys, os, collections
@@ -243,7 +297,8 @@ PY
 
 # ------------------------------------------------------- keep it out of git
 MARK="# claude harness (install-harness.sh) — local only, never commit"
-if [[ -n "$EXCLUDE" && -d "$(dirname "$EXCLUDE")" ]]; then
+if [[ -n "$EXCLUDE" ]]; then
+  mkdir -p "$(dirname "$EXCLUDE")"
   if [[ $MODE == unlink ]]; then
     if grep -qF "$MARK" "$EXCLUDE" 2>/dev/null; then
       python3 - "$EXCLUDE" "$MARK" <<'PY'
@@ -267,7 +322,8 @@ PY
       say "would      add the links to .git/info/exclude"
     else
       { echo ""; echo "$MARK"; echo ".claude/skills"; echo ".claude/agents"; echo ".claude/rules/harness"; echo ".claude/settings.local.json"; echo ".claude/*.pre-harness"; echo ".claude/rules/*.pre-harness"; } >> "$EXCLUDE"
-      say "excluded   from git via .git/info/exclude"
+      say "excluded   from git via $(basename "$(dirname "$(dirname "$EXCLUDE")")")/info/exclude"
+      [[ $IS_WORKTREE -eq 1 ]] && say "           (shared with every worktree of this repo — harmless, the paths are tracked there)"
     fi
   else
     say "ok         already in .git/info/exclude"
