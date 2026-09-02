@@ -18,6 +18,12 @@
 # against the remote ref you already have — meaning "up to date" means "up to
 # date as of your last fetch", and it says so rather than implying more.
 #
+# It also reports a BROKEN LINK, which is the failure this model fails at worst:
+# move the harness checkout and every link in every project that opted in points
+# at nothing. Claude Code does not error on that — the skills, agents and rules
+# simply are not there, and a session looks normal while being unarmed. Detecting
+# it costs one stat call; not detecting it costs a day of wondering.
+#
 # Silent when it cannot find a harness checkout, so a repo that does not use one
 # is unaffected. Informational — always exits 0. Wire on SessionStart.
 #
@@ -44,6 +50,31 @@ resolve_checkout() {
   fi
   return 1
 }
+
+# --------------------------------------------------------- broken links first
+# Checked before anything else: if the links are dead, everything below is moot.
+broken=""
+for n in skills agents rules/harness; do
+  l=".claude/$n"
+  [[ -L "$l" ]] || continue
+  [[ -e "$l" ]] && continue          # resolves — fine
+  broken="${broken}
+     .claude/$n -> $(readlink "$l")"
+done
+
+if [[ -n "$broken" ]]; then
+  {
+    echo ""
+    echo "⚠  the linked harness is not there. These point at nothing:"
+    echo "$broken"
+    echo ""
+    echo "   Claude Code does not error on this — the skills, agents and rules are"
+    echo "   simply absent, so a session looks normal while being unarmed."
+    echo "   The checkout was probably moved or deleted. Re-link with:"
+    echo "     <harness>/install-harness.sh"
+    echo ""
+  } >&2
+fi
 
 CO=$(resolve_checkout) || exit 0
 git -C "$CO" rev-parse --git-dir >/dev/null 2>&1 || exit 0
