@@ -40,6 +40,23 @@ rule, and the 29% was measured with it in place. If a fresh report still shows
 roughly 29%, the conclusion is that prose does not fix this and the next step is
 a different mechanism, not a better sentence.
 
+## Imported hypotheses — not ours, not measured here
+
+Numbers this harness now acts on that came from **someone else's benchmark**. They are flagged so a future reader knows which figures are earned and which are borrowed.
+
+**~3 cohesive clusters, 5-7 tasks each** — the grouping rule in `/orchestrate` Step 1 and `/wave`.
+
+| source | [Tech Leads Club](https://agent-skills.techleads.club/tlc-spec-driven/), an 18-task Stripe epic |
+|---|---|
+| method | one codebase, one run per architecture, four architectures |
+| what it showed | one-agent-per-task is worst on every axis (25M tokens, 43m, 0.81); ~3 clusters best (10.5M, 18m, 0.95) and finishes at 26% of the window instead of 74% |
+| what is solid | the **shape** — granularity destroys quality, and more workers can leave the main thread fatter because every summary returns to it |
+| what is not | the **number**. n=1 per cell, and its own authors call the 0.93 vs 0.95 quality gap statistically indistinguishable |
+
+**What would confirm or refute it here:** run `/orchestrate` on a real spec of roughly this size and compare a `/harness-report` against the rows above. The figures that matter are tokens, wall time, and how much of the window is left at the end — that last one is the actual claim, since the token cost at 18 tasks is a wash.
+
+**Why adopt before measuring.** Our own baseline says the opposite failure: 1.0 dispatches per message and 29% of `Edit` delegated, meaning we sit near the *inline* row while `/orchestrate` as written would have produced the *per-task* row. Both directions are wrong and the correction points the same way, so the shape is worth adopting now. If our own numbers land elsewhere, the number changes and the shape stays.
+
 ## Reading a report honestly
 
 - **A small sample is not a trend.** A handful of edits in one session says

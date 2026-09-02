@@ -12,9 +12,11 @@ Follow `.claude/rules/delegation.md` (you coordinate, specialists implement) and
 
 From `$ARGUMENTS`: either a spec folder (take the next unchecked tasks from its `tasks.md`) or a free-form description (split it yourself).
 
-Keep the batch to a handful. **Every task in a wave must touch disjoint files** — two tasks editing the same file belong in different waves, not the same one. If you cannot split them cleanly, run the batch as one task.
+**Group into a few cohesive clusters, not one dispatch per task.** A cluster is 5-7 related tasks that one specialist runs in order, in its own context. One agent per task measured **worst on every axis** — 2.4x the tokens, 2.4x the time, and lower quality than not dispatching at all — because each dispatch starts from zero and loses sight of the whole. See the table in the `orchestrate` skill.
 
-Pick the specialist per task from `.claude/agents/` (stack specialists arrive via a stack plugin). No specialist for this stack → use a general-purpose implementer **and say the specialist is missing**.
+Keep the batch to a handful of clusters. **Clusters must touch disjoint files**, since they go out together; inside a cluster the tasks may share files freely, because one specialist runs them in order. If you cannot split them cleanly, run the batch as one cluster.
+
+Pick one specialist per cluster from `.claude/agents/` (stack specialists arrive via a stack plugin). No specialist for this stack → use a general-purpose implementer **and say the specialist is missing**.
 
 ## 2 — Confirm branch
 
@@ -22,9 +24,9 @@ Feature branch or worktree, never a protected branch (`main` / `master` / `devel
 
 ## 3 — Dispatch — all of them, in ONE message
 
-This is the whole point of the command. Independent tasks go out as **several agent calls in a single message** so they run concurrently. One-per-message is sequential and defeats the wave.
+This is the whole point of the command. Independent clusters go out as **several agent calls in a single message** so they run concurrently. One-per-message is sequential and defeats the wave.
 
-Each dispatch carries a **curated handoff**: the task, one line on what earlier work already changed (files touched), the relevant spec/plan context if any, this task's explicit done criteria, "follow this repo's `.claude/rules/` and skills", and "**return only files changed + one paragraph — not a transcript**".
+Each dispatch carries a **curated handoff**: the cluster's tasks in order, one line on what earlier work already changed (files touched), the relevant spec/plan context if any, this task's explicit done criteria, "follow this repo's `.claude/rules/` and skills", and "**return only files changed + one paragraph for the whole cluster — not a transcript, and not one report per task**".
 
 Announce the batch in one line before dispatching (task → specialist). Do not stop for approval — the human can interrupt.
 

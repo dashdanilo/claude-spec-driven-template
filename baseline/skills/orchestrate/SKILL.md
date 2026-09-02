@@ -38,45 +38,73 @@ Skip Step 0 only when `tasks.md` was written in this session and nothing has bee
 
    When a task spans two classes, take the **stricter** row. When you cannot tell, take the stricter row and say why. The build gate is never skipped except on docs-only — that invariant does not bend.
 
-2. Build a **wave plan**: group the unchecked tasks into waves. Within a wave the tasks must be independent **and touch disjoint files** — two tasks editing the same file belong in different waves, because the whole wave is dispatched at once and they would clobber each other. If you cannot split them cleanly, merge them into a single task or put them in consecutive waves. Across waves they depend in order. For each task, pick the **specialist agent for this repo's stack** — the stack-specific agents in `.claude/agents/` (provided by a stack plugin). If the repo has no stack specialists, dispatch to a general-purpose implementer.
+2. **Group the tasks into a few cohesive clusters — not one per task, and not one per phase.**
 
-   **Default dependency order** — foundational layers first: data model / schema / migration → core logic / services → interface / API / UI contract → tests. A task that consumes another task's output goes in a **later** wave; only genuinely independent tasks share a wave.
+   A cluster is **5-7 related tasks that one specialist runs in order, in its own context**. Aim for roughly **three clusters** on a spec of ~18 tasks. This is the single most consequential number in the plan, and the reason is not speed:
+
+   | how you slice | tokens | time | quality | main thread left |
+   |---|---|---|---|---|
+   | everything inline, no dispatch | 9M | 19m | 0.93 | **74% used** |
+   | **~3 cohesive clusters** | 10.5M | 18m | **0.95** | **26% used** |
+   | one per phase (7) | 15M | 35m | 0.90 | 24% used |
+   | **one per task (18)** | **25M** | **43m** | **0.81** | 32% used |
+
+   Three things that table is saying, and only one of them is obvious:
+
+   - **Granularity destroys quality.** Every extra dispatch starts from zero, re-reads the files, and loses sight of the whole. One agent per task is the *worst* row, not the most parallel one.
+   - **More workers does not mean a leaner main thread.** Eighteen workers left it *fatter* than seven, because each worker's summary comes back into it. Fan-out has a cost on the side you were trying to protect.
+   - **Sub-agents here buy context budget, not speed.** Eighteen minutes against nineteen is no speed-up at all. What you actually bought is finishing with **26% of the window used instead of 74%**, so the correction rounds — where the real work happens — are cheap instead of degrading.
+
+   Numbers from a benchmark by [Tech Leads Club](https://agent-skills.techleads.club/tlc-spec-driven/) on an 18-task epic: one codebase, one run per architecture. Treat the **shape** as established and the **number** as a hypothesis — see `.claude/docs/harness-baseline.md`.
+
+   **How to cluster:**
+   - **Cohesive, not independent.** Tasks in a cluster should touch the same area and may touch the same files — one specialist runs them in order, so they cannot clobber each other. Cohesion is what gives the specialist the context that made the quality go up.
+   - **Disjoint files *between* clusters**, since clusters are dispatched together. Two clusters editing the same file belong in consecutive waves.
+   - **Size by tasks per specialist, not by cluster count.** Three is right for ~18 tasks. For 60, three clusters of 20 would blow each specialist's window — hold the cluster at 5-7 and accept more waves.
+   - **A cluster takes the strictest gate** of the classes it contains.
+   - One specialist per cluster, picked for this repo's stack from `.claude/agents/` (provided by a stack plugin). No stack specialist is a gap in the plugin — say so, and use a general-purpose implementer as a stopgap.
+
+   **Default dependency order** — foundational layers first: data model / schema / migration → core logic / services → interface / API / UI contract → tests. A cluster that consumes another cluster's output goes in a **later** wave; only clusters that are genuinely independent share a wave.
 
 ## Step 2 — Approval gate ⏸
 
-Present the wave plan as a table (`wave | task | class | specialist | gates | parallel?`) and **STOP**. Wait for the user's explicit "go" (or edits). Do not execute without approval.
+Present the wave plan as a table (`wave | cluster | tasks | class | specialist | gates`) and **STOP**. Wait for the user's explicit "go" (or edits). Do not execute without approval.
 
 The `gates` column is what Step 1 selected — showing it here is what makes the selection reviewable. A human who disagrees with a class corrects it now, not after a specialist has already run.
 
 ## Step 3 — Execute, one **wave** at a time
 
-The unit of execution is the wave, not the task. Dispatching a wave's tasks one at a time is a queue wearing a wave's name — it costs the full latency of every task in sequence and delivers nothing the plan promised. Measured on this template's own project: **54 of 54 dispatches went out one per message**, so no wave plan ever actually fanned out.
+The wave is the **barrier**; the cluster is the **unit of dispatch**. One specialist per cluster, running its 5-7 tasks in order inside its own context — never one dispatch per task, which is the row that measured worst on every axis (Step 1).
+
+Measured on this template's own project: **54 of 54 dispatches went out one per message**, so no wave plan ever actually fanned out.
 
 For each wave, in the approved order:
 
-1. **Dispatch the whole wave in ONE message** — several Agent calls in a single message is what makes them concurrent. Not one per message (that is sequential), and not background (background is for long work you collect later in the same turn; here you are collecting immediately, and a backgrounded wave is how dispatches end up uncollected for days).
+1. **Dispatch the wave's clusters in ONE message** — one Agent call per cluster, all in a single message, which is what makes them concurrent. Not one per message (that is sequential), and not background (background is for long work you collect later in the same turn; here you are collecting immediately, and a backgrounded wave is how dispatches end up uncollected for days).
 
-   Each dispatch carries its own **context handoff**: the task text, a one-line summary of what earlier waves already changed (files touched) so it doesn't re-discover them, the relevant `spec.md`/`plan.md` context, this task's explicit "done" criteria, "follow this repo's `.claude/rules/` and skills", and "**return only a concise summary — files changed + one paragraph — not a transcript**" (context discipline, see `.claude/docs/context-engineering.md`). Keep the main thread lean: bulky work stays in the subagents.
+   Each dispatch carries its own **context handoff**: **all of the cluster's tasks, in order**, a one-line summary of what earlier waves already changed (files touched) so it doesn't re-discover them, the relevant `spec.md`/`plan.md` context, each task's explicit "done" criteria, "follow this repo's `.claude/rules/` and skills", and "**return only a concise summary — files changed + one paragraph for the whole cluster — not a transcript, and not one report per task**" (context discipline, see `.claude/docs/context-engineering.md`).
 
-   A wave of one task is fine — dispatch it and carry on. Do not pad a wave to make it look parallel.
+   That last instruction is doing more work than it looks: a specialist's summary lands in the main thread, so a cluster reporting per task undoes the context saving that clustering bought.
+
+   A wave of one cluster is fine — dispatch it and carry on. Do not pad a wave to make it look parallel.
 
 2. **Collect all of them** before doing anything else. A wave is a barrier: you gate what the whole wave produced, not a moving target.
 
 3. **Build gate — once, for the wave, in the foreground.** Run the `verify-before-done` skill (it discovers the repo's install → codegen → typecheck → build → tests from `AGENTS.md`). Never background a gate; a gate you do not wait for blocks nothing.
-   - Red → **attribute the failure before retrying.** The cost of gating a batch is that a red does not name its author: read the failure against the files each specialist reported touching. If it is still ambiguous, gate the suspect task alone rather than guessing.
+   - Red → **attribute the failure before retrying.** The cost of gating a batch is that a red does not name its author: read the failure against the files each specialist reported touching. If it is still ambiguous, gate the suspect cluster alone rather than guessing.
    - Then **hand the responsible specialist the specific failure/diagnosis so the next attempt takes a different path** (fix the root cause; re-plan or re-scope the task if needed) — never blind-retry the same approach. A correction must change the path, not just be logged. Up to **3×**. Still red, or the fix looks hacky → **STOP** and report (and record a lesson, Step 5).
 
-4. **Test + review** — run the union of the gates the wave's classes selected in Step 1. `tester` (tests for the touched area) and `code-reviewer` (against `spec`/`plan`/`tasks`) are independent of each other and of the tasks: dispatch every reviewer this wave needs **in one message** too. Blocking findings → back to the responsible specialist.
+4. **Test + review** — run the union of the gates the wave's clusters selected in Step 1 (each cluster carries the strictest class it contains). `tester` (tests for the touched area) and `code-reviewer` (against `spec`/`plan`/`tasks`) are independent of each other and of the tasks: dispatch every reviewer this wave needs **in one message** too. Blocking findings → back to the responsible specialist.
 
 5. **Docs gate** — for the tasks whose class selected it: ensure the relevant doc or nested `src/<folder>/CLAUDE.md` is updated (`documenting-domains`) before marking done.
 
-6. **Check the boxes** for the wave in `tasks.md` (Edit) — only the tasks that are actually green. A task whose specialist came back short does not get a box because its wave-mates passed. Add a short inline `Note:` if useful.
+6. **Check the boxes** for the wave in `tasks.md` (Edit) — only the tasks that are actually green. A task the specialist did not finish does not get a box because the rest of its cluster passed, and a cluster does not get its boxes because its wave-mates passed. Add a short inline `Note:` if useful.
 
 7. **Next wave.**
 
 If a task's work turned out to be bigger than its class assumed — a "config / chore" that ended up touching a service — **re-classify it and run the stricter gates** before checking its box. The class is a plan, and the diff outranks the plan.
 
-**Document ownership** (so parallel specialists don't clobber): tasks in the same wave must touch **disjoint files** — that is what makes one-message dispatch safe. A specialist edits only its own task's files; `tasks.md` is **yours** to check off, not theirs; ADRs are append-only (`.claude/rules/adr.md`). See the three principles in `.claude/README.md`.
+**Document ownership** (so parallel specialists don't clobber): **clusters** in the same wave must touch **disjoint files** — that is what makes one-message dispatch safe. Inside a cluster the tasks may share files freely, because one specialist runs them in order. A specialist edits only its own task's files; `tasks.md` is **yours** to check off, not theirs; ADRs are append-only (`.claude/rules/adr.md`). See the three principles in `.claude/README.md`.
 
 ## Step 4 — Finish
 
@@ -101,4 +129,4 @@ Anything you log as `needs decision` is a **STOP**, not a note. Report it and wa
 - `tasks.md` is **ambiguous**.
 - **Stagnation / budget:** no task got checked off in the last **3** iterations, or you have run ~**10** task-iterations without finishing — halt and report status instead of spinning.
 
-**Invariants:** never tick a box without a **fresh** green gate covering that wave (re-run it every wave; never trust a previous green); never plan waves from unreconciled checkboxes; dispatch a wave in one message, never one task per message; never push/merge to a protected branch; one worktree per feature.
+**Invariants:** never tick a box without a **fresh** green gate covering that wave (re-run it every wave; never trust a previous green); never plan waves from unreconciled checkboxes; dispatch a wave in one message, one call per cluster, never one per task; never push/merge to a protected branch; one worktree per feature.

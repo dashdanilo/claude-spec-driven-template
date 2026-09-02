@@ -4,6 +4,40 @@
 
 AI-only. Portable: no stack assumptions.
 
+## Decide whether to dispatch at all
+
+Before the shape, the prior question. Dispatching is not free and it is not always better.
+
+| the work is | do this | why |
+|---|---|---|
+| a codebase sweep, a search, research | **always dispatch** | the sub-agent reads widely and returns only the distillate; the breadth never enters your window |
+| many tasks, or a run past ~30 minutes | **dispatch, grouped into a few cohesive clusters** | your window fills before the corrections start, which is where the work actually is |
+| small and self-contained | **inline** | a round trip costs more than the edit, and the specialist re-reads what you already have |
+| genuinely parallelisable, disjoint files | **dispatch** | this is the only case where speed is the reason |
+
+## How finely to slice, and why it is not "as fine as possible"
+
+Measured on an 18-task epic, one run per architecture, by [Tech Leads Club](https://agent-skills.techleads.club/tlc-spec-driven/):
+
+| how you slice | tokens | time | quality | main thread used |
+|---|---|---|---|---|
+| inline, no dispatch | 9M | 19m | 0.93 | **74%** |
+| **~3 cohesive clusters** | 10.5M | 18m | **0.95** | **26%** |
+| one per phase (7) | 15M | 35m | 0.90 | 24% |
+| **one per task (18)** | **25M** | **43m** | **0.81** | 32% |
+
+Three readings, and only the first is intuitive.
+
+**Granularity destroys quality.** Every dispatch starts from zero, re-reads the files, and loses the whole. One agent per task is the worst row on every axis, including against not dispatching at all.
+
+**More workers can leave the main thread fatter.** Eighteen workers used *more* of it than seven, because every worker's summary lands there. Fan-out has a cost on the side you were trying to protect — which is why a cluster is told to report once, not once per task.
+
+**The win is context budget, not speed.** Eighteen minutes against nineteen is no speed-up. What was bought is finishing at 26% instead of 74%, so the correction rounds are cheap instead of degrading. At 18 tasks the token cost is a wash; past that, the inline row inflates and clustering starts winning outright.
+
+The industry disagreement dissolves here. Anthropic reports sub-agents costing more but answering better on long-running work; Cognition reports them fragmenting context and being dangerous. Both are true at different granularities, and granularity is the variable.
+
+**Treat the shape as established and the number as a hypothesis.** It is one epic, one codebase, one run per cell, and its authors call 0.93 vs 0.95 statistically the same. Size by **tasks per specialist** (5-7), not by a fixed cluster count: three clusters of 20 tasks would blow each window. See `harness-baseline.md`.
+
 ## Pick the shape before the mechanics
 
 Six shapes cover almost every dispatch you will plan. Choose the shape from the *work*, then apply the mechanics below. Picking the wrong shape is more expensive than any mechanic can fix: a fan-out over dependent tasks wastes every parallel run, and a pipeline over independent ones wastes wall-clock.
