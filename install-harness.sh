@@ -90,7 +90,17 @@ if [[ $SCOPE == global ]]; then
   EXCLUDE=""
 else
   TARGET=$(cd -- "$TARGET" 2>/dev/null && pwd) || { warn "no such directory"; exit 2; }
-  [[ "$TARGET" != "$HERE" ]] || { warn "that is the harness itself — it already has baseline/"; exit 2; }
+  if [[ "$TARGET" == "$HERE" ]]; then
+    # Having baseline/ is not the same as being able to use it: Claude Code
+    # discovers machinery under .claude/, never under baseline/. The harness repo
+    # therefore links itself too — but with RELATIVE links that are committed, so
+    # every clone works with no install step and nothing breaks if the checkout
+    # moves. Those links are already in git; there is nothing to do here.
+    warn "this is the harness itself. It links to its own baseline/ with committed"
+    warn "relative symlinks (.claude/skills -> ../baseline/skills), so it already"
+    warn "works in any clone. Nothing to install."
+    exit 0
+  fi
   DEST="$TARGET/.claude"
   SETTINGS="$DEST/settings.local.json"
   # Resolve via git, not by guessing: in a worktree .git is a FILE, so a -d test

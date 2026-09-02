@@ -33,9 +33,26 @@ CLAUDE="CLAUDE.md"
 [[ -f "$CLAUDE" ]] || exit 0
 
 # Roots that this repo owns, and are therefore expected to be indexed.
+#
+# A repo can hold the same machinery under two paths: the harness repo itself has
+# baseline/skills AND .claude/skills symlinked to it, and any repo that linked the
+# harness has .claude/skills pointing outside. Scanning both would report every
+# finding twice. Resolve each candidate and keep it only if it is new.
 OWNED=()
-[[ -d baseline/agents || -d baseline/skills || -d baseline/rules ]] && OWNED+=("baseline")
-[[ -d .claude/agents  || -d .claude/skills  || -d .claude/rules  ]] && OWNED+=(".claude")
+seen=""
+add_root() {
+  local root="$1" real
+  [[ -d "$root/agents" || -d "$root/skills" || -d "$root/rules" ]] || return 0
+  for sub in skills agents rules; do
+    [[ -e "$root/$sub" ]] || continue
+    real=$(cd -- "$root/$sub" 2>/dev/null && pwd -P) || continue
+    case "$seen" in *"|$real|"*) return 0 ;; esac
+    seen="${seen}|$real|"
+  done
+  OWNED+=("$root")
+}
+add_root "baseline"
+add_root ".claude"
 # Personal scope contributes names, never expectations.
 EXTRA=()
 [[ -d "$HOME/.claude/skills" || -d "$HOME/.claude/rules" || -d "$HOME/.claude/agents" ]] && EXTRA+=("$HOME/.claude")
