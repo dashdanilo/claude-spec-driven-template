@@ -10,7 +10,9 @@
 #   - One worktree per FEATURE. Several specs/plans can share it.
 #   - Worktrees are NOT removed on merge. Clean up later with --remove / --prune.
 #
-# On create, gitignored local files are provisioned into the new worktree:
+# On create, gitignored local files are provisioned into the new worktree —
+# including the harness links, which are excluded from git and therefore exist
+# only in the worktree that made them:
 #   - Symlinked (single source of truth): CLAUDE.local.md,
 #     .claude/settings.local.json, .claude/context/config.json
 #   - Copy-seeded (regenerable per-branch cache): .claude/context/repomix-snapshot.md
@@ -93,6 +95,21 @@ provision_locals() {
       log "  linked  $f"
     fi
   done
+  # Carry the harness links over. They are gitignored (via .git/info/exclude), so
+  # they exist only in the worktree that created them — a new worktree of a repo
+  # that opted in would otherwise start WITHOUT the harness, silently, which is
+  # the same quiet failure a moved checkout produces. Point at the same target
+  # the main checkout uses rather than re-deriving it.
+  for f in ".claude/skills" ".claude/agents" ".claude/rules/harness"; do
+    if [[ -L "$MAIN_ROOT/$f" && ! -e "$wt/$f" ]]; then
+      local target
+      target=$(readlink "$MAIN_ROOT/$f")
+      mkdir -p "$(dirname "$wt/$f")"
+      ln -s "$target" "$wt/$f"
+      log "  linked  $f (harness)"
+    fi
+  done
+
   # Copy-seed the regenerable snapshot cache (do NOT symlink: it is per-branch
   # and gets rewritten when it goes stale; sharing it would corrupt main's copy)
   local snap=".claude/context/repomix-snapshot.md"
