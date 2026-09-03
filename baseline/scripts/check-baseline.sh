@@ -76,6 +76,36 @@ if [[ -n "$broken" ]]; then
   } >&2
 fi
 
+# ------------------------------------------------------- stale fallback copies
+# On a platform that would not symlink, install-harness.sh copies instead and
+# marks the copy. A copy does NOT follow the checkout, so `git pull` updates
+# nothing for that person — and nothing else would tell them, which is the whole
+# problem with a fallback nobody checks on.
+stale_copies=""
+for n in skills agents rules/harness; do
+  d=".claude/$n"
+  [[ -f "$d/.harness-copy" ]] || continue
+  src=$(cat "$d/.harness-copy" 2>/dev/null)
+  [[ -n "$src" && -d "$src" ]] || continue
+  if ! diff -rq --exclude=.harness-copy "$src" "$d" >/dev/null 2>&1; then
+    stale_copies="${stale_copies}
+     .claude/$n"
+  fi
+done
+
+if [[ -n "$stale_copies" ]]; then
+  {
+    echo ""
+    echo "⚠  these are COPIES of the harness, and they no longer match it:"
+    echo "$stale_copies"
+    echo ""
+    echo "   A copy does not follow the checkout — git pull did not update them."
+    echo "   Re-run the installer to refresh:"
+    echo "     <harness>/install-harness.sh"
+    echo ""
+  } >&2
+fi
+
 CO=$(resolve_checkout) || exit 0
 git -C "$CO" rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
@@ -109,8 +139,9 @@ fi
   fi
 
   if [[ "$dirty" -gt 0 ]]; then
-    echo "   $dirty uncommitted file(s) under baseline/ — LIVE in every project on"
-    echo "   this machine right now, unreviewed."
+    echo "   $dirty uncommitted file(s) under baseline/ — live in every project that"
+    echo "   LINKED the harness, right now, unreviewed. Projects that fell back to"
+    echo "   copying are unaffected until the installer is re-run there."
     git -C "$CO" status --porcelain -- baseline 2>/dev/null | head -6 | sed 's/^/     /'
   fi
   echo ""
