@@ -17,7 +17,7 @@ The main thread **coordinates**; specialists **implement**. This rule loads alwa
 ## Non-negotiable
 
 - **Never write feature code from the main thread.** If you are about to Edit or Write a source file for the task at hand, dispatch it instead.
-- **No specialist for this stack is a gap in the stack plugin, not permission to hand-roll it.** Say so out loud, dispatch to a general-purpose implementer as a stopgap, and flag the missing agent — a general-purpose agent re-discovers the repo on every run and costs multiples of a specialist.
+- **No specialist for this stack is a gap in the stack plugin, not permission to hand-roll it.** Dispatch the baseline's `implementer` — it is the portable fallback and it reads the repo before writing — and flag the missing specialist. Do **not** fall back to the built-in `general-purpose` agent: it knows nothing about the repo and re-discovers it every run, measured at a median of 122 tool calls, the most expensive agent in the estate.
 - The main thread owns exactly four things: the plan, the `tasks.md` checkboxes, the gate decision, and the conversation with the human.
 
 ## Narrow exceptions

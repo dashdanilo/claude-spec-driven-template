@@ -35,6 +35,7 @@ The subagents in `baseline/agents/` run in isolated context windows:
 - `tester` - portable; writes and runs tests using the repo's own framework, discovered from AGENTS.md/tooling
 - `researcher` - deep-dives on libs and APIs (persistent memory across projects)
 - `security-auditor` - audits auth, secrets, input validation
+- `implementer` - **portable fallback implementer**: writes code in any stack by learning the repo first (`AGENTS.md`, the rules, the code next to the change). Used only when no stack specialist exists, and it names the missing specialist in its report so the gap lands in the plugin instead of being paid for silently
 
 ### Drivers (also skills)
 

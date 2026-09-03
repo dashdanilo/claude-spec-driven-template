@@ -62,7 +62,7 @@ Skip Step 0 only when `tasks.md` was written in this session and nothing has bee
    - **Disjoint files *between* clusters**, since clusters are dispatched together. Two clusters editing the same file belong in consecutive waves.
    - **Size by tasks per specialist, not by cluster count.** Three is right for ~18 tasks. For 60, three clusters of 20 would blow each specialist's window — hold the cluster at 5-7 and accept more waves.
    - **A cluster takes the strictest gate** of the classes it contains.
-   - One specialist per cluster, picked for this repo's stack from `.claude/agents/` (provided by a stack plugin). No stack specialist is a gap in the plugin — say so, and use a general-purpose implementer as a stopgap.
+   - One specialist per cluster, picked for this repo's stack from `.claude/agents/` (provided by a stack plugin). No stack specialist is a gap in the plugin — say so, and dispatch the baseline's `implementer`, which is the portable fallback. Not the built-in `general-purpose` agent, which starts with no knowledge of the repo.
 
    **Default dependency order** — foundational layers first: data model / schema / migration → core logic / services → interface / API / UI contract → tests. A cluster that consumes another cluster's output goes in a **later** wave; only clusters that are genuinely independent share a wave.
 
