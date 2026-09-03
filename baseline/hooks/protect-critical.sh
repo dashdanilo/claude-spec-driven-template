@@ -15,7 +15,7 @@ set -euo pipefail
 input=$(cat)
 
 # Extract the file_path from JSON (Edit and Write both have file_path in tool_input)
-file_path=$(echo "$input" | grep -oP '"file_path"\s*:\s*"\K[^"]*' || echo "")
+file_path=$(printf '%s' "$input" | python3 -c "import sys,json;d=json.load(sys.stdin);ti=d.get('tool_input') or {};print(d.get('file_path') or ti.get('file_path') or '')" 2>/dev/null || echo "")
 
 if [[ -z "$file_path" ]]; then
   exit 0
@@ -54,7 +54,7 @@ for pattern in "${critical_patterns[@]}"; do
     echo "  2. If it's a lockfile, run the package manager instead (pnpm install, cargo update, etc)" >&2
     echo "  3. If it's a migration, create a new migration instead of editing" >&2
     echo "  4. If it's generated code, regenerate from source" >&2
-    exit 1
+    exit 2  # 2 = block. Exit 1 is a non-blocking error: the tool call proceeds.
   fi
 done
 

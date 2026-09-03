@@ -9,7 +9,7 @@
 input=$(cat)
 
 # Extract the command from the JSON (tool_input.command for the Bash tool)
-command=$(echo "$input" | grep -oP '"command"\s*:\s*"\K[^"]*' || echo "")
+command=$(printf '%s' "$input" | python3 -c "import sys,json;d=json.load(sys.stdin);ti=d.get('tool_input') or {};print(d.get('command') or ti.get('command') or '')" 2>/dev/null || echo "")
 
 # Forbidden patterns
 forbidden_patterns=(
@@ -29,7 +29,7 @@ for pattern in "${forbidden_patterns[@]}"; do
   if echo "$command" | grep -qE "$pattern"; then
     echo "BLOCKED by block-secrets.sh: command matches forbidden pattern '$pattern'" >&2
     echo "If you need to read .env values, do it manually outside the agent session." >&2
-    exit 1
+    exit 2  # 2 = block. Exit 1 is a non-blocking error: the tool call proceeds.
   fi
 done
 

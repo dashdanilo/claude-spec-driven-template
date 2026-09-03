@@ -130,6 +130,55 @@ If you ever need to undo, you want the granularity to be fine.
 
 Recommendation for teams to define and document. This template does not enforce a choice.
 
+## Branching, merging and the three rules that came from breaking them
+
+These are not style. Each one is here because skipping it put someone else's
+unreviewed work on a shared branch.
+
+### Branch from the remote ref, never from the local branch
+
+```bash
+git checkout -b feat/x origin/main      # correct
+git checkout main && git pull && git checkout -b feat/x   # not this
+```
+
+The second looks equivalent and is not. If the local branch carries commits that
+were never pushed — your own work in progress, an old propagation, anything —
+your new branch inherits them, and they ride into the PR under your change's
+title. Branching from `origin/main` cannot pick up what the remote does not have.
+
+This matters most in exactly the situation where you are least likely to check:
+a script looping over several repositories.
+
+### Read the file list before merging your own PR
+
+```bash
+gh pr view <n> --json files --jq '.files[].path'
+```
+
+A PR you opened by hand you already know. A PR opened by a script you do not, and
+the title tells you nothing — it says what you *meant* to change. If the list
+contains a file you cannot explain, stop.
+
+Note that `gh pr view` shows the diff against the base *as GitHub sees it*, which
+is the honest one; a local `git diff` against a stale branch can look clean while
+the PR is not.
+
+### Never `--admin` on a repository other people share
+
+`gh pr merge --admin` bypasses branch protection. Used on your own repo to
+unblock yourself it is fine. Used on a shared repo it removes the review that
+exists precisely to catch the previous two mistakes, and it removes it silently —
+the merge looks identical to a reviewed one afterwards.
+
+If protection is genuinely in the way, say so and let a human decide, rather than
+routing around it.
+
+**Why this is a rule after one occurrence** rather than the usual three: the
+failure mode is someone else's unreviewed code landing on a protected branch. The
+cost of the mistake is not paid by the person who makes it, and it is invisible
+once merged.
+
 ## Pull requests
 
 **Before opening a PR:**
