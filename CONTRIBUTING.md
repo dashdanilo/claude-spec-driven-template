@@ -30,8 +30,8 @@ Thanks for considering a contribution. This template's value comes from being a 
 - **No em-dashes** in copy
 - **One H1 per file**, used as the title
 - **Code blocks have language tags** (` ```bash `, ` ```markdown `, etc)
-- **File paths in inline code:** `.claude/skills/example-skill/SKILL.md`
-- **Directory paths end with slash:** `.claude/skills/` not `.claude/skills`
+- **File paths in inline code:** `baseline/skills/example-skill/SKILL.md`
+- **Directory paths end with slash:** `baseline/skills/` not `baseline/skills`
 - **Dates in ISO format:** `2026-06-21`
 
 ## Commit messages
@@ -74,10 +74,10 @@ If you add a new example (rule, skill, agent, etc), follow this pattern:
 
 The template ships several ready-to-use skills and subagents. If you add new ones:
 
-- Skills go in `.claude/skills/<name>/SKILL.md`. Descriptions must be triggering conditions (`Use when...`), not documentation.
-- Subagents go in `.claude/agents/<name>.md`. Set `tools:` narrowly to reduce surface area.
-- Hooks go in `.claude/hooks/<name>.sh` (or another executable). Register in `.claude/settings.json`.
-- Utility scripts shared by multiple hooks or agents go in `.claude/scripts/`.
+- Skills go in `baseline/skills/<name>/SKILL.md`. Descriptions must be triggering conditions (`Use when...`), not documentation.
+- Subagents go in `baseline/agents/<name>.md`. Set `tools:` narrowly to reduce surface area.
+- Hooks go in `baseline/hooks/<name>.sh` (or another executable). Register in `.claude/settings.json`.
+- Utility scripts shared by multiple hooks or agents go in `baseline/scripts/`.
 - Update the tree diagram in `README.md` to include the new file.
 
 ## Changing paths
@@ -91,15 +91,15 @@ Paths appear in many places (READMEs, CLAUDE.md, AGENTS.md, skills, subagents, h
 
 ## Testing shell scripts
 
-Scripts in `.claude/scripts/` and `.claude/hooks/` should be tested standalone before merging:
+Scripts in `baseline/scripts/` and `baseline/hooks/` should be tested standalone before merging:
 
 ```bash
 # Simulate the JSON stdin a hook receives
-echo '{"tool_name":"Bash","tool_input":{"command":"ls"}}' | ./.claude/hooks/block-secrets.sh
+echo '{"tool_name":"Bash","tool_input":{"command":"ls"}}' | ./baseline/hooks/block-secrets.sh
 echo "Exit: $?"
 
 # Utility scripts should be runnable directly
-./.claude/scripts/check-snapshot.sh
+./baseline/scripts/check-snapshot.sh
 ```
 
 Both should be deterministic. Random flakiness means users get random behavior.
