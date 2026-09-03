@@ -50,9 +50,16 @@
 #
 # While adopted, git reports the set-aside files as DELETED, because they are
 # tracked and the symlink does not expose them. That is expected and harmless as
-# long as you do not commit in that state. --unlink restores them and leaves the
-# working tree exactly as it was; deleting the .pre-harness copies for good is a
-# separate, deliberate commit.
+# long as you do not COMMIT, MERGE or PULL in that state. --unlink restores them
+# and leaves the working tree exactly as it was; deleting the .pre-harness copies
+# for good is a separate, deliberate commit.
+#
+# The merge/pull half is the one that bites. Git sees those files as deleted, so
+# any operation that restores the working tree writes them back — over the links.
+# You end up with a real .claude/skills next to an orphaned .claude/skills
+# .pre-harness, and --unlink cannot fix it because the destination is occupied.
+# The way out is `git checkout -- .claude`, which is authoritative, then removing
+# the leftovers by hand. Unlink before you merge, and re-adopt after.
 
 set -uo pipefail
 

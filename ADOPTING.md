@@ -76,9 +76,17 @@ se **mesclam** em vez de serem substituídos: um repo com `delegation.md` própr
 carregaria a regra duas vezes. O `--unlink` devolve todos eles.
 
 > Enquanto estiver adotado, o git reporta os arquivos deslocados como
-> **deletados**. Eles são versionados e o symlink não os expõe. **Não commite
-> nesse estado.** Ou rode `--unlink` para restaurar, ou apague as cópias
-> `.pre-harness` de propósito, como um commit próprio, quando tiver decidido.
+> **deletados**. Eles são versionados e o symlink não os expõe. **Não commite,
+> não faça merge e não dê pull nesse estado.** Ou rode `--unlink` para restaurar,
+> ou apague as cópias `.pre-harness` de propósito, como um commit próprio, quando
+> tiver decidido.
+>
+> O merge é o que morde de verdade: o git acha os arquivos deletados, então
+> qualquer operação que restaure a working tree os escreve **por cima dos links**.
+> Você fica com um `.claude/skills` real ao lado de um `.claude/skills.pre-harness`
+> órfão, e o `--unlink` não conserta porque o destino está ocupado. A saída é
+> `git checkout -- .claude`, que é autoritativo, e remover a sobra à mão.
+> **Desfaça antes de mergear, re-adote depois.**
 
 ### 4. Projeto novo, ainda sem contexto
 
