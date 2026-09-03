@@ -112,7 +112,7 @@ COPIED     .claude/skills (this platform would not make a symlink)
 
 Uma cópia funciona igual no dia a dia, mas **não acompanha o checkout**. Então
 para você, `git pull` sozinho não atualiza nada: **rode o instalador de novo
-depois de puxar.** O `--status` diz quais entradas são cópia.
+depois de puxar.** O `--status` diz quais entradas são cópia. E o `check-baseline.sh` compara a sua cópia com o harness na abertura da sessão: se ela ficou para trás, ele avisa e manda rodar o instalador de novo. Você não precisa lembrar sozinho.
 
 Ligar o Modo de Desenvolvedor no Windows, ou usar WSL, devolve o comportamento
 de symlink e o `git pull` volta a bastar.
