@@ -101,7 +101,7 @@ Use for conventions specific to that layer:
 
 ### Layer 3: Path-scoped rules
 
-In `.claude/rules/`, rules with `paths:` in frontmatter load only when the glob matches the file Claude is touching.
+In `baseline/rules/`, rules with `paths:` in frontmatter load only when the glob matches the file Claude is touching.
 
 ```markdown
 ---
@@ -250,7 +250,7 @@ The right answer: four layers, from cheap to detailed.
 
 Just the name and role. No details.
 
-### Layer 2: Convention rules in `.claude/rules/`
+### Layer 2: Convention rules in `baseline/rules/`
 
 For conventions tied to a library that apply across the codebase:
 
@@ -264,7 +264,7 @@ paths: "**/*.{tsx,jsx}"
 - Follow the existing component patterns
 ```
 
-### Layer 3: Project-specific lib doc in `.claude/docs/libs/`
+### Layer 3: Project-specific lib doc in `baseline/docs/libs/`
 
 Not the official docs. The subset you use, with your gotchas:
 
@@ -293,8 +293,8 @@ A `researcher` subagent with `memory: user` builds expertise across sessions.
 | You need to know... | Layer |
 |---|---|
 | What stack is this? | `CLAUDE.md` |
-| What naming convention applies to .tsx files? | `.claude/rules/` |
-| How do we use a specific external service? | `.claude/docs/libs/<name>.md` |
+| What naming convention applies to .tsx files? | `baseline/rules/` |
+| How do we use a specific external service? | `baseline/docs/libs/<name>.md` |
 | What gotchas have I hit with this lib before? | `researcher` subagent memory |
 | Full official API reference? | Context7 MCP, do not duplicate |
 
@@ -425,7 +425,7 @@ Yes, write an ADR when:
 
 No, don't write one for:
 
-- Naming conventions (those go in `docs/CONVENTIONS.md` or `.claude/rules/`)
+- Naming conventions (those go in `docs/CONVENTIONS.md` or `baseline/rules/`)
 - Trivial library choices (lodash, date-fns)
 - Anything reversible in a day
 
@@ -519,7 +519,7 @@ Registered in `settings.json`:
       {
         "matcher": "Bash",
         "hooks": [
-          { "type": "command", "command": ".claude/hooks/block-secrets.sh" }
+          { "type": "command", "command": "baseline/hooks/block-secrets.sh" }
         ]
       }
     ]
@@ -574,7 +574,7 @@ When you adopt this template on an existing project, this skill scans the codeba
 **Repomix snapshot (`.claude/context/repomix-snapshot.md`)**
 Repomix packs the entire codebase into one file that AI subagents can consume. Cheaper than reading dozens of files individually. The snapshot has metadata (commit SHA, generated date, file count) that lets the template check staleness.
 
-**Staleness check (`.claude/scripts/check-snapshot.sh`)**
+**Staleness check (`baseline/scripts/check-snapshot.sh`)**
 Classifies the snapshot as `fresh`, `stale-mild`, or `stale-major` by comparing the metadata against current HEAD. Considers commits ahead, files changed, days elapsed, and whether config files changed (weighted heavier because they signal convention drift).
 
 **`codebase-explorer` subagent**
@@ -629,7 +629,7 @@ You don't manage the snapshot manually after step 2. The system takes care of it
 
 The symptom: `CLAUDE.md` grows past 200 lines with sections on every library and convention. The cost: every session pays for all of it, and content duplicates with `AGENTS.md`.
 
-The fix: make `CLAUDE.md` a **stub** that points to `AGENTS.md` for shared content (stack, commands, conventions, structure), and keep it lean with only Claude-specific extras (which skills/agents/hooks ship in this project). Move detailed reference material to `.claude/docs/`, scope conventions to `.claude/rules/` with `paths:`, and put folder-specific guidance in nested `CLAUDE.md`.
+The fix: make `CLAUDE.md` a **stub** that points to `AGENTS.md` for shared content (stack, commands, conventions, structure), and keep it lean with only Claude-specific extras (which skills/agents/hooks ship in this project). Move detailed reference material to `baseline/docs/`, scope conventions to `baseline/rules/` with `paths:`, and put folder-specific guidance in nested `CLAUDE.md`.
 
 ### 2. Skills with vague descriptions
 
@@ -645,9 +645,9 @@ The fix: always add `paths:` to scope rules. Otherwise they belong in `CLAUDE.md
 
 ### 4. Library docs duplicated from official sources
 
-The symptom: `.claude/docs/libs/<lib>.md` is a copy of the official API reference. It goes stale fast.
+The symptom: `baseline/docs/libs/<lib>.md` is a copy of the official API reference. It goes stale fast.
 
-The fix: `.claude/docs/libs/` should only contain the project-specific subset and gotchas. Use Context7 MCP for live official docs.
+The fix: `baseline/docs/libs/` should only contain the project-specific subset and gotchas. Use Context7 MCP for live official docs.
 
 ### 5. Spec gets ignored mid-implementation
 

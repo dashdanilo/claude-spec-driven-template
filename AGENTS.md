@@ -39,15 +39,15 @@ Contributions are validated by:
 
 ```bash
 # Verify shell scripts run without syntax errors
-bash -n .claude/hooks/*.sh
-bash -n .claude/scripts/*.sh
+bash -n baseline/hooks/*.sh
+bash -n baseline/scripts/*.sh
 
 # Verify JSON is valid
 python3 -m json.tool .claude/settings.json > /dev/null && echo "settings.json valid"
 
 # List all skill and agent files to spot missing pieces
-find .claude/skills -name "SKILL.md" | sort
-find .claude/agents -name "*.md" | sort
+find baseline/skills -name "SKILL.md" | sort
+find baseline/agents -name "*.md" | sort
 ```
 
 ## Structure
@@ -118,7 +118,7 @@ Documented in full in `docs/CONSTITUTION.md`. The short version:
 - **Documentation over code.** Structural decisions are described, not implemented.
 - **Attribution preserved.** Community contributions keep their author attribution inline.
 - **Context economy.** What loads always must be small. What is detailed must load on demand.
-- **Delegation.** The main thread coordinates; specialists implement. Never write feature code from the main thread — dispatch it. Full rule (with the narrow exceptions) in `.claude/rules/delegation.md`.
+- **Delegation.** The main thread coordinates; specialists implement. Never write feature code from the main thread — dispatch it. Full rule (with the narrow exceptions) in `baseline/rules/delegation.md`.
 
 ## Files agents should not touch
 
