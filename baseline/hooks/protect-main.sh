@@ -5,6 +5,11 @@
 #
 # Registered in .claude/settings.json under hooks.PreToolUse with matcher "Bash".
 #
+# It also blocks `gh pr merge --admin`, anywhere, on any branch. That flag
+# bypasses branch protection, which removes exactly the review that catches an
+# unreviewed commit riding into a PR under someone else's title. Measured: it
+# happened once, and the cost was paid by the repo, not by the agent that did it.
+#
 # Rationale: agents can accidentally commit directly to main. This is the classic
 # "I forgot to create a feature branch" mistake. A cheap hook prevents it.
 
@@ -14,7 +19,30 @@ set -euo pipefail
 input=$(cat)
 
 # Extract the command from JSON
-command=$(echo "$input" | grep -oP '"command"\s*:\s*"\K[^"]*' || echo "")
+command=$(printf '%s' "$input" | python3 -c "import sys,json;d=json.load(sys.stdin);ti=d.get('tool_input') or {};print(d.get('command') or ti.get('command') or '')" 2>/dev/null || echo "")
+
+# --- gh pr merge --admin: blocked everywhere, on any branch -------------------
+# Bypassing branch protection is never something to do on someone else's behalf.
+# If protection is genuinely in the way, that is a decision for a human.
+# Only at a COMMAND POSITION - start of a line, or after ; && || | - because
+# matching anywhere fires on the words appearing inside a heredoc or a commit
+# message, which is someone documenting the command, not running it. That
+# false positive blocked the very commit that introduced this guard.
+if echo "$command" | grep -qE '(^|[;&|])[[:space:]]*gh[[:space:]]+pr[[:space:]]+merge' \
+   && echo "$command" | grep -qE '(^|[[:space:]])--admin([[:space:]]|$)'; then
+  {
+    echo "BLOCKED by protect-main.sh: 'gh pr merge --admin' bypasses branch protection."
+    echo ""
+    echo "That flag removes the review that catches an unreviewed commit riding into"
+    echo "a PR under another change's title — which is how it has already gone wrong."
+    echo ""
+    echo "Check what the PR actually contains first:"
+    echo "  gh pr view <n> --json files --jq '.files[].path'"
+    echo ""
+    echo "If the protection is genuinely in the way, say so and let a human decide."
+  } >&2
+  exit 2
+fi
 
 # Only inspect git commands
 if ! echo "$command" | grep -qE '^\s*git\s'; then
@@ -65,7 +93,7 @@ for pattern in "${dangerous_patterns[@]}"; do
     echo "Then repeat the operation." >&2
     echo "" >&2
     echo "Protected branches: $protected_branches" >&2
-    exit 1
+    exit 2  # 2 = block. Exit 1 is a non-blocking error: the tool call proceeds.
   fi
 done
 

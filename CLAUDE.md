@@ -52,7 +52,7 @@ These are skills too — `baseline/skills/<name>/SKILL.md` — but they *drive* 
 For this repo, in `.claude/settings.json`. For a project that linked the harness, `./install-harness.sh` registers the portable ones in that project's gitignored `.claude/settings.local.json`, pointing at absolute paths in this checkout — the repo's committed `settings.json` is never touched. `protect-critical.sh` and `check-snapshot-on-session.sh` are **deliberately excluded** from the global set: the first knows about lockfiles and migrations, the second about a per-repo snapshot, so both belong to a repo and not to a machine.
 
 - `PreToolUse` on Bash: `block-secrets.sh` blocks commands that would read `.env` or print secret-named env vars
-- `PreToolUse` on Bash: `protect-main.sh` blocks commits, pushes, merges on protected branches (main, master, etc)
+- `PreToolUse` on Bash: `protect-main.sh` blocks commits, pushes, merges on protected branches (main, master, etc), and blocks `gh pr merge --admin` **anywhere** — bypassing branch protection is a human's decision, not an agent's
 - `PreToolUse` on Edit/Write: `protect-critical.sh` blocks modifications to lockfiles, applied migrations, generated code, and other critical files
 - `PreToolUse` on Edit/Write: `log-edit.sh` appends one line per file edit to the gitignored `.claude/tool-log.txt`, recording **which thread** did it (main or specialist) — the raw material for `/harness-report`. Never blocks
 - `SessionStart`: `check-snapshot-on-session.sh` warns if the Repomix snapshot is stale-major
