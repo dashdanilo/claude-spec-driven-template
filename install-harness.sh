@@ -22,6 +22,12 @@
 #   Absolute paths.  No assumption that the harness sits as a sibling on disk,
 #   so a work repo, a new site and a personal experiment all work the same.
 #
+#   A copy when a link is impossible.  Git Bash on Windows will not create a
+#   symlink without Developer Mode, and a "symlink" that is quietly a copy is
+#   worse than an honest one — every promise about `git pull` updating it would
+#   be false. So the installer verifies the link it just made, falls back to
+#   copying, marks the copy, and says so. --status reports which is which.
+#
 #   Nothing is committed.  The links go into .git/info/exclude, which is
 #   per-clone and never leaves your machine. A teammate cloning the repo sees
 #   no dangling symlink, and CI sees nothing at all.
@@ -131,6 +137,34 @@ fi
 NAMES=(skills agents "rules/harness")
 SRCS=("$BASE/skills" "$BASE/agents" "$BASE/rules")
 
+# Marker dropped inside a fallback copy, so --status and --unlink can tell a copy
+# WE made from a directory the repo owns. Without it an interrupted install looks
+# identical to a hand-written folder, and the safe move would be to leave it.
+MARKER=".harness-copy"
+
+# Try a symlink; fall back to copying if the platform will not make one.
+# On Windows this is not hypothetical: Git Bash silently copies unless
+# MSYS=winsymlinks:nativestrict is set AND the user has Developer Mode or admin,
+# and a "symlink" that is quietly a copy is worse than an honest copy, because
+# every promise this installer makes about `git pull` updating it would be false.
+link_or_copy() {
+  local src="$1" dst="$2" label="$3"
+  if ln -s "$src" "$dst" 2>/dev/null && [[ -L "$dst" ]]; then
+    say "link       .claude/$label -> $src"
+    return 0
+  fi
+  rm -f "$dst" 2>/dev/null
+  if cp -R "$src" "$dst" 2>/dev/null; then
+    printf '%s\n' "$src" > "$dst/$MARKER" 2>/dev/null
+    say "COPIED     .claude/$label (this platform would not make a symlink)"
+    COPIED=1
+    return 0
+  fi
+  warn "FAILED     could not link or copy .claude/$label"
+  return 1
+}
+COPIED=0
+
 # ------------------------------------------------------------------ status
 if [[ $MODE == status ]]; then
   say "harness:  $HERE"
@@ -140,6 +174,8 @@ if [[ $MODE == status ]]; then
     if [[ -L "$d" ]]; then
       if [[ "$(readlink "$d")" == "$s" ]]; then printf '  %-14s linked\n' "$n"
       else printf '  %-14s linked elsewhere -> %s\n' "$n" "$(readlink "$d")"; fi
+    elif [[ -f "$d/.harness-copy" ]]; then
+      printf '  %-14s COPIED (this platform would not symlink — re-run after git pull)\n' "$n"
     elif [[ -e "$d" ]]; then
       printf '  %-14s real directory (not linked)\n' "$n"
     else
@@ -164,6 +200,8 @@ for i in 0 1 2; do
   if [[ $MODE == unlink ]]; then
     if [[ -L "$dst" && "$(readlink "$dst")" == "$src" ]]; then
       rm "$dst"; say "unlinked   .claude/$n"
+    elif [[ -f "$dst/$MARKER" ]]; then
+      rm -rf "$dst"; say "removed    .claude/$n (was a fallback copy)"
     else
       say "left alone .claude/$n (not ours)"
     fi
@@ -200,8 +238,11 @@ for i in 0 1 2; do
     fi
   fi
 
-  say "link       .claude/$n -> $src"
-  [[ $MODE == dryrun ]] || ln -s "$src" "$dst"
+  if [[ $MODE == dryrun ]]; then
+    say "link       .claude/$n -> $src"
+  else
+    link_or_copy "$src" "$dst" "$n"
+  fi
 done
 
 # --------------------------------------------------- per-file collisions
@@ -352,7 +393,15 @@ say ""
 case $MODE in
   dryrun) say "dry run — nothing changed." ;;
   unlink) say "removed. The repo keeps whatever lives in its own .claude/." ;;
-  *)      say "linked. Update everything that opted in with: git -C $HERE pull"
+  *)      if [[ ${COPIED:-0} -eq 1 ]]; then
+            say "Some entries were COPIED, not linked, because this platform would not"
+            say "make a symlink — Git Bash on Windows does this unless Developer Mode"
+            say "is on. A copy does NOT follow the checkout, so \`git pull\` alone will"
+            say "not update it: re-run this installer after pulling. --status says which"
+            say "entries are copies."
+            say ""
+          fi
+          say "linked. Update everything that opted in with: git -C $HERE pull"
           if [[ $ADOPT -eq 1 ]]; then
             say ""
             say "NOTE: the files you set aside are tracked, so git now reports them as"
