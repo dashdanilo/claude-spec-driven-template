@@ -75,3 +75,12 @@ The AI agents in this template read `docs/` extensively:
 - `code-reviewer` checks changes against `CONVENTIONS.md`
 
 Keep them accurate and current.
+
+## `reference/`
+
+Background moved out of `README.md` so the front door stays short:
+
+- [`layers.md`](./reference/layers.md) — the four instruction layers and what each is for, including what the hooks do
+- [`spec-driven.md`](./reference/spec-driven.md) — how `spec.md` / `plan.md` / `tasks.md` relate
+- [`where-does-it-go.md`](./reference/where-does-it-go.md) — decision table for placing an instruction
+- [`ecosystem.md`](./reference/ecosystem.md) — tools that pair well with this harness
