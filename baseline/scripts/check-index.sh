@@ -102,14 +102,17 @@ for d in "$root"/skills/*/; do
 done; done
 
 # ---------------------------------------------------------------- rules
+# Rules are discovered RECURSIVELY by Claude Code, and the harness lands its own
+# in a rules/harness/ subdirectory, so a flat glob reports every one of them as
+# missing. Walk the tree instead.
 for root in ${OWNED[@]+"${OWNED[@]}"}; do
-for f in "$root"/rules/*.md; do
+while IFS= read -r f; do
   [[ -e "$f" ]] || continue
   base=$(basename "$f")
   [[ -n "$(fm "$f" paths)" ]] || add broken "rule     $base — no 'paths:' in frontmatter; it will never scope to anything"
   know "$base"; know "${base%.md}"
   grep -q "$base" "$CLAUDE" || add unlisted "rule     $base"
-done; done
+done < <(find -L "$root/rules" -name '*.md' -type f 2>/dev/null); done
 
 # ---------------------------------------------------------------- commands
 for root in ${OWNED[@]+"${OWNED[@]}"}; do
@@ -138,6 +141,23 @@ for f in "$root"/hooks/*.sh; do
   [[ -x "$f" ]] || add broken "hook     $base — not executable (chmod +x); it will silently never run"
   know "$base"
 done; done
+
+# ------------------------------------------------- plugins (names only)
+# Machinery a plugin provides lives in ~/.claude/plugins/marketplaces/, not in
+# any .claude/ this scan can see. Without this, every repo that enables a stack
+# plugin reports its agents and skills as "indexed but not on disk" — which is
+# the check crying wolf about the exact setup it is meant to support.
+PLUGIN_ROOT="$HOME/.claude/plugins/marketplaces"
+if [[ -d "$PLUGIN_ROOT" ]]; then
+  while IFS= read -r f; do
+    [[ -e "$f" ]] || continue
+    n=$(fm "$f" name); know "${n:-$(basename "$f" .md)}"
+  done < <(find -L "$PLUGIN_ROOT" -path '*/agents/*.md' -type f 2>/dev/null)
+  while IFS= read -r d; do
+    [[ -f "$d/SKILL.md" ]] || continue
+    n=$(fm "$d/SKILL.md" name); know "${n:-$(basename "$d")}"
+  done < <(find -L "$PLUGIN_ROOT" -type d -path '*/skills/*' -depth 3 2>/dev/null; find -L "$PLUGIN_ROOT" -type d -path '*/skills/*' -maxdepth 5 2>/dev/null)
+fi
 
 # ------------------------------------------------- personal scope (names only)
 for root in ${EXTRA[@]+"${EXTRA[@]}"}; do
