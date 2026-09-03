@@ -100,13 +100,30 @@ Depois, personalize o `AGENTS.md`. É de lá que o `verify-before-done` descobre
 comandos de install, build e teste, então o gate não funciona enquanto ele não
 estiver preenchido.
 
+### Windows
+
+Se você estiver no **Git Bash nativo**, o `ln -s` não cria symlink sem **Modo de
+Desenvolvedor** ligado (ou terminal como admin). O instalador detecta isso: ele
+tenta o link, confere se de fato virou link e, se não virou, **copia e avisa**.
+
+```
+COPIED     .claude/skills (this platform would not make a symlink)
+```
+
+Uma cópia funciona igual no dia a dia, mas **não acompanha o checkout**. Então
+para você, `git pull` sozinho não atualiza nada: **rode o instalador de novo
+depois de puxar.** O `--status` diz quais entradas são cópia.
+
+Ligar o Modo de Desenvolvedor no Windows, ou usar WSL, devolve o comportamento
+de symlink e o `git pull` volta a bastar.
+
 ### Atualizar
 
 ```bash
 git -C ~/Sites/harness pull
 ```
 
-Esse é o mecanismo de atualização inteiro. Todo projeto que você linkou recebe na
+Esse é o mecanismo de atualização inteiro — **desde que os seus sejam symlinks**. Se o `--status` disser `COPIED`, rode o instalador de novo depois do pull. Todo projeto que você linkou recebe na
 hora, porque todos leem os mesmos arquivos.
 
 ### Remover
