@@ -12,17 +12,17 @@ input=$(cat)
 command=$(printf '%s' "$input" | python3 -c "import sys,json;d=json.load(sys.stdin);ti=d.get('tool_input') or {};print(d.get('command') or ti.get('command') or '')" 2>/dev/null || echo "")
 
 # Forbidden patterns
+# Anchored at a COMMAND POSITION - start of a line, or after ; && || | - so the
+# guard fires on someone RUNNING the command, not on someone writing about it.
+# The unanchored version matched any prose containing the words, which made it
+# block a pull-request body that merely documented what the guard blocks.
+CMD='(^|[;&|])[[:space:]]*'
 forbidden_patterns=(
-  'cat\s+\.env'
-  'cat\s+.*\.env'
-  '\.env.*\|'
-  'printenv'
-  'env\s*$'
-  'echo\s+\$[A-Z_]*TOKEN'
-  'echo\s+\$[A-Z_]*KEY'
-  'echo\s+\$[A-Z_]*SECRET'
-  'echo\s+\$[A-Z_]*PASSWORD'
-  'curl.*\.env'
+  "${CMD}(cat|less|more|head|tail|bat|strings)[[:space:]]+[^|;&]*\.env"
+  "${CMD}(printenv|env)[[:space:]]*$"
+  "${CMD}(curl|wget)[^|;&]*\.env"
+  "${CMD}"'echo[[:space:]]+\$[A-Z_]*(TOKEN|KEY|SECRET|PASSWORD)'
+  '\\$\\([[:space:]]*cat[[:space:]]+[^)]*\\.env'
 )
 
 for pattern in "${forbidden_patterns[@]}"; do
