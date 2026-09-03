@@ -331,7 +331,7 @@ PY
     if [[ $MODE == dryrun ]]; then
       say "would      add the links to .git/info/exclude"
     else
-      { echo ""; echo "$MARK"; echo ".claude/skills"; echo ".claude/agents"; echo ".claude/rules/harness"; echo ".claude/settings.local.json"; echo ".claude/*.pre-harness"; echo ".claude/rules/*.pre-harness"; } >> "$EXCLUDE"
+      { echo ""; echo "$MARK"; echo ".claude/skills"; echo ".claude/agents"; echo ".claude/rules/harness"; echo ".claude/settings.local.json"; echo ".claude/**/*.pre-harness"; echo ".claude/*.pre-harness"; } >> "$EXCLUDE"
       say "excluded   from git via $(basename "$(dirname "$(dirname "$EXCLUDE")")")/info/exclude"
       [[ $IS_WORKTREE -eq 1 ]] && say "           (shared with every worktree of this repo — harmless, the paths are tracked there)"
     fi
