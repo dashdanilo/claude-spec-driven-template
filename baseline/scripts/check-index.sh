@@ -98,7 +98,7 @@ for d in "$root"/skills/*/; do
   [[ -n "$desc" ]] || add broken "skill    $dir — no 'description:' (it is the auto-invocation trigger)"
   [[ "$name" == "$dir" ]] || add broken "skill    $dir — frontmatter name is '$name'"
   know "$name"
-  grep -q "\`$name\`" "$CLAUDE" || add unlisted "skill    $name"
+  grep -q "\`$name\`\|\`/$name\`" "$CLAUDE" || add unlisted "skill    $name"
 done; done
 
 # ---------------------------------------------------------------- rules
@@ -121,7 +121,9 @@ for f in "$root"/commands/*.md; do
   base=$(basename "$f" .md)
   [[ -n "$(fm "$f" description)" ]] || add broken "command  /$base — no 'description:'; it lists without help text"
   know "$base"
-  grep -q "\`$base\`" "$CLAUDE" || add unlisted "command  /$base"
+  # Both forms are normal in an index: `name` and `/name`. Only accepting the
+  # first reported four correctly-listed commands as missing in a real repo.
+  grep -q "\`$base\`\|\`/$base\`" "$CLAUDE" || add unlisted "command  /$base"
 done; done
 
 # ---------------------------------------------------------------- docs
@@ -174,7 +176,7 @@ done
 while IFS= read -r name; do
   [[ -n "$name" ]] || continue
   grep -qxF "$name" <<< "$known" || add stale "$name"
-done < <(grep -oE '^- `[a-z][a-z0-9-]*(\.md)?`' "$CLAUDE" | tr -d '`' | sed 's/^- //' | sort -u)
+done < <(grep -oE '^- `/?[a-z][a-z0-9-]*(\.md)?`' "$CLAUDE" | tr -d '`' | sed 's/^- //; s/^\///' | sort -u)
 
 # ---------------------------------------------------------------- report
 found=0
