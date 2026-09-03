@@ -160,14 +160,15 @@ A simple reading order:
 ```
 claude-spec-driven-template/
 ├─ baseline/                               # THE HARNESS — linked into projects, never copied
-│  ├─ agents/                              # 7 subagents, isolated context windows
+│  ├─ agents/                              # 8 subagents, isolated context windows
 │  │  ├─ spec-reviewer.md                  # Audits spec.md before it becomes a plan
 │  │  ├─ code-reviewer.md                  # Reviews code against spec/plan/tasks
 │  │  ├─ reviewer.md                       # Whole-branch review, runs the gate, opens the PR
 │  │  ├─ tester.md                         # Writes and runs tests in the repo's own framework
 │  │  ├─ researcher.md                     # Deep-dives libs, keeps memory across sessions
 │  │  ├─ codebase-explorer.md              # Read-only archaeology, uses the Repomix snapshot
-│  │  └─ security-auditor.md               # Auth, secrets, input validation
+│  │  ├─ security-auditor.md               # Auth, secrets, input validation
+│  │  └─ implementer.md                   # Portable fallback: writes code by learning the repo first
 │  │
 │  ├─ skills/                              # 19 skills — a `/name` each, loaded on demand
 │  │  ├─ orchestrate/                      #   driver: a whole spec, wave by wave
