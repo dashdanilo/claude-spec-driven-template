@@ -56,11 +56,14 @@ Everything in a handover is prose about state, and prose ages — including this
 - **Spec active** → append/update a `## Handover` section at the bottom of `specs/<slug>/tasks.md`. Durable, re-findable, and versioned alongside the work it describes.
 - **No spec active** (repo-level, exploratory, or harness work) → write `.claude/handovers/<YYYY-MM-DD>-<slug>.md`, where `<slug>` names the stretch of work (`harness`, `marketplace-migration`). Say in the file's header that there is no active spec, so the next reader knows why it lives there.
 
-  Keep that directory out of git with `.git/info/exclude`, not `.gitignore`: a handover is local session state, and `.gitignore` is a committed file belonging to the repo — the harness must not add lines to it in a project that merely adopted the harness. Add the line once, if missing:
+  Keep that directory out of git with the repo's local exclude file, not `.gitignore`: a handover is local session state, and `.gitignore` is a committed file belonging to the repo — the harness must not add lines to it in a project that merely adopted the harness. Add the line once, if missing:
 
   ```bash
-  grep -qxF '.claude/handovers/' .git/info/exclude || echo '.claude/handovers/' >> .git/info/exclude
+  E=$(git rev-parse --git-path info/exclude)
+  grep -qxF '.claude/handovers/' "$E" 2>/dev/null || echo '.claude/handovers/' >> "$E"
   ```
+
+  Resolve the path with `git rev-parse --git-path`, never as the literal `.git/info/exclude`. **Inside a worktree `.git` is a file, not a directory**, so the literal path does not exist and the append fails with `not a directory` — and this harness puts one worktree per feature, which makes the worktree the common case, not the exception.
 
   Commit a handover only when the human asks — for instance when it documents repo-level work the whole team needs. Default is local.
 
