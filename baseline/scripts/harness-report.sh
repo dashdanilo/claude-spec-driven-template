@@ -27,26 +27,32 @@ tool_log, agent_log, as_json = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
 # ---------------------------------------------------------------- delegation
 edits = collections.Counter()
 by_ext = collections.Counter()
+by_specialist = collections.Counter()
 if os.path.exists(tool_log):
     for line in open(tool_log, encoding="utf-8", errors="replace"):
         parts = line.rstrip("\n").split("\t")
         if len(parts) < 4:
             continue
         _, thread, _tool, path = parts[0], parts[1], parts[2], parts[3]
+        agent_type = parts[4] if len(parts) > 4 else ""
         edits[thread] += 1
         if thread == "main" and path:
             by_ext[os.path.splitext(path)[1] or "(no ext)"] += 1
+        if thread == "sub" and agent_type:
+            by_specialist[agent_type] += 1
 
 total_edits = sum(edits.values())
 known = edits["main"] + edits["sub"]
 delegated_pct = round(100 * edits["sub"] / known) if known else None
 
 # ---------------------------------------------------------------- dispatches
-# agent-log.txt lines look like: "<iso> agent=<type> desc=... tokens=N dur=Ns tools=N"
+# agent-log.txt lines look like: "<iso> agent=<type> desc=... tokens=N cached=N dur=Ns tools=N [approx=1]"
 agents = collections.Counter()
 tokens_total = 0
+cached_total = 0
 dispatches = 0
 unknown_agent = 0
+approx_attribution = 0
 if os.path.exists(agent_log):
     for line in open(agent_log, encoding="utf-8", errors="replace"):
         if not line.strip():
@@ -60,6 +66,11 @@ if os.path.exists(agent_log):
         t = re.search(r"tokens=(\d+)", line)
         if t:
             tokens_total += int(t.group(1))
+        c = re.search(r"cached=(\d+)", line)
+        if c:
+            cached_total += int(c.group(1))
+        if re.search(r"approx=1\b", line):
+            approx_attribution += 1
 
 out = {
     "edits_total": total_edits,
@@ -70,7 +81,10 @@ out = {
     "dispatches": dispatches,
     "dispatch_types": dict(agents.most_common()),
     "unattributed_dispatches": unknown_agent,
+    "approximate_attribution": approx_attribution,
+    "specialist_edits_by_agent": dict(by_specialist.most_common()),
     "subagent_tokens": tokens_total,
+    "subagent_cache_reads": cached_total,
     "main_thread_edit_hotspots": dict(by_ext.most_common(5)),
 }
 
@@ -103,6 +117,8 @@ if edits["?"]:
     line("thread unknown", edits["?"])
 if by_ext:
     line("main-thread edits by type", ", ".join(f"{k} {v}" for k, v in by_ext.most_common(5)))
+if by_specialist:
+    line("specialist edits by agent", ", ".join(f"{k} {v}" for k, v in by_specialist.most_common()))
 
 print()
 print(" dispatch  (docs/dispatching.md)")
@@ -111,8 +127,12 @@ if agents:
     line("by agent", ", ".join(f"{k} {v}" for k, v in agents.most_common(6)))
 if unknown_agent:
     line("unattributed", f"{unknown_agent}  (log-agent.sh could not resolve the type)")
+if approx_attribution:
+    line("approximate attribution", f"{approx_attribution}  (fallback by mtime; unreliable in parallel waves)")
 if tokens_total:
     line("subagent tokens", f"{tokens_total:,}")
+if cached_total:
+    line("  of which cache reads", f"{cached_total:,}")
 
 print()
 print(" compare against .claude/docs/harness-baseline.md")

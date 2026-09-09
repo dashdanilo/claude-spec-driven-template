@@ -12,11 +12,21 @@
 # being broken is a rule that decays. This makes it countable, and
 # `/harness-report` makes it visible.
 #
-# Thread detection: a subagent's transcript lives under a `subagents/` directory,
-# the main thread's does not. That is a heuristic on the payload shape, not a
-# documented field — when it cannot tell, it records `?` rather than guessing,
-# and the report counts unknowns separately instead of folding them into either
-# side.
+# Thread detection: read the payload directly rather than inferring from
+# `transcript_path`. A subagent's `PreToolUse` payload carries `agent_id` (and
+# usually `agent_type`) — that alone means "sub", regardless of what
+# `transcript_path` points at. Measured: a captured payload from inside an
+# `implementer` subagent had `transcript_path` pointing at the *main* session's
+# transcript (no `subagents` segment anywhere in it) while `agent_id` and
+# `agent_type` were both present. The old heuristic — "sub" only when
+# `transcript_path` contains a `subagents` segment, "main" otherwise — read
+# that as `main`, so every specialist edit was silently counted as main-thread
+# work, one direction only. The old header comment claimed it "records `?`
+# rather than guessing" for the case it cannot tell; it did not — it guessed
+# `main` with full confidence. The `subagents`-segment check is kept as a
+# second-line fallback for older clients whose payload omits `agent_id`. `?` is
+# reserved for the one case with neither signal: no `agent_id` and no
+# `transcript_path` at all.
 
 set -uo pipefail
 
@@ -34,13 +44,18 @@ tool = d.get("tool_name") or "?"
 ti = d.get("tool_input") or {}
 path = ti.get("file_path") or ti.get("notebook_path") or ""
 
+agent_type = d.get("agent_type") or ""
+agent_id = d.get("agent_id") or ""
 tp = d.get("transcript_path") or ""
-if not tp:
-    thread = "?"
-elif "subagents" in tp.split(os.sep):
+
+if agent_id or agent_type:
     thread = "sub"
-else:
+elif tp and "subagents" in tp.split(os.sep):
+    thread = "sub"
+elif tp:
     thread = "main"
+else:
+    thread = "?"
 
 # Repo-relative when possible: absolute paths make the log unreadable and leak
 # the checkout location into a file people paste into issues.
@@ -49,7 +64,7 @@ if path.startswith(cwd + os.sep):
     path = path[len(cwd) + 1:]
 
 ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-print("\t".join([ts, thread, tool, path]))
+print("\t".join([ts, thread, tool, path, agent_type]))
 ' >> .claude/tool-log.txt 2>/dev/null
 
 exit 0
