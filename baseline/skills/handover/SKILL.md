@@ -49,11 +49,22 @@ This is stronger than "don't paste diffs": it also rules out summarizing an ADR'
 
 Everything in a handover is prose about state, and prose ages — including this document, from the moment it is written. Say so in it, and mark anything that was **not** verified in this session as unverified rather than presenting it as confirmed. `.claude/rules/specs.md` applies to a handover as much as to a spec: the confident, well-written paragraph is the dangerous one, because it reads as settled.
 
-## Where to put it
+## Where to put it — always a file ⚠️
 
-- If a spec is active, append/update a `## Handover` section at the bottom of `specs/<slug>/tasks.md` (durable and re-findable).
-- Otherwise, output it in chat.
-- **Either way, also print it in chat as a single fenced block**, so the person opening a fresh session can copy it in one gesture. The file is the durable copy; the block is the one that actually gets carried across the cut.
+**A handover that exists only in chat is destroyed by the `/clear` this skill tells you to run.** The last step below discards the session; if the chat was the only copy, the skill just deleted its own output. Write the file first, print the block second.
+
+- **Spec active** → append/update a `## Handover` section at the bottom of `specs/<slug>/tasks.md`. Durable, re-findable, and versioned alongside the work it describes.
+- **No spec active** (repo-level, exploratory, or harness work) → write `.claude/handovers/<YYYY-MM-DD>-<slug>.md`, where `<slug>` names the stretch of work (`harness`, `marketplace-migration`). Say in the file's header that there is no active spec, so the next reader knows why it lives there.
+
+  Keep that directory out of git with `.git/info/exclude`, not `.gitignore`: a handover is local session state, and `.gitignore` is a committed file belonging to the repo — the harness must not add lines to it in a project that merely adopted the harness. Add the line once, if missing:
+
+  ```bash
+  grep -qxF '.claude/handovers/' .git/info/exclude || echo '.claude/handovers/' >> .git/info/exclude
+  ```
+
+  Commit a handover only when the human asks — for instance when it documents repo-level work the whole team needs. Default is local.
+
+- **Then, in both cases, also print it in chat as a single fenced block**, so the person opening a fresh session can copy it in one gesture. The file is the durable copy; the block is the convenience. They are never the only copy of each other.
 
 Do not dump file or tool output — link and point to it. This is a map, not the territory.
 
@@ -64,10 +75,12 @@ A handover is only half the move. Externalizing state has no effect on context w
 So end every handover with an explicit cut, exactly like this:
 
 ```
-✂️ State is on disk in specs/<slug>/tasks.md § Handover — safe to clear.
+✂️ State is on disk in <the file you just wrote> — safe to clear.
    Resume with: /status  (or open the worktree ../<repo>.<slug> in a fresh session)
    Most likely first move: <one line — the only forward-looking sentence in the whole handover>
 ```
+
+The first line names the **real path you wrote** — `specs/<slug>/tasks.md § Handover`, or `.claude/handovers/<date>-<slug>.md` when no spec is active. Never point the cut at the conversation: the cut is what erases the conversation.
 
 Then **stop and say nothing else.** Do not start the next task in the same session — that is precisely the habit that produces 400-hour context windows.
 
