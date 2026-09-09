@@ -57,6 +57,39 @@ Numbers this harness now acts on that came from **someone else's benchmark**. Th
 
 **Why adopt before measuring.** Our own baseline says the opposite failure: 1.0 dispatches per message and 29% of `Edit` delegated, meaning we sit near the *inline* row while `/orchestrate` as written would have produced the *per-task* row. Both directions are wrong and the correction points the same way, so the shape is worth adopting now. If our own numbers land elsewhere, the number changes and the shape stays.
 
+## 2026-09-09 — the instrument was broken; no report before this date is usable
+
+The first attempt to re-measure the four claims above found that the two hooks
+producing the data were wrong in three ways. All three were caught by capturing
+real hook payloads and comparing them against what the hooks logged, in one
+session on this repository.
+
+| bug | effect on the numbers | direction |
+|---|---|:---:|
+| `log-edit.sh` inferred the thread from `transcript_path`, which points at the **main** session even inside a subagent | every specialist edit counted as a main-thread edit; a session with two active `implementer` dispatches reported **`DELEGATED 0%`** | understates delegation |
+| `log-agent.sh` summed only `input_tokens + output_tokens` | a dispatch that created 20,347 cache tokens and read 18,592 more logged **`tokens=169`**, ~120x low | understates subagent cost |
+| `log-agent.sh` picked the subagent transcript by newest **mtime** | in a parallel wave every `SubagentStop` resolved to the same file, so N agents produced N lines carrying the last one's identity and cost | destroys attribution exactly in the wave case |
+
+All three are fixed. Verified live: two subagents dispatched in the same
+message, one second apart, were attributed to their own types with their own
+costs and zero `approx=1`; and `.claude/tool-log.txt` recorded the same
+`implementer` as `main` at 03:13:34 and as `sub` at 03:13:45, across the edit
+that landed the fix.
+
+**What this means for the four claims in the table above.** None of them has
+been judged yet. The delegation row in particular cannot be read from any
+report produced before today: the detector answered `main` regardless of the
+truth, so a low percentage measured with it is evidence about the detector and
+nothing else. The 29% baseline itself survives — it was computed from
+transcripts in 2026-08-03, not from these hooks — but every comparison against
+it since the hooks landed was invalid.
+
+**What is still not measured.** The delegation ratio in a real implementation
+session. `.claude/tool-log.txt` is empty in every njord checkout, because the
+hooks were never registered there — the harness has never been adopted in a
+repository while real feature work ran through it. That run is still the open
+item, and it is now the *first* one that can produce a number worth reading.
+
 ## Reading a report honestly
 
 - **A small sample is not a trend.** A handful of edits in one session says
