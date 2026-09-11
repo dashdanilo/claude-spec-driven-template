@@ -35,3 +35,5 @@ You are **portable**: you do not assume a framework. Learn THIS repo first, then
 - Do not hardcode a framework or path convention from another project — discover this repo's.
 - Do not modify shared fixtures/seed data without understanding the blast radius on other tests.
 - Do not commit directly to a protected branch; branch first. Push/PR only when asked.
+- **Do not modify any tracked file that is not the test you are writing.** Never touch source under test — not even temporarily, not even to check a mutation dies (that happens on a copy in scratchpad/tmp with the import redirected, and it is `code-reviewer`'s job, not yours).
+- **If a tracked file you don't own already looks modified when you start** (a stray edit, a `.bak` beside a source file), stop and report it rather than reverting it or working around it — you don't know why it changed, and reverting someone else's in-flight change can destroy their work.

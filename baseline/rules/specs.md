@@ -43,14 +43,16 @@ Long or autonomous runs depart from the plan. That is not a failure — silently
 - **Did:** <what actually happened>
 - **Why:** <the reason, including the blocker or assumption that forced it>
 - **Consequence:** <what is now true that the plan does not describe>
-- **Status:** accepted | to revert | needs decision
+- **Status:** accepted | to revert | needs decision | finding
 ```
 
 Four things belong here: an **assumption** taken without confirmation, a **blocker** worked around, a **scope change** decided mid-flight, and work executed **outside the pipeline** (phases run straight from `plan.md`, edits made in the main thread — neither ever gets a checkbox ticked by anyone).
 
+**`finding`** is a fifth, different in kind: a production defect a test revealed that is **out of scope** for this spec — the task didn't ask for it, the fix doesn't belong in this diff. Log it here anyway rather than losing it or scope-creeping the task to fix it. A `finding` **does not block** the run.
+
 Do not write them into `tasks.md`. Checkboxes are machine-readable and prose is not; a narrative wedged between boxes is read by humans and ignored by the next wave plan, which is the worst of both.
 
-`needs decision` is the only status that blocks. It is the one a `/handover` must surface and a reviewer must resolve.
+`needs decision` is the only status that blocks. It is the one a `/handover` must surface and a reviewer must resolve. An open `finding` doesn't block, but it doesn't stay invisible either — it belongs in the PR body (`/orchestrate` Step 4) and in `/handover`'s open decisions, the same as `needs decision`.
 
 ## Why this is a rule
 

@@ -86,6 +86,10 @@ For each wave, in the approved order:
 
    That last instruction is doing more work than it looks: a specialist's summary lands in the main thread, so a cluster reporting per task undoes the context saving that clustering bought.
 
+   **For clusters whose class produces logic or tests, the handoff carries two more things:**
+   - **Falsifiability, not a green run.** Before reporting done, the specialist proves its central assertions actually kill a mutation — applied to a **copy in scratchpad/tmp with the import redirected**, never to the tracked file (verification agents follow the same rule in Step 3 item 4). Denominators and arithmetic boundaries are named as an explicit case, not folded into "cover the boundaries". A claim of "equivalent mutant" is accepted only when proven **by construction against the real call site**, never by the parameter's declared type — a value arriving from a query string or an untransformed DTO routinely sits outside it (`?read[]=false` arrives as an array, not the `boolean` the type says).
+   - **The run's known-bug marker** — one, chosen by the orchestrator once (the repo's own convention if it has one) and handed to every cluster, so a test that pins already-buggy behavior is recognizable in CI output instead of each cluster inventing its own.
+
    A wave of one cluster is fine — dispatch it and carry on. Do not pad a wave to make it look parallel.
 
 2. **Collect all of them** before doing anything else. A wave is a barrier: you gate what the whole wave produced, not a moving target.
@@ -94,7 +98,7 @@ For each wave, in the approved order:
    - Red → **attribute the failure before retrying.** The cost of gating a batch is that a red does not name its author: read the failure against the files each specialist reported touching. If it is still ambiguous, gate the suspect cluster alone rather than guessing.
    - Then **hand the responsible specialist the specific failure/diagnosis so the next attempt takes a different path** (fix the root cause; re-plan or re-scope the task if needed) — never blind-retry the same approach. A correction must change the path, not just be logged. Up to **3×**. Still red, or the fix looks hacky → **STOP** and report (and record a lesson, Step 5).
 
-4. **Test + review** — run the union of the gates the wave's clusters selected in Step 1 (each cluster carries the strictest class it contains). `tester` (tests for the touched area) and `code-reviewer` (against `spec`/`plan`/`tasks`) are independent of each other and of the tasks: dispatch every reviewer this wave needs **in one message** too. Blocking findings → back to the responsible specialist.
+4. **Test + review.** `tester` runs once for the wave, covering the union of the gates the wave's clusters selected in Step 1 (each cluster carries the strictest class it contains). `code-reviewer` runs **once per cluster**, scoped to the files that cluster's specialist reported touching — dispatch every cluster's `code-reviewer` **in one message**, same as the implementation wave. Per-cluster is the granularity that matches who wrote the code: one review across the whole wave is too coarse to catch what a review sized to one specialist's output catches, and one review per task is too fine to hold the cluster's context (`.claude/docs/harness-baseline.md`, 2026-09-10). Neither `tester` nor `code-reviewer` modifies a tracked file outside its own deliverable — see the verification-agent rule in `.claude/docs/dispatching.md`. Blocking findings → back to the responsible specialist.
 
 5. **Docs gate** — for the tasks whose class selected it: ensure the relevant doc or nested `src/<folder>/CLAUDE.md` is updated (`documenting-domains`) before marking done.
 
@@ -108,7 +112,11 @@ If a task's work turned out to be bigger than its class assumed — a "config / 
 
 ## Step 4 — Finish
 
-When every box is checked: dispatch `reviewer` to review the whole branch, run the gate once more, and open a **PR to the repo's integration branch** (`main` / `develop`). **Never merge** (`protect-main` blocks it). Report the PR link.
+When every box is checked: dispatch `reviewer` to review the whole branch — it runs its environment-variation checklist (timezones, locales, serial mode, random order; see `.claude/agents/reviewer.md`) rather than trusting the author's green — run the gate once more, and open a **PR to the repo's integration branch** (`main` / `develop`). **Never merge** (`protect-main` blocks it).
+
+If `deviations.md` has any open `finding` (a production defect a test revealed, out of scope for this spec — `.claude/rules/specs.md`), add a **"Findings outside scope"** section to the PR body listing each one in one line, so it does not stay invisible in a file nobody but this run reads. `finding` never blocks the PR; only `needs decision` does.
+
+Report the PR link.
 
 ## Step 5 — Learn (the improve loop)
 
@@ -129,4 +137,4 @@ Anything you log as `needs decision` is a **STOP**, not a note. Report it and wa
 - `tasks.md` is **ambiguous**.
 - **Stagnation / budget:** no task got checked off in the last **3** iterations, or you have run ~**10** task-iterations without finishing — halt and report status instead of spinning.
 
-**Invariants:** never tick a box without a **fresh** green gate covering that wave (re-run it every wave; never trust a previous green); never plan waves from unreconciled checkboxes; dispatch a wave in one message, one call per cluster, never one per task; never push/merge to a protected branch; one worktree per feature.
+**Invariants:** never tick a box without a **fresh** green gate covering that wave (re-run it every wave; never trust a previous green); never plan waves from unreconciled checkboxes; dispatch a wave in one message, one call per cluster, never one per task; `code-reviewer` runs once per cluster, scoped to that cluster's files, never once for the whole wave; a verification agent never writes to a tracked file outside its own deliverable; never push/merge to a protected branch; one worktree per feature.
