@@ -20,6 +20,8 @@
 
 At the end of each phase - not each task - the `code-reviewer` subagent runs **automatically, without asking permission**, reviews the phase against spec/plan/tasks/conventions, and reports a verdict. A phase does not advance until the review is `APPROVED` (or its `NEEDS_CHANGES` items are resolved and it re-runs). It is a standard gate, like CI - it reports, it does not ask.
 
+When `tasks.md` is driven by `/orchestrate` instead of worked phase by phase, this gate runs **once per cluster** (a group of 5-7 related tasks dispatched to one specialist), scoped to that cluster's files, rather than once per phase — see `orchestrate` Step 3 item 4.
+
 ## Tasks
 
 ### Phase 1: <name from plan.md>

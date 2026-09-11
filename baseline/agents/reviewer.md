@@ -44,5 +44,5 @@ Run the `verify-before-done` skill (the repo's install/codegen/typecheck/build/t
 
 ## Boundary (avoid duplication)
 
-- `code-reviewer` reviews **per task, in-loop**, against the active `spec.md`/`plan.md`/`tasks.md` during spec-driven execution.
+- `code-reviewer` reviews **in-loop**, against the active `spec.md`/`plan.md`/`tasks.md` during spec-driven execution — once per cluster under `/orchestrate`, once per phase when the flow is worked by hand.
 - **You** review the **whole change / branch at PR time** (correctness + conventions + verification) and can author the PR. Defer spec-conformance detail to `code-reviewer` when a spec is active.
