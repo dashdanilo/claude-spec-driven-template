@@ -47,13 +47,13 @@ Optional but recommended for parallel work: each feature branch lives in its own
 Convention:
 
 - Path: `../<repo>.<slug>` - a flat sibling directory (dot separator, no nesting), so git never sees it and it can't be committed by accident
-- Branch: `<type>/<slug>`, always created fresh from `main`
+- Branch: `<type>/<slug>`, always created fresh from the remote's default branch (`origin/HEAD` - `origin/main` on most repos, but whatever the remote actually points at, e.g. `origin/develop`)
 - Not removed on merge - clean up deliberately later
 
 Use the helper (it also provisions gitignored local files - symlinks `CLAUDE.local.md` / `.claude/settings.local.json` / `.claude/context/config.json`, and copy-seeds the Repomix snapshot):
 
 ```bash
-.claude/scripts/spec-worktree.sh <slug>            # create + branch from main
+.claude/scripts/spec-worktree.sh <slug>            # create + branch from the remote's default branch
 .claude/scripts/spec-worktree.sh --list            # list worktrees
 .claude/scripts/spec-worktree.sh --remove <slug>   # remove one (keeps the branch)
 .claude/scripts/spec-worktree.sh --prune           # remove worktrees whose branch is merged
@@ -142,10 +142,16 @@ git checkout -b feat/x origin/main      # correct
 git checkout main && git pull && git checkout -b feat/x   # not this
 ```
 
+`origin/main` here stands for the remote's default branch, not a fixed literal —
+on most repos that is `origin/main`, but the actual ref is whatever `origin/HEAD`
+points at (`origin/develop` on a repo whose integration branch is `develop`, for
+example). Resolve it once (`git symbolic-ref refs/remotes/origin/HEAD`) rather
+than hardcoding `main`.
+
 The second looks equivalent and is not. If the local branch carries commits that
 were never pushed — your own work in progress, an old propagation, anything —
 your new branch inherits them, and they ride into the PR under your change's
-title. Branching from `origin/main` cannot pick up what the remote does not have.
+title. Branching from the remote ref cannot pick up what the remote does not have.
 
 This matters most in exactly the situation where you are least likely to check:
 a script looping over several repositories.

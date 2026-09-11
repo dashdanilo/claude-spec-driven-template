@@ -62,15 +62,21 @@ MAIN_ROOT=$(dirname "$common_dir")
 REPO_NAME=$(basename "$MAIN_ROOT")
 PARENT_DIR=$(dirname "$MAIN_ROOT")
 
-# --- Pick the base branch (latest main) ---
+# --- Pick the base branch (repo default integration branch) ---
 base_ref() {
   git fetch origin --quiet 2>/dev/null || true
-  if git rev-parse --verify --quiet origin/main > /dev/null; then
+  # Prefer the remote's default branch (origin/HEAD), so repos whose integration
+  # branch is 'develop' (or anything else) get the correct base, not a stale main.
+  local def
+  def=$(git symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null | sed 's#^refs/remotes/##')
+  if [[ -n "$def" ]] && git rev-parse --verify --quiet "$def" > /dev/null; then
+    echo "$def"
+  elif git rev-parse --verify --quiet origin/main > /dev/null; then
     echo "origin/main"
   elif git rev-parse --verify --quiet main > /dev/null; then
     echo "main"
   else
-    die "no 'main' branch found (looked for origin/main and main)" 2
+    die "no default/main branch found (looked for origin/HEAD, origin/main, main)" 2
   fi
 }
 
