@@ -90,6 +90,67 @@ hooks were never registered there — the harness has never been adopted in a
 repository while real feature work ran through it. That run is still the open
 item, and it is now the *first* one that can produce a number worth reading.
 
+## 2026-09-10 — A/B: the current driver against the one it replaced
+
+The first run instrumented correctly, and the first real comparison. Same spec
+(16 unit-test tasks for pure helpers in njord-back), same 16 targets, same
+baseline (14 suites / 190 tests), same fixed instrument. One variable changed:
+the driver. Run 1 used the current `orchestrate` skill (132 lines). Run 2 used
+the 53-line `commands/orchestrate.md` that njord-back's `develop` still ships.
+
+| | run 1 (current) | run 2 (old) | |
+|---|---:|---:|---|
+| tasks delivered | 16 | 16 | |
+| dispatches | 8 | 53 | 6.6x |
+| new tokens | 1,776,741 | 7,708,367 | **4.34x** |
+| cache reads | 26.3M | 68.4M | 2.6x |
+| implementation tokens per task | ~52k | ~164k | 3.2x |
+| tests produced | 220 | 548 | 2.5x |
+| production findings | 2 | 17 | |
+
+**Where the old driver's money went:** `code-reviewer` 40.8%, implementation
+34.0%, `tester` 23.9%. The `tester` wrote **nothing in 16 of 16 dispatches** —
+each time it audited the coverage, found no gap, and returned. With no
+class-to-gates matrix the old driver dispatches it even on tasks whose
+deliverable is a test file. That waste alone cost more than the whole of run 1.
+
+**Against the claims table above.** Dispatches per message: run 1 sent its wave
+three-in-one, the first fan-out on record — confirmed. Unattributed dispatches:
+0% in both runs — confirmed. Edit delegated: run 1 measured 92% (37 of 40),
+confirmed in direction but weakly, because every task created a new file, the
+easiest possible class to delegate. Run 2's 100% is an artifact (see below).
+
+**Against the imported TLC hypothesis.** Implementation alone cost 3.2x per task
+under one-dispatch-per-task, against TLC's ~2.4x between the same two shapes.
+Different codebase, different work, different tool — the ratio reproduced. The
+shape stays established; the number is now ours, not borrowed.
+
+**A second effect nobody had measured: coherence.** Run 2's 16 files came from
+16 independent contexts, and the branch review listed five different known-bug
+markers, two languages in test titles and three fixture-naming styles. Run 1
+produced the same 16 files from three clusters with one convention. Cohesion
+buys consistency, not only budget.
+
+**What the A/B does not prove.**
+- Run 2 produced more tests and more findings, and the main cause was the
+  orchestrator: from its fifth task on, the implementation briefing required
+  proving that central assertions kill a mutation — an instruction run 1 never
+  had. The bias runs in favour of the old driver, and it still cost 4.34x.
+- Run 2's delegation reads 100% because the orchestrator edited its own
+  documents through `Bash`, which `log-edit.sh` does not see. The two
+  percentages are not comparable. Instrumentation hole, still open.
+- Two run-2 dispatches were killed by a rate limit and never fired
+  `SubagentStop`; the log understates run 2 by at least 97,478 tokens.
+- n=1 per driver.
+
+**Decision recorded.** The current driver is the one to adopt. What run 2 did
+better — per-task review found real assertion gaps in three of its first four
+tasks, and the mutation requirement stopped them — is ported into it rather
+than kept by keeping the old driver: review per cluster, falsifiability in the
+implementation handoff, an environment-variation checklist for the branch
+review, and no verification agent writing to a tracked file. Projection, not
+measurement: ~2.3M for the same spec, still ~3.3x under the old driver.
+
 ## Reading a report honestly
 
 - **A small sample is not a trend.** A handful of edits in one session says
