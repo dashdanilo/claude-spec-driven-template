@@ -253,7 +253,7 @@ emit "⚠  .claude/docs or .claude/scripts pointer that does not resolve:" "$dan
 if [[ $found -eq 1 ]]; then
   {
     echo ""
-    echo "   Update CLAUDE.md (and .claude/README.md) so the index matches reality."
+    echo "   Update CLAUDE.md so the index matches reality."
     echo ""
   } >&2
   [[ $STRICT -eq 1 ]] && exit 1

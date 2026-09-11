@@ -32,7 +32,14 @@ set -uo pipefail
 
 input=$(cat)
 
-printf '%s' "$input" | python3 -c '
+# python3, falling back to `python` (some Windows shells only have `python` on
+# PATH). Never blocks either way: if neither is present, this observability
+# hook just has nothing to log this time.
+PYTHON_BIN=python3
+command -v python3 >/dev/null 2>&1 || PYTHON_BIN=python
+command -v "$PYTHON_BIN" >/dev/null 2>&1 || exit 0
+
+printf '%s' "$input" | "$PYTHON_BIN" -c '
 import sys, json, datetime, os
 
 try:

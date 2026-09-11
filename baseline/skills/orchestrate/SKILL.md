@@ -62,7 +62,7 @@ Skip Step 0 only when `tasks.md` was written in this session and nothing has bee
    - **Disjoint files *between* clusters**, since clusters are dispatched together. Two clusters editing the same file belong in consecutive waves.
    - **Size by tasks per specialist, not by cluster count.** Three is right for ~18 tasks. For 60, three clusters of 20 would blow each specialist's window — hold the cluster at 5-7 and accept more waves.
    - **A cluster takes the strictest gate** of the classes it contains.
-   - One specialist per cluster, picked for this repo's stack from `.claude/agents/` (provided by a stack plugin). No stack specialist is a gap in the plugin — say so, and dispatch the baseline's `implementer`, which is the portable fallback. Not the built-in `general-purpose` agent, which starts with no knowledge of the repo.
+   - One specialist per cluster, picked for this repo's stack from `.claude/agents/` (provided by a stack plugin). **If the project's context declares a specialist routing map** — a `specialists:` key in an imported knowledge catalog, or an equivalent table in `AGENTS.md`/`CLAUDE.md` — route each cluster to the specialist the map assigns to its task class (e.g. schema/migration vs. contract vs. everything else) instead of guessing from the stack alone; without a map, pick by stack as above. Either way, **an agent shipped by a plugin is namespaced** (`<plugin>:<agent>`, e.g. `some-stack:database`) — the name in the map must match exactly what the Agent tool accepts, or the dispatch fails to resolve. No stack specialist is a gap in the plugin — say so, and dispatch the baseline's `implementer`, which is the portable fallback. Not the built-in `general-purpose` agent, which starts with no knowledge of the repo.
 
    **Default dependency order** — foundational layers first: data model / schema / migration → core logic / services → interface / API / UI contract → tests. A cluster that consumes another cluster's output goes in a **later** wave; only clusters that are genuinely independent share a wave.
 
@@ -108,7 +108,7 @@ For each wave, in the approved order:
 
 If a task's work turned out to be bigger than its class assumed — a "config / chore" that ended up touching a service — **re-classify it and run the stricter gates** before checking its box. The class is a plan, and the diff outranks the plan.
 
-**Document ownership** (so parallel specialists don't clobber): **clusters** in the same wave must touch **disjoint files** — that is what makes one-message dispatch safe. Inside a cluster the tasks may share files freely, because one specialist runs them in order. A specialist edits only its own task's files; `tasks.md` is **yours** to check off, not theirs; ADRs are append-only (`.claude/rules/adr.md`). See the three principles in `.claude/README.md`.
+**Document ownership** (so parallel specialists don't clobber): **clusters** in the same wave must touch **disjoint files** — that is what makes one-message dispatch safe. Inside a cluster the tasks may share files freely, because one specialist runs them in order. A specialist edits only its own task's files; `tasks.md` is **yours** to check off, not theirs; ADRs are append-only (`.claude/rules/adr.md`). See the three principles in `.claude/docs/harness/principles.md`.
 
 ## Step 4 — Finish
 
