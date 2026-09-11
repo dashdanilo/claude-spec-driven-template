@@ -52,7 +52,7 @@ A red gate never advances. The loop fixes the root cause and re-runs. **The pipe
 ## The loop (supervised, and autonomous)
 
 - **Supervised (`/loop`):** `/loop implement the next unchecked task in specs/<slug>/tasks.md; run verify-before-done; if green check the box, else fix and retry` — one task per pass.
-- **Orchestrated (`/orchestrate <spec folder>`):** the command reconciles `tasks.md` against the code, classifies each task to pick its gates, plans waves, then runs **one wave at a time** — the whole wave dispatched in a single message to the stack specialists, collected, gated once with `verify-before-done` + the reviewers the wave's classes selected, boxes ticked, next wave — halting on a red gate or anything ambiguous.
+- **Orchestrated (`/orchestrate <spec folder>`):** the command reconciles `tasks.md` against the code, classifies each task to pick its gates, plans waves, then runs **one wave at a time** — the whole wave dispatched in a single message to the stack specialists, collected, built-and-tested once with `verify-before-done` + `tester`, then `code-reviewer` **once per cluster** scoped to that cluster's files, boxes ticked, next wave — halting on a red gate or anything ambiguous.
 
 ## Non-negotiables
 

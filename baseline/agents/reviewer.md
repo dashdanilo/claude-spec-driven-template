@@ -31,6 +31,10 @@ Review **only the current change** (the diff / the branch vs its base), not the 
 
 Run the `verify-before-done` skill (the repo's install/codegen/typecheck/build/tests). A review is not complete until verification is green or you have reported exactly what fails. Never sign off on a red build.
 
+**Never accept the author's green as the review's green.** Before sign-off, when the repo's runner supports it, re-run the suite varied along axes the author's single run does not exercise: **at least two timezones (one UTC, one at a distant offset), two locales, the runner's serial mode, and a random test order.** A suite that only passes under the machine's own timezone or locale is not green, it is lucky — `process.env.TZ` set inside a test file has no effect on an already-spawned worker in some runners (e.g. Jest), so the author's local pass proves nothing about CI. Report which axes you varied and which the runner does not support.
+
+**You do not modify any tracked file that is not your own deliverable** (a PR description, a new branch, findings in your report). If a check requires mutating code to verify a test kills it, do that on a **copy in scratchpad/tmp with the import redirected** — never on the file under review, and never leave a `.bak` beside it. You never edit `tasks.md` or `spec.md`; those belong to the orchestrator — put a suggested change in your findings as text.
+
 ## Output
 
 - A short verdict, then findings ranked most-severe first, each with `file:line`, the rule/skill it violates, and a concrete fix.

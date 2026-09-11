@@ -26,7 +26,7 @@ Prose and checkboxes are two states of the same file, and only one of them is ma
 
 **Also check `lessons.md`:** if the same class of failure appears 3+ times (here or in sibling specs), propose promoting it to a `.claude/rules/` rule or a skill, and put that proposal in the handover's open decisions. A lesson that never gets promoted will be re-learned at full price.
 
-**And read `deviations.md`:** every entry still marked `needs decision` goes into the handover's open decisions verbatim — that file is the raw material for that section, not a separate concern. An `accepted` deviation that the spec still contradicts is worth one line too: the next reader will otherwise trust the spec.
+**And read `deviations.md`:** every entry still marked `needs decision` **or `finding`** goes into the handover's open decisions verbatim — that file is the raw material for that section, not a separate concern. A `finding` doesn't block like `needs decision` does, but it stays open until someone owns the fix, and a handover that drops it is how a real defect disappears between sessions. An `accepted` deviation that the spec still contradicts is worth one line too: the next reader will otherwise trust the spec.
 
 ## Include
 
