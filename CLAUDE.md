@@ -14,7 +14,7 @@ The skills in `baseline/skills/` are workflows Claude Code auto-invokes based on
 - `grilling` - relentless one-question-at-a-time interview that walks a decision tree to lock open decisions; called by `explore` for decision rigor (MIT, adapted from [mattpocock/skills](https://github.com/mattpocock/skills))
 - `find-existing-first` - reuse before create, invoked before any new file
 - `write-spec` - persists a shaped idea as `specs/YYYY-MM-DD-<slug>/` with `spec.md` filled and `plan.md`/`tasks.md` scaffolded
-- `spec-worktree` - one git worktree per feature (`../<repo>.<slug>`, branch from `main`); wraps `.claude/scripts/spec-worktree.sh`
+- `spec-worktree` - one git worktree per feature (`../<repo>.<slug>`, branch from the remote's default branch); wraps `.claude/scripts/spec-worktree.sh`
 - `verify-before-done` - runs the repo's own verification (install, codegen, typecheck, build, tests) and confirms green before claiming done; the gate for automated loops (stack-agnostic)
 - `skill-architect` - guided workflow to author a new skill or agent the way this repo does it (CC-BY-4.0, adapted from [tech-leads-club/agent-skills](https://github.com/tech-leads-club/agent-skills))
 - `jury` - decides **between competing options** with a panel of 3-5 subagents that argue blind, then commits to a verdict with dissent and the riskiest assumption preserved (CC-BY-4.0, adapted from [tech-leads-club/agent-skills](https://github.com/tech-leads-club/agent-skills))

@@ -26,7 +26,7 @@ Do NOT create a worktree per `plan.md`. If a feature has multiple plans, they al
 
 - `<slug>` is the feature slug in kebab-case (same slug family as the spec folder, without the date prefix).
 - `--type` defaults to `feat`. Valid: `feat fix hotfix refactor docs chore test` (the Conventional Commits / commitlint types; see `.claude/rules/git-workflow.md`).
-- The branch is always created **from the latest `main`** (the script fetches first).
+- The branch is always created **from the latest remote default branch** — `origin/HEAD` (`origin/main` on most repos, but whatever the remote actually points at, e.g. `origin/develop`), falling back to `origin/main` then local `main` (the script fetches first).
 - The script provisions gitignored local files into the new worktree: it **symlinks** `CLAUDE.local.md`, `.claude/settings.local.json`, `.claude/context/config.json` (single source of truth), and **copy-seeds** `.claude/context/repomix-snapshot.md` (regenerable per-branch cache).
 
 The script prints the new worktree path on stdout. **You cannot `cd` the user's shell from a subprocess**, so after creating, tell the user to move into it and launch Claude there:
@@ -42,7 +42,7 @@ Each worktree is best opened as its own editor window so the file view is scoped
 ```bash
 .claude/scripts/spec-worktree.sh --list            # what exists (git worktree list)
 .claude/scripts/spec-worktree.sh --remove <slug>   # remove one worktree (keeps the branch)
-.claude/scripts/spec-worktree.sh --prune           # remove worktrees whose branch is merged into main
+.claude/scripts/spec-worktree.sh --prune           # remove worktrees whose branch is merged into the default branch
 ```
 
 Worktrees are **not** removed automatically on merge — you may still need one. Clean up deliberately, later, with `--remove` or `--prune`. `--prune` skips any worktree that has uncommitted changes.
@@ -50,7 +50,7 @@ Worktrees are **not** removed automatically on merge — you may still need one.
 ## What NOT to do
 
 - Do not create a worktree per plan. One per feature.
-- Do not base the branch on anything but `main`. Always fresh from `main`.
+- Do not base the branch on anything but the remote's default branch. Always fresh from it (not local `main`, not a stale checkout).
 - Do not nest the worktree inside the repo. It is a flat sibling (`../<repo>.<slug>`), so git never sees it and it can't be committed by accident.
 - Do not symlink the Repomix snapshot. It is per-branch and gets rewritten when stale; sharing it corrupts main's copy. The script copies it once and the existing staleness mechanism refreshes it in-place.
 - Do not remove a worktree just because its PR merged, unless the user asks. Keep it until cleanup.
