@@ -43,8 +43,27 @@ set -euo pipefail
 # Read JSON input from Claude Code via stdin
 input=$(cat)
 
+# Extract the command with python3, falling back to `python` (some Windows
+# shells only have `python` on PATH, where `python3` is missing or a broken
+# alias). If neither is available, this guard cannot read the payload at all
+# — warn loudly on stderr and let the command through rather than blocking
+# every single Bash call on this machine, which is the failure that gets a
+# guard disabled outright instead of fixed (see the false-positive note
+# above).
+PYTHON_BIN=""
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN=python3
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_BIN=python
+fi
+
+if [[ -z "$PYTHON_BIN" ]]; then
+  echo "WARNING: protect-main.sh: no python3 or python on PATH — cannot read the tool payload, so this guard is DISABLED for this call. Install Python to restore it." >&2
+  exit 0
+fi
+
 # Extract the command from JSON
-command=$(printf '%s' "$input" | python3 -c "import sys,json;d=json.load(sys.stdin);ti=d.get('tool_input') or {};print(d.get('command') or ti.get('command') or '')" 2>/dev/null || echo "")
+command=$(printf '%s' "$input" | "$PYTHON_BIN" -c "import sys,json;d=json.load(sys.stdin);ti=d.get('tool_input') or {};print(d.get('command') or ti.get('command') or '')" 2>/dev/null || echo "")
 
 # --- gh pr merge --admin: blocked everywhere, on any branch -------------------
 # Bypassing branch protection is never something to do on someone else's behalf.
