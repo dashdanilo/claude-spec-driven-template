@@ -53,10 +53,10 @@ Convention:
 Use the helper (it also provisions gitignored local files - symlinks `CLAUDE.local.md` / `.claude/settings.local.json` / `.claude/context/config.json`, and copy-seeds the Repomix snapshot):
 
 ```bash
-.claude/scripts/spec-worktree.sh <slug>            # create + branch from the remote's default branch
-.claude/scripts/spec-worktree.sh --list            # list worktrees
-.claude/scripts/spec-worktree.sh --remove <slug>   # remove one (keeps the branch)
-.claude/scripts/spec-worktree.sh --prune           # remove worktrees whose branch is merged
+.claude/scripts/harness/spec-worktree.sh <slug>            # create + branch from the remote's default branch
+.claude/scripts/harness/spec-worktree.sh --list            # list worktrees
+.claude/scripts/harness/spec-worktree.sh --remove <slug>   # remove one (keeps the branch)
+.claude/scripts/harness/spec-worktree.sh --prune           # remove worktrees whose branch is merged
 ```
 
 After creating, open the worktree as its own editor window and launch your agent from inside it:
@@ -65,7 +65,7 @@ After creating, open the worktree as its own editor window and launch your agent
 cd "../<repo>.<slug>" && claude
 ```
 
-Agents: the `spec-worktree` skill wraps this with the when/how. See also `.claude/scripts/README.md`.
+Agents: the `spec-worktree` skill wraps this with the when/how. See also `.claude/scripts/harness/README.md`.
 
 ## Commits
 

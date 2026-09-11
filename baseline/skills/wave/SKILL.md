@@ -6,7 +6,7 @@ argument-hint: <what to do — free-form, or a spec folder to take the next unch
 
 Dispatch **one wave** and stop. No spec required, no PR at the end. Use this when `/orchestrate` is more ceremony than the work deserves — which is most of the time.
 
-Follow `.claude/rules/delegation.md` (you coordinate, specialists implement) and `.claude/docs/dispatching.md` (how to fan out).
+Follow `.claude/rules/delegation.md` (you coordinate, specialists implement) and `.claude/docs/harness/dispatching.md` (how to fan out).
 
 ## 1 — Build the batch
 

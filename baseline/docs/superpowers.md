@@ -72,6 +72,8 @@ At each phase boundary, the `code-reviewer` subagent (in `.claude/agents/`) runs
 
 CRITICAL issues **block** progress. Without resolution, the next task does not run.
 
+This is the phase-boundary cadence for working `tasks.md` by hand. When `/orchestrate` drives the same file, `code-reviewer` runs once per cluster instead — see `baseline/skills/orchestrate/SKILL.md` Step 3 item 4.
+
 ### 6. Ship
 
 The `finishing-a-development-branch` skill verifies everything passes, then presents options: merge, PR, keep branch, discard.
@@ -80,7 +82,7 @@ The `finishing-a-development-branch` skill verifies everything passes, then pres
 
 - **`specs/`** follows the three-file format (spec.md + plan.md + tasks.md per feature)
 - **`.claude/agents/spec-reviewer.md`** complements brainstorming: audits the spec before it becomes a plan
-- **`.claude/agents/code-reviewer.md`** acts as the automatic gate between phases
+- **`.claude/agents/code-reviewer.md`** acts as the automatic gate between phases (between clusters, under `/orchestrate`)
 - **`src/<folder>/CLAUDE.md`** nested files provide conventions the code-reviewer uses
 
 ## When NOT to use the full flow

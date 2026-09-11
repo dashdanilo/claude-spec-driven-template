@@ -3,7 +3,7 @@ name: handover
 description: Produce a session handover — a compact, high-signal statement of what is true now: what changed, where it stands, what is undecided, so a new session or agent can continue without re-deriving context. Ends by closing the session.
 ---
 
-Write a handover for whoever picks this up next (human or a fresh agent). Follow context discipline (`.claude/docs/context-engineering.md`): conclusions and pointers, not a transcript.
+Write a handover for whoever picks this up next (human or a fresh agent). Follow context discipline (`.claude/docs/harness/context-engineering.md`): conclusions and pointers, not a transcript.
 
 ## The rule that shapes everything below: state, not instructions
 

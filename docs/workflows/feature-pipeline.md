@@ -12,7 +12,7 @@ The end-to-end path from an idea to an open PR: the spec-driven flow, specialist
 | `spec-reviewer` | audits `spec.md` before it becomes plan/tasks |
 | stack specialists (from a plugin) | implement the change in their layer (e.g. data / API / UI) |
 | `tester` | writes and runs tests, discovers the framework |
-| `code-reviewer` | per-phase review vs the active spec/plan/tasks |
+| `code-reviewer` | review vs the active spec/plan/tasks — per cluster under `/orchestrate`, per phase when worked by hand |
 | `reviewer` | whole-branch review, runs the gate, opens the PR |
 
 ## Pipeline
@@ -39,7 +39,7 @@ The end-to-end path from an idea to an open PR: the spec-driven flow, specialist
 1. **Spec gate** — `spec-reviewer` approves `spec.md` (scope, clarity, out-of-scope). `write-spec` runs it automatically.
 2. **Build gate** — `verify-before-done` green: install → codegen → typecheck → build → tests, discovered from `AGENTS.md`.
 3. **Test gate** — the repo's tests green for the touched area (`tester`).
-4. **Review gate** — `code-reviewer` (auto per phase) and `reviewer` (branch) have no blocking findings.
+4. **Review gate** — `code-reviewer` (auto per cluster under `/orchestrate`, per phase when worked by hand) and `reviewer` (branch) have no blocking findings.
 
 A red gate never advances. The loop fixes the root cause and re-runs. **The pipeline ends at an open PR — never auto-merge** (`protect-main` blocks direct merges to protected branches).
 

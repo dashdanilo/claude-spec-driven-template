@@ -2,6 +2,11 @@
 
 Utility scripts used by hooks, skills, and subagents. Not directly invoked by the user.
 
+In a project that linked the harness (`install-harness.sh`), this whole directory
+lands at `.claude/scripts/harness/` — except `check-snapshot.sh`, which
+`install.sh` copies directly into `.claude/scripts/check-snapshot.sh` because it
+is a per-repo guard, not harness method (see `install.sh`'s header).
+
 ## Contents
 
 - **`check-snapshot.sh`** - Compares the current git HEAD against the Repomix snapshot metadata and classifies staleness. Returns JSON. Called by the `SessionStart` hook and by the `codebase-explorer` subagent.

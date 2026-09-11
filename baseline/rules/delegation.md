@@ -34,4 +34,4 @@ Doing it yourself always feels faster in the moment, and it never is: the main t
 
 Measured on a real project running this template: **71% of `Edit` calls happened in the main thread**, while `Grep`/`Glob` were **100% delegated**. Exploration was being delegated and implementation was not — exactly backwards. The main thread ended up carrying 71% of total token spend, in a system whose own context doc says to keep it lean.
 
-See `.claude/docs/dispatching.md` for *how* to dispatch (parallelism, background, re-review) and `.claude/docs/context-engineering.md` for what to send and take back.
+See `.claude/docs/harness/dispatching.md` for *how* to dispatch (parallelism, background, re-review) and `.claude/docs/harness/context-engineering.md` for what to send and take back.

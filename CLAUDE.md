@@ -14,7 +14,7 @@ The skills in `baseline/skills/` are workflows Claude Code auto-invokes based on
 - `grilling` - relentless one-question-at-a-time interview that walks a decision tree to lock open decisions; called by `explore` for decision rigor (MIT, adapted from [mattpocock/skills](https://github.com/mattpocock/skills))
 - `find-existing-first` - reuse before create, invoked before any new file
 - `write-spec` - persists a shaped idea as `specs/YYYY-MM-DD-<slug>/` with `spec.md` filled and `plan.md`/`tasks.md` scaffolded
-- `spec-worktree` - one git worktree per feature (`../<repo>.<slug>`, branch from the remote's default branch); wraps `.claude/scripts/spec-worktree.sh`
+- `spec-worktree` - one git worktree per feature (`../<repo>.<slug>`, branch from the remote's default branch); wraps `.claude/scripts/harness/spec-worktree.sh`
 - `verify-before-done` - runs the repo's own verification (install, codegen, typecheck, build, tests) and confirms green before claiming done; the gate for automated loops (stack-agnostic)
 - `skill-architect` - guided workflow to author a new skill or agent the way this repo does it (CC-BY-4.0, adapted from [tech-leads-club/agent-skills](https://github.com/tech-leads-club/agent-skills))
 - `jury` - decides **between competing options** with a panel of 3-5 subagents that argue blind, then commits to a verdict with dissent and the riskiest assumption preserved (CC-BY-4.0, adapted from [tech-leads-club/agent-skills](https://github.com/tech-leads-club/agent-skills))
@@ -31,7 +31,7 @@ The subagents in `baseline/agents/` run in isolated context windows:
 
 - `codebase-explorer` - read-only archaeology; uses the Repomix snapshot, refreshes when stale-major
 - `spec-reviewer` - mandatory audit of `spec.md` before it becomes a plan (`write-spec` runs it automatically)
-- `code-reviewer` - reviews implementation against spec, plan, tasks and conventions; auto-gates each phase (has persistent memory)
+- `code-reviewer` - reviews implementation against spec, plan, tasks and conventions; under `/orchestrate` auto-gates once per cluster, standalone auto-gates each phase (has persistent memory)
 - `reviewer` - portable staff-level review of a whole diff/branch; runs the repo's verification and can open the PR (adapts to any stack)
 - `tester` - portable; writes and runs tests using the repo's own framework, discovered from AGENTS.md/tooling
 - `researcher` - deep-dives on libs and APIs (persistent memory across projects)
@@ -47,7 +47,7 @@ These are skills too — `baseline/skills/<name>/SKILL.md` — but they *drive* 
 - `handover` - compact, high-signal session handover (done / current state / open decisions / not started) so a fresh session continues without re-deriving context. **State, not instructions** — it describes what is true, never what to do next, because a fact outlives an instruction. **Reconciles `tasks.md` against reality before writing the narrative, always writes a file** (`tasks.md § Handover`, or `.claude/handovers/<date>-<slug>.md` when no spec is active), prints a copyable block, **and ends with an explicit cut** that names that file — state is on disk, clear the session and resume in a fresh one
 - `checkpoint` - safe-save: runs `verify-before-done`, then commits the work on the feature branch (never on a red gate)
 - `status` - read-only project health card: active spec/phase, unchecked tasks, gate status, branch, snapshot staleness
-- `harness-report` - read-only report on the **harness itself**: how much implementation is actually delegated, how dispatches are distributed, how many are unattributed — judged against `.claude/docs/harness-baseline.md`. Answers "is this being used the way it is designed", which a rule cannot answer about itself
+- `harness-report` - read-only report on the **harness itself**: how much implementation is actually delegated, how dispatches are distributed, how many are unattributed — judged against `.claude/docs/harness/harness-baseline.md`. Answers "is this being used the way it is designed", which a rule cannot answer about itself
 
 ### Hooks registered
 

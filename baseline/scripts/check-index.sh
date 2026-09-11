@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 # check-index.sh
 # Checks that CLAUDE.md and the .claude/ machinery still describe each other,
-# and that the machinery itself is well-formed. Three classes of drift:
+# and that the machinery itself is well-formed. Four classes of drift:
 #
 #   1. on disk, not in the index   — you added a skill/agent and forgot to list it
 #   2. in the index, not on disk   — you renamed or deleted one and the index still advertises it
 #   3. malformed on disk           — missing frontmatter, name/filename mismatch, non-executable hook
+#   4. dangling doc/script pointer — a `.claude/docs/...` or `.claude/scripts/...`
+#      mention in a rule, skill, agent or script that does not resolve as a file
+#      from the repo root
 #
-# (2) and (3) are the silent ones. A stale index entry sends an agent looking for
-# something that is not there; a hook without +x never runs and never says so.
+# (2), (3) and (4) are the silent ones. A stale index entry sends an agent looking
+# for something that is not there; a hook without +x never runs and never says so;
+# a dangling pointer sends an agent to read a file that was never linked.
 #
 # Where it looks, in order of what exists:
 #   baseline/     — the harness repo itself, where the machinery is authored
@@ -21,8 +25,8 @@
 # Informational by default — always exits 0, so it is safe on SessionStart.
 # Pass --strict to exit 1 when anything is found (for CI).
 #
-#   .claude/scripts/check-index.sh
-#   .claude/scripts/check-index.sh --strict
+#   .claude/scripts/harness/check-index.sh
+#   .claude/scripts/harness/check-index.sh --strict
 
 set -uo pipefail
 
@@ -169,6 +173,61 @@ for root in ${EXTRA[@]+"${EXTRA[@]}"}; do
   for f in "$root"/commands/*.md; do [[ -e "$f" ]] || continue; know "$(basename "$f" .md)"; done
 done
 
+# ----------------------------------------------- dangling doc/script pointers
+# A fourth class, orthogonal to the other three: `.claude/docs/...` and
+# `.claude/scripts/...` are the two namespaced links a repo gets when it links
+# the harness (install-harness.sh). A stale one survives every check above,
+# because nothing dereferences prose — until an agent tries to read it and
+# finds nothing. Resolved from the repo root, the same way every pointer in
+# this codebase is written.
+#
+# Two pointer shapes are exempt, not because the regex cannot see them but
+# because they are correct without ever resolving in THIS checkout:
+#   - `.claude/scripts/check-snapshot.sh` — install.sh (not install-harness.sh)
+#     copies this one script directly into a consumer's .claude/scripts/, by
+#     design, so it works for a teammate who never linked the harness at all.
+#     This repo never runs install.sh on itself, so the copy never exists here.
+#   - `.claude/docs/libs/...` — "how THIS project uses each library" is
+#     project-owned content, never delivered by the harness link. What ships
+#     in baseline/docs/libs/example-lib.md is a template to be copied into a
+#     project's own docs, not something the harness link exposes at that path.
+is_exempt_pointer() {
+  case "$1" in
+    .claude/scripts/check-snapshot.sh) return 0 ;;
+    .claude/docs/libs|.claude/docs/libs/*) return 0 ;;
+  esac
+  return 1
+}
+
+dangling=""
+seen_ptr_files=""
+ptr_files=()
+for f in "$CLAUDE" AGENTS.md; do
+  [[ -f "$f" ]] || continue
+  ptr_files+=("$f")
+done
+for root in ${OWNED[@]+"${OWNED[@]}"}; do
+  while IFS= read -r f; do
+    [[ -e "$f" ]] || continue
+    ptr_files+=("$f")
+  done < <(find -L "$root" -type f \( -name '*.md' -o -name '*.sh' \) 2>/dev/null)
+done
+
+for f in ${ptr_files[@]+"${ptr_files[@]}"}; do
+  real=$( (cd -- "$(dirname -- "$f")" 2>/dev/null && pwd -P) )/$(basename -- "$f")
+  case "$seen_ptr_files" in *"|$real|"*) continue ;; esac
+  seen_ptr_files="${seen_ptr_files}|$real|"
+  while IFS=: read -r lineno pointer; do
+    [[ -n "$pointer" ]] || continue
+    # A pointer at the end of a sentence ("...harness-baseline.md.") picks up
+    # the full stop; it is punctuation, not part of the path.
+    pointer="${pointer%.}"
+    [[ -e "$pointer" ]] && continue
+    is_exempt_pointer "$pointer" && continue
+    add dangling "$f:$lineno — $pointer"
+  done < <(grep -noE '\.claude/(docs|scripts)/[A-Za-z0-9_./-]+' "$f" 2>/dev/null)
+done
+
 # ---------------------------------------------------------------- reverse
 # Index entries are written as a bullet whose first token is a backticked
 # lowercase name: "- `write-spec` - persists a shaped idea as ...".
@@ -189,6 +248,7 @@ emit() {
 emit "⚠  On disk but not listed in CLAUDE.md:" "$unlisted"
 emit "⚠  Listed in CLAUDE.md but not on disk (renamed or deleted?):" "$stale"
 emit "⚠  Malformed — these do not work as intended:" "$broken"
+emit "⚠  .claude/docs or .claude/scripts pointer that does not resolve:" "$dangling"
 
 if [[ $found -eq 1 ]]; then
   {

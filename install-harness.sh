@@ -13,9 +13,11 @@
 # It symlinks, it does not copy — so `git pull` in this checkout updates every
 # project that opted in, at once, with no propagation step.
 #
-#   .claude/skills        -> <checkout>/baseline/skills
-#   .claude/agents        -> <checkout>/baseline/agents
-#   .claude/rules/harness -> <checkout>/baseline/rules
+#   .claude/skills         -> <checkout>/baseline/skills
+#   .claude/agents         -> <checkout>/baseline/agents
+#   .claude/rules/harness  -> <checkout>/baseline/rules
+#   .claude/docs/harness   -> <checkout>/baseline/docs
+#   .claude/scripts/harness -> <checkout>/baseline/scripts
 #
 # Three things make this safe to run inside a repository other people share:
 #
@@ -32,9 +34,12 @@
 #   per-clone and never leaves your machine. A teammate cloning the repo sees
 #   no dangling symlink, and CI sees nothing at all.
 #
-#   Rules land in a SUBDIRECTORY (.claude/rules/harness/) instead of replacing
-#   the rules folder. Rules are discovered recursively, so the repo's own rules
+#   Rules, docs and scripts land in a SUBDIRECTORY (.claude/rules/harness/,
+#   .claude/docs/harness/, .claude/scripts/harness/) instead of replacing the
+#   whole folder. Rules are discovered recursively, so the repo's own rules
 #   keep working alongside — and a project rule still wins over a harness one.
+#   The same namespace keeps a project's own .claude/docs/libs/ or its own
+#   .claude/scripts/*.sh from colliding with what the harness provides.
 #
 # Hooks cannot ride a symlink because they are registered by path, so they are
 # merged into .claude/settings.local.json — already gitignored, so the repo's
@@ -134,8 +139,8 @@ else
   fi
 fi
 
-NAMES=(skills agents "rules/harness")
-SRCS=("$BASE/skills" "$BASE/agents" "$BASE/rules")
+NAMES=(skills agents "rules/harness" "docs/harness" "scripts/harness")
+SRCS=("$BASE/skills" "$BASE/agents" "$BASE/rules" "$BASE/docs" "$BASE/scripts")
 
 # Marker dropped inside a fallback copy, so --status and --unlink can tell a copy
 # WE made from a directory the repo owns. Without it an interrupted install looks
@@ -169,7 +174,7 @@ COPIED=0
 if [[ $MODE == status ]]; then
   say "harness:  $HERE"
   say "target:   $DEST"
-  for i in 0 1 2; do
+  for i in "${!NAMES[@]}"; do
     n="${NAMES[$i]}"; s="${SRCS[$i]}"; d="$DEST/$n"
     if [[ -L "$d" ]]; then
       if [[ "$(readlink "$d")" == "$s" ]]; then printf '  %-14s linked\n' "$n"
@@ -190,10 +195,19 @@ if [[ $MODE == status ]]; then
   exit 0
 fi
 
-[[ $MODE == dryrun ]] || mkdir -p "$DEST" "$DEST/rules"
+if [[ $MODE != dryrun ]]; then
+  mkdir -p "$DEST"
+  # Parent dir of each namespaced entry (rules/harness needs .claude/rules/,
+  # docs/harness needs .claude/docs/, scripts/harness needs .claude/scripts/) —
+  # derived from NAMES instead of hardcoded, so adding a fourth namespaced link
+  # later does not require touching this line too.
+  for n in "${NAMES[@]}"; do
+    [[ "$n" == */* ]] && mkdir -p "$DEST/$(dirname "$n")"
+  done
+fi
 
 # ------------------------------------------------------------------ links
-for i in 0 1 2; do
+for i in "${!NAMES[@]}"; do
   n="${NAMES[$i]}"; src="${SRCS[$i]}"; dst="$DEST/$n"
   [[ -d "$src" ]] || { warn "skip $n — not in this checkout"; continue; }
 
@@ -379,7 +393,7 @@ PY
     if [[ $MODE == dryrun ]]; then
       say "would      add the links to .git/info/exclude"
     else
-      { echo ""; echo "$MARK"; echo ".claude/skills"; echo ".claude/agents"; echo ".claude/rules/harness"; echo ".claude/settings.local.json"; echo ".claude/**/*.pre-harness"; echo ".claude/*.pre-harness"; } >> "$EXCLUDE"
+      { echo ""; echo "$MARK"; echo ".claude/skills"; echo ".claude/agents"; echo ".claude/rules/harness"; echo ".claude/docs/harness"; echo ".claude/scripts/harness"; echo ".claude/settings.local.json"; echo ".claude/**/*.pre-harness"; echo ".claude/*.pre-harness"; } >> "$EXCLUDE"
       say "excluded   from git via $(basename "$(dirname "$(dirname "$EXCLUDE")")")/info/exclude"
       [[ $IS_WORKTREE -eq 1 ]] && say "           (shared with every worktree of this repo — harmless, the paths are tracked there)"
     fi

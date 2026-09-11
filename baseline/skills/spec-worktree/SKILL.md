@@ -1,13 +1,13 @@
 ---
 name: spec-worktree
-description: Creates and manages one git worktree per feature so a feature branch is worked on in isolation, in its own sibling directory, without switching branches in the main checkout. Use when starting to implement a feature (moving from spec/plan into execution), when the user wants to work on multiple features in parallel, or says "work on this in a worktree", "create a worktree", "spin up a worktree for X". Also handles listing and cleaning up worktrees. Delegates the mechanics to `.claude/scripts/spec-worktree.sh`.
+description: Creates and manages one git worktree per feature so a feature branch is worked on in isolation, in its own sibling directory, without switching branches in the main checkout. Use when starting to implement a feature (moving from spec/plan into execution), when the user wants to work on multiple features in parallel, or says "work on this in a worktree", "create a worktree", "spin up a worktree for X". Also handles listing and cleaning up worktrees. Delegates the mechanics to `.claude/scripts/harness/spec-worktree.sh`.
 ---
 
 # Spec worktree
 
 One worktree per **feature**, not per plan. A feature branch (`<type>/<slug>`) lives in its own sibling directory `../<repo>.<slug>`. Several specs and plans that belong to the same feature share that one worktree.
 
-This skill is the decision layer. The mechanics (git worktree, symlinks, snapshot seeding, cleanup) live in `.claude/scripts/spec-worktree.sh` so a human or any agent can run them without Claude.
+This skill is the decision layer. The mechanics (git worktree, symlinks, snapshot seeding, cleanup) live in `.claude/scripts/harness/spec-worktree.sh` so a human or any agent can run them without Claude.
 
 ## When to invoke
 
@@ -21,7 +21,7 @@ Do NOT create a worktree per `plan.md`. If a feature has multiple plans, they al
 ## Create a worktree
 
 ```bash
-.claude/scripts/spec-worktree.sh <slug> [--type <type>]
+.claude/scripts/harness/spec-worktree.sh <slug> [--type <type>]
 ```
 
 - `<slug>` is the feature slug in kebab-case (same slug family as the spec folder, without the date prefix).
@@ -40,9 +40,9 @@ Each worktree is best opened as its own editor window so the file view is scoped
 ## List, remove, prune
 
 ```bash
-.claude/scripts/spec-worktree.sh --list            # what exists (git worktree list)
-.claude/scripts/spec-worktree.sh --remove <slug>   # remove one worktree (keeps the branch)
-.claude/scripts/spec-worktree.sh --prune           # remove worktrees whose branch is merged into the default branch
+.claude/scripts/harness/spec-worktree.sh --list            # what exists (git worktree list)
+.claude/scripts/harness/spec-worktree.sh --remove <slug>   # remove one worktree (keeps the branch)
+.claude/scripts/harness/spec-worktree.sh --prune           # remove worktrees whose branch is merged into the default branch
 ```
 
 Worktrees are **not** removed automatically on merge — you may still need one. Clean up deliberately, later, with `--remove` or `--prune`. `--prune` skips any worktree that has uncommitted changes.

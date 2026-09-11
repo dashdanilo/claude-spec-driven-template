@@ -7,13 +7,13 @@ Report on the harness itself, not the code. Read state; change nothing.
 
 ## 1 — Collect
 
-Run `.claude/scripts/harness-report.sh`. It reads `.claude/tool-log.txt` (who edits: main thread or specialist) and `.claude/agent-log.txt` (what each dispatch cost). Both are gitignored and per-checkout.
+Run `.claude/scripts/harness/harness-report.sh`. It reads `.claude/tool-log.txt` (who edits: main thread or specialist) and `.claude/agent-log.txt` (what each dispatch cost). Both are gitignored and per-checkout.
 
 If it says there is no data, say so and stop. An empty log means the hooks have not fired yet, not that behaviour is perfect.
 
 ## 2 — Judge against the baseline
 
-Read `.claude/docs/harness-baseline.md` and compare. Report the **direction**, not just the value:
+Read `.claude/docs/harness/harness-baseline.md` and compare. Report the **direction**, not just the value:
 
 - **Edit delegated** vs the 29% baseline — this is the headline. Below or near 29% means `rules/delegation.md` did not change behaviour.
 - **Dispatch count and mix** — a healthy run shows several dispatches and more than one agent type. All `general-purpose` means the stack plugin is missing specialists, which costs multiples per task.

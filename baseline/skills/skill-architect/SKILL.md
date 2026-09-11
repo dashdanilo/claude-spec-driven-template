@@ -37,7 +37,7 @@ Understanding precedes building: don't write a `SKILL.md` until you know the out
 
 ## Phase 5 — Deliver
 
-- **Update `CLAUDE.md`** (and `.claude/README.md`) to list the new skill, then confirm `.claude/scripts/check-index.sh` reports no drift.
+- **Update `CLAUDE.md`** (and `.claude/README.md`) to list the new skill, then confirm `.claude/scripts/harness/check-index.sh` reports no drift.
 - Commit on a branch, open a PR to `develop`. Never commit to a protected branch.
 
 ## Principles

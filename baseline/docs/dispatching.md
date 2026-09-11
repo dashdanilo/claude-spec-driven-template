@@ -1,6 +1,6 @@
 # Dispatching subagents
 
-*What* to delegate is `.claude/rules/delegation.md`. *What context* to pass is `.claude/docs/context-engineering.md`. This doc is **how** — parallelism, background, re-review, memory.
+*What* to delegate is `.claude/rules/delegation.md`. *What context* to pass is `.claude/docs/harness/context-engineering.md`. This doc is **how** — parallelism, background, re-review, memory.
 
 AI-only. Portable: no stack assumptions.
 

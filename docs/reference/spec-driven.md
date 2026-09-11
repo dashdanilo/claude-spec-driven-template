@@ -47,6 +47,8 @@ flowchart TD
     style Q fill:#dcfce7,stroke:#16a34a
 ```
 
+This diagram shows the flow worked task by task, by hand — `code-reviewer` gates each phase. Driven by `/orchestrate` instead, the same gate runs once per cluster (a group of related tasks dispatched together), not once per phase.
+
 When code and spec diverge, the spec wins. Code gets fixed.
 
 The `write-spec` skill ships the `spec.md` / `plan.md` / `tasks.md` templates in [`baseline/skills/write-spec/references/`](./baseline/skills/write-spec/references/) and copies them into `specs/YYYY-MM-DD-<slug>/` for you.

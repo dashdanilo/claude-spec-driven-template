@@ -17,7 +17,7 @@ Duas coisas chegam por caminhos diferentes, e essa separação é o desenho inte
 
 | | o quê | como chega | vai pro git? |
 |---|---|---|:--:|
-| **Método** | skills, agents, rules, hooks portáveis | **symlink** do seu clone deste repo | não |
+| **Método** | skills, agents, rules, docs, scripts, hooks portáveis | **symlink** do seu clone deste repo | não |
 | **Contexto** | `AGENTS.md`, `CLAUDE.md`, `docs/`, `specs/`, guardas do repo | **cópia** dentro do repositório | sim |
 
 Método é como *você* trabalha: idêntico para todo mundo, opt-in por repo,
@@ -48,13 +48,20 @@ cd ~/Sites/algum-projeto
 ~/Sites/harness/install-harness.sh
 ```
 
-Isso cria três symlinks e registra os hooks portáveis:
+Isso cria cinco symlinks e registra os hooks portáveis:
 
 ```
-.claude/skills        -> ~/Sites/harness/baseline/skills
-.claude/agents        -> ~/Sites/harness/baseline/agents
-.claude/rules/harness -> ~/Sites/harness/baseline/rules
+.claude/skills          -> ~/Sites/harness/baseline/skills
+.claude/agents          -> ~/Sites/harness/baseline/agents
+.claude/rules/harness   -> ~/Sites/harness/baseline/rules
+.claude/docs/harness    -> ~/Sites/harness/baseline/docs
+.claude/scripts/harness -> ~/Sites/harness/baseline/scripts
 ```
+
+Os dois últimos ficam num subdiretório pelo mesmo motivo que `rules/harness`: não
+substituem a pasta inteira, então `.claude/docs/libs/` (como este projeto usa
+cada lib) e um `.claude/scripts/` próprio do repositório convivem com o que o
+harness linkou.
 
 **Nada é commitado.** Os links vão para o `.git/info/exclude` (por clone, nunca
 sobe) e os hooks para o `.claude/settings.local.json` (já gitignorado). Quem
