@@ -167,4 +167,4 @@ Keep MEMORY.md concise. Findings over process. Do not log every grep you ran.
 - Do not read the entire snapshot for a narrow question (it's 20-50k tokens; use grep/glob for scoped searches).
 - Do not skip the staleness check - a stale snapshot misleads the main session.
 - Do not ask the user before refreshing on `stale-major` - refresh silently and note it in the report.
-- Keep context lean — see `.claude/docs/context-engineering.md`: return findings/summaries, never file dumps; read narrowly (grep + targeted reads over whole files).
+- Keep context lean — see `.claude/docs/harness/context-engineering.md`: return findings/summaries, never file dumps; read narrowly (grep + targeted reads over whole files).

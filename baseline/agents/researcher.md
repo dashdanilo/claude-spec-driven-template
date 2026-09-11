@@ -52,4 +52,4 @@ Keep MEMORY.md scoped to **findings**, not process. Do not log what you searched
 - Do not paste entire docs into the conversation. Summarize and link.
 - Do not recommend without trade-offs. Every choice has costs.
 - Do not claim certainty on fast-moving topics. Date your sources.
-- Keep context lean — see `.claude/docs/context-engineering.md` (return conclusions, not raw material).
+- Keep context lean — see `.claude/docs/harness/context-engineering.md` (return conclusions, not raw material).

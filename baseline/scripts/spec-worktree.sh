@@ -25,7 +25,7 @@
 #   spec-worktree.sh --help                   Show this help
 #
 # The created worktree path is printed to stdout (last line) so a caller can:
-#   cd "$(.claude/scripts/spec-worktree.sh add-dark-mode)"
+#   cd "$(.claude/scripts/harness/spec-worktree.sh add-dark-mode)"
 # Human-readable progress goes to stderr.
 #
 # Exit codes:
@@ -106,7 +106,7 @@ provision_locals() {
   # that opted in would otherwise start WITHOUT the harness, silently, which is
   # the same quiet failure a moved checkout produces. Point at the same target
   # the main checkout uses rather than re-deriving it.
-  for f in ".claude/skills" ".claude/agents" ".claude/rules/harness"; do
+  for f in ".claude/skills" ".claude/agents" ".claude/rules/harness" ".claude/docs/harness" ".claude/scripts/harness"; do
     if [[ -L "$MAIN_ROOT/$f" && ! -e "$wt/$f" ]]; then
       local target
       target=$(readlink "$MAIN_ROOT/$f")

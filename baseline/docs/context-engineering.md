@@ -15,7 +15,7 @@ Portable — applies to any repo. Every agent here should follow it.
 - **Continue an agent instead of re-dispatching it.** First pass on an artifact → fresh dispatch. Second and third pass on the **same** artifact → continue the live agent. A re-dispatch re-reads everything from zero and has forgotten what it already flagged; a continuation costs a fraction and still remembers its own findings.
 - **A declared memory is not a used memory.** An agent with `memory:` in its frontmatter has a durable notebook across runs. Tell it to read that notebook first and append what it learned — otherwise the config is decoration and the agent re-derives the same conventions every run.
 
-Mechanics of dispatching — parallelism, background, concurrency ceiling — live in `.claude/docs/dispatching.md`. Who writes the code lives in `.claude/rules/delegation.md`.
+Mechanics of dispatching — parallelism, background, concurrency ceiling — live in `.claude/docs/harness/dispatching.md`. Who writes the code lives in `.claude/rules/delegation.md`.
 
 ## Quick checklist
 

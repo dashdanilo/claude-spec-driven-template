@@ -7,10 +7,10 @@
 #   .claude/agent-log.txt   (log-agent.sh)  — what each dispatch cost
 #
 # Prints a plain table on stdout. Exits 0 always — this measures, it does not gate.
-# Compare the output against .claude/docs/harness-baseline.md.
+# Compare the output against .claude/docs/harness/harness-baseline.md.
 #
-#   .claude/scripts/harness-report.sh
-#   .claude/scripts/harness-report.sh --json
+#   .claude/scripts/harness/harness-report.sh
+#   .claude/scripts/harness/harness-report.sh --json
 
 set -uo pipefail
 
@@ -135,7 +135,7 @@ if cached_total:
     line("  of which cache reads", f"{cached_total:,}")
 
 print()
-print(" compare against .claude/docs/harness-baseline.md")
+print(" compare against .claude/docs/harness/harness-baseline.md")
 print()
 PY
 

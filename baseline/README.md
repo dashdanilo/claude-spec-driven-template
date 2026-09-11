@@ -31,10 +31,10 @@ Also: `scripts/` (shell helpers, e.g. `spec-worktree.sh`, `check-index.sh`), `co
 
 ## Delegation and dispatch
 
-Who writes the code is a rule, not a preference: `.claude/rules/delegation.md` (always loaded — the main thread coordinates, specialists implement). *How* to dispatch — parallel means several agent calls in **one** message, background only for long work you collect this turn, never background a gate — is `.claude/docs/dispatching.md`. What to send and take back is `.claude/docs/context-engineering.md`.
+Who writes the code is a rule, not a preference: `.claude/rules/delegation.md` (always loaded — the main thread coordinates, specialists implement). *How* to dispatch — parallel means several agent calls in **one** message, background only for long work you collect this turn, never background a gate — is `.claude/docs/harness/dispatching.md`. What to send and take back is `.claude/docs/harness/context-engineering.md`.
 
 ## Where things point
 
 - Project context & stack → `AGENTS.md` (source of truth), `CLAUDE.md` (Claude-specific extras).
-- The index above is kept honest by `.claude/scripts/check-index.sh` (runs on SessionStart; warns when `CLAUDE.md` lists something that no longer exists or misses something on disk).
+- The index above is kept honest by `.claude/scripts/harness/check-index.sh` (runs on SessionStart; warns when `CLAUDE.md` lists something that no longer exists or misses something on disk).
 - Human docs → `docs/` (architecture, conventions, decisions).

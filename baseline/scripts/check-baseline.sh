@@ -54,7 +54,7 @@ resolve_checkout() {
 # --------------------------------------------------------- broken links first
 # Checked before anything else: if the links are dead, everything below is moot.
 broken=""
-for n in skills agents rules/harness; do
+for n in skills agents rules/harness docs/harness scripts/harness; do
   l=".claude/$n"
   [[ -L "$l" ]] || continue
   [[ -e "$l" ]] && continue          # resolves — fine
@@ -82,7 +82,7 @@ fi
 # nothing for that person — and nothing else would tell them, which is the whole
 # problem with a fallback nobody checks on.
 stale_copies=""
-for n in skills agents rules/harness; do
+for n in skills agents rules/harness docs/harness scripts/harness; do
   d=".claude/$n"
   [[ -f "$d/.harness-copy" ]] || continue
   src=$(cat "$d/.harness-copy" 2>/dev/null)
