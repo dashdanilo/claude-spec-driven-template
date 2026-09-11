@@ -17,8 +17,14 @@
 #     .claude/settings.local.json, .claude/context/config.json
 #   - Copy-seeded (regenerable per-branch cache): .claude/context/repomix-snapshot.md
 #
+# If the new worktree has an executable script/setup (Scripts to Rule Them All
+# convention — see docs/guides/), it is run after provisioning, taking the
+# worktree from "created" to "ready to work in". Skip with --no-setup. A repo
+# without script/setup is unaffected: this step is a no-op.
+#
 # Usage:
-#   spec-worktree.sh <slug> [--type <type>]   Create worktree + branch from main
+#   spec-worktree.sh <slug> [--type <type>] [--no-setup]
+#                                              Create worktree + branch from main
 #   spec-worktree.sh --list                   List worktrees (git worktree list)
 #   spec-worktree.sh --remove <slug>          Remove one worktree
 #   spec-worktree.sh --prune                  Remove worktrees whose branch is merged
@@ -32,6 +38,9 @@
 #   0 - success
 #   1 - usage error
 #   2 - git error / precondition failed
+#   3 - worktree created but script/setup failed (the worktree is kept — never
+#       deleted on a failed setup, since that would discard the branch work
+#       alongside it; fix the environment and rerun script/setup by hand)
 
 set -euo pipefail
 
@@ -44,7 +53,7 @@ log()  { echo "$@" >&2; }
 die()  { echo "error: $*" >&2; exit "${2:-2}"; }
 
 usage() {
-  sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//' >&2
+  sed -n '2,43p' "$0" | sed 's/^# \{0,1\}//' >&2
   exit "${1:-0}"
 }
 
@@ -126,8 +135,28 @@ provision_locals() {
   fi
 }
 
+# Runs the repo's own script/setup inside the new worktree, if it exists and is
+# executable (Scripts to Rule Them All convention). A repo without one is
+# unaffected — this is a no-op, not a warning. On failure the worktree is
+# NEVER removed: deleting it would discard the branch alongside a setup error
+# that has nothing to do with the branch itself.
+run_setup() {
+  local wt="$1"
+  local setup="$wt/script/setup"
+  [[ -x "$setup" ]] || return 0
+  log ""
+  log "Running script/setup in $wt"
+  if ! ( cd "$wt" && ./script/setup ) >&2; then
+    log ""
+    log "error: script/setup failed. The worktree exists at $wt, but the"
+    log "environment did not come up. Fix the issue and rerun script/setup"
+    log "by hand inside the worktree — the worktree itself was NOT removed."
+    return 3
+  fi
+}
+
 cmd_create() {
-  local slug="$1" type="$2"
+  local slug="$1" type="$2" no_setup="$3"
   validate_slug "$slug"
   if [[ " $VALID_TYPES " != *" $type "* ]]; then
     die "invalid type '$type' (valid: $VALID_TYPES)" 1
@@ -149,6 +178,13 @@ cmd_create() {
   git worktree add -b "$branch" "$wt" "$base" >&2
 
   provision_locals "$wt"
+
+  if [[ "$no_setup" == "1" ]]; then
+    log ""
+    log "Skipping script/setup (--no-setup)."
+  else
+    run_setup "$wt" || die "worktree kept at $wt; environment setup failed (see above)" 3
+  fi
 
   log ""
   log "Done. Next:"
@@ -215,13 +251,15 @@ case "$1" in
   *)
     slug="$1"; shift
     type="$DEFAULT_TYPE"
+    no_setup="0"
     while [[ $# -gt 0 ]]; do
       case "$1" in
-        --type) shift; [[ $# -ge 1 ]] || die "--type needs a value" 1; type="$1" ;;
-        *)      die "unexpected argument: $1" 1 ;;
+        --type)      shift; [[ $# -ge 1 ]] || die "--type needs a value" 1; type="$1" ;;
+        --no-setup)  no_setup="1" ;;
+        *)           die "unexpected argument: $1" 1 ;;
       esac
       shift
     done
-    cmd_create "$slug" "$type"
+    cmd_create "$slug" "$type" "$no_setup"
     ;;
 esac
