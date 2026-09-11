@@ -113,6 +113,10 @@ Reuse existing files if they exist (`README.md`, `ARCHITECTURE.md`, `CONTRIBUTIN
 - Update `AGENTS.md` to reflect the same
 - Do NOT invent conventions. If unclear, leave placeholders and note it in your final report.
 
+### 6b. Check for `script/setup` / `script/test`
+
+Look for an executable `script/setup` and `script/test` at the repo root (the Scripts to Rule Them All convention — `docs/guides/script-setup-and-test.md`). If either is missing, note it as a recommendation in the report (step 8) — do not create them yourself. They are project-owned: only the team knows what "ready to work in" and "verified" mean for this repo.
+
 ### 7. Log the run
 
 ```bash
@@ -141,6 +145,7 @@ Summarize what you did and what needs human review:
 ### Needs your review
 - Any TODO markers left in generated files
 - CONVENTIONS.md (I inferred these from N files; confirm they match team intent)
+- [if applicable] This repo has no `script/setup` / `script/test` (Scripts to Rule Them All). Recommended — see `docs/guides/script-setup-and-test.md` — but not created here.
 
 ### Suggested next steps
 - Review the generated docs and correct anything wrong

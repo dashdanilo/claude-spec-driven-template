@@ -28,6 +28,8 @@ Do NOT create a worktree per `plan.md`. If a feature has multiple plans, they al
 - `--type` defaults to `feat`. Valid: `feat fix hotfix refactor docs chore test` (the Conventional Commits / commitlint types; see `.claude/rules/git-workflow.md`).
 - The branch is always created **from the latest remote default branch** — `origin/HEAD` (`origin/main` on most repos, but whatever the remote actually points at, e.g. `origin/develop`), falling back to `origin/main` then local `main` (the script fetches first).
 - The script provisions gitignored local files into the new worktree: it **symlinks** `CLAUDE.local.md`, `.claude/settings.local.json`, `.claude/context/config.json` (single source of truth), and **copy-seeds** `.claude/context/repomix-snapshot.md` (regenerable per-branch cache).
+- If the repo has an executable `script/setup` at its root (the Scripts to Rule Them All convention — see `docs/guides/script-setup-and-test.md`), it runs it inside the new worktree right after provisioning, taking the worktree from "created" to "ready to work in" (deps installed, env file provisioned, codegen run). Pass `--no-setup` to skip it. A repo without `script/setup` is unaffected — this step is a no-op, not a warning.
+- If `script/setup` fails, the worktree is **kept, never deleted** — the script exits non-zero (3) and tells you where the worktree is and that the environment did not come up. Fix the issue and rerun `script/setup` by hand inside the worktree.
 
 The script prints the new worktree path on stdout. **You cannot `cd` the user's shell from a subprocess**, so after creating, tell the user to move into it and launch Claude there:
 
@@ -50,6 +52,7 @@ Worktrees are **not** removed automatically on merge — you may still need one.
 ## What NOT to do
 
 - Do not create a worktree per plan. One per feature.
+- Do not write `script/setup` yourself — it is project-owned, not something this skill or the harness generates. If it does not exist, note the gap and let the human write it (see `docs/guides/script-setup-and-test.md`).
 - Do not base the branch on anything but the remote's default branch. Always fresh from it (not local `main`, not a stale checkout).
 - Do not nest the worktree inside the repo. It is a flat sibling (`../<repo>.<slug>`), so git never sees it and it can't be committed by accident.
 - Do not symlink the Repomix snapshot. It is per-branch and gets rewritten when stale; sharing it corrupts main's copy. The script copies it once and the existing staleness mechanism refreshes it in-place.
