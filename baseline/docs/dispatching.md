@@ -142,7 +142,7 @@ Wave with 3 independent tasks
 
 This is the single most-missed mechanic. On a real project, **54 of 54 dispatches went out one per message** — the wave plan existed on paper and never once fanned out. The overlap that did happen came from background dispatches accidentally outliving each other, peaking at 3.
 
-Before dispatching a wave, ask: *are these tasks touching disjoint files?* If yes, they belong in one message. If no, they belong in different waves (see document ownership in `.claude/README.md`).
+Before dispatching a wave, ask: *are these tasks touching disjoint files?* If yes, they belong in one message. If no, they belong in different waves (see document ownership in `.claude/docs/harness/principles.md`).
 
 **Verification agents are not exempt from disjointness.** `tester`, `code-reviewer` and `reviewer` write only their own deliverable — a test file, a report, a PR description — never a tracked file that belongs to someone else, and never a tracked file at all for a mutation check (mutate a copy in scratchpad/tmp with the import redirected, instead). Measured: a `tester` and a `code-reviewer` dispatched together, in the same tree — the reviewer mutated a helper file in place to check whether an assertion killed it, the tester ran the suite in that same window, hit a red gate against a modified production file plus a stray `.bak`, and correctly refused to revert something it did not own. The file-disjointness rule above was written for whoever authors the deliverable; it did not anticipate that verification writes too.
 
