@@ -5,26 +5,15 @@
 # PreToolUse calls (`{"tool_input":{"file_path":"..."}}`) and asserts the exit
 # code (2 = blocked, 0 = passes).
 #
-# Two groups of cases need real git fixtures (built under a mktemp dir,
-# removed on exit via trap — never inside a real repo):
+# This suite covers only what protect-critical.sh still owns after the
+# governance split: files that are sensitive (env, secrets) or would cause
+# silent damage if edited without explicit approval (lockfiles, applied
+# migrations, generated code), plus the `.example` template exemption and the
+# payload-without-file_path no-op. None of these cases need a real git repo.
 #
-#   Group A (config: .claude/settings.json, .claude/settings.local.json) —
-#   blocked unconditionally, so these cases don't need real repos, just any
-#   cwd/file_path pairing.
-#
-#   Group B (governance source: baseline/hooks/*.sh, .claude/hooks/*.sh,
-#   baseline/rules/**, .claude/rules/**) — blocked only when the session's
-#   cwd and the edited file resolve to DIFFERENT git repositories, so these
-#   cases build two disposable repos (REPO_A, REPO_B) plus a worktree of
-#   REPO_A, to prove: same-repo passes, cross-repo blocks, and a worktree of
-#   the SAME repo counts as the same repo (not a different one) even though
-#   `git rev-parse --show-toplevel` would report a different path for it —
-#   which is exactly the scenario this suite's own author was invoked under.
-#
-# Degradation cases (no git on PATH, cwd outside any repo, target directory
-# that does not exist) construct their own minimal environment per case
-# rather than relying on the ambient one, so the suite's own result does not
-# depend on whether git happens to be installed on the machine running it.
+# The governance cases (the harness's own hooks, hook config, and rules —
+# .claude/settings.json, baseline/hooks/*.sh, baseline/rules/**, etc.) moved
+# to protect-harness.test.sh alongside the hook that now owns them.
 #
 # Run: bash baseline/hooks/tests/protect-critical.test.sh
 
@@ -49,48 +38,6 @@ fi
 
 TMPDIR_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_ROOT"' EXIT
-
-# --- disposable git repos for the Group B same-repo / cross-repo cases ---
-
-REPO_A="$TMPDIR_ROOT/repo-a"          # simulates "this harness checkout"
-REPO_B="$TMPDIR_ROOT/repo-b"          # simulates a different consuming project (e.g. njord-back)
-NO_GIT_CWD="$TMPDIR_ROOT/no-git-cwd"  # plain dir, never git-initialized
-
-_init_repo() {
-  local dir="$1"
-  mkdir -p "$dir"
-  git -C "$dir" init -q
-  git -C "$dir" config user.email "test@example.com"
-  git -C "$dir" config user.name "Test"
-  mkdir -p "$dir/baseline/hooks" "$dir/.claude/hooks" "$dir/.claude/rules/harness" "$dir/baseline/rules"
-  printf '#!/usr/bin/env bash\n' > "$dir/baseline/hooks/protect-main.sh"
-  printf '#!/usr/bin/env bash\n' > "$dir/.claude/hooks/some-hook.sh"
-  printf '# rule\n' > "$dir/.claude/rules/harness/delegation.md"
-  printf '# rule\n' > "$dir/baseline/rules/git-workflow.md"
-  printf '{}\n' > "$dir/.claude/settings.json"
-  printf '{}\n' > "$dir/.claude/settings.local.json"
-  git -C "$dir" add -A
-  git -C "$dir" commit -q -m "init"
-}
-
-_init_repo "$REPO_A"
-_init_repo "$REPO_B"
-mkdir -p "$NO_GIT_CWD"
-
-# A worktree of REPO_A, on its own branch, in its own directory — proves a
-# worktree of the SAME repo is treated as the same repo, not a different one.
-REPO_A_WT="$TMPDIR_ROOT/repo-a-worktree"
-git -C "$REPO_A" worktree add -q -b wt-branch "$REPO_A_WT" >/dev/null 2>&1
-
-# A PATH with everything the hook needs EXCEPT git, to simulate "no git on
-# PATH" without depending on the real machine's PATH layout (which may or may
-# not have git early/late in it — this must work the same everywhere).
-NO_GIT_PATH_DIR="$TMPDIR_ROOT/no-git-path"
-mkdir -p "$NO_GIT_PATH_DIR"
-for tool in bash cat "$PYTHON_BIN" grep dirname; do
-  src=$(command -v "$tool" 2>/dev/null) || continue
-  ln -sf "$src" "$NO_GIT_PATH_DIR/$(basename "$src")"
-done
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -159,81 +106,14 @@ _run_case "8: .env.test.example passes (regression check)" \
 _run_case "9: nested .env.example passes" \
   "$TMPDIR_ROOT" "apps/api/.env.example" 0
 
-# --- Group A (config): blocked unconditionally, same-repo or cross-repo ---
-
-_run_case "10: .claude/settings.json blocked, cwd in SAME repo as target" \
-  "$REPO_A" "$REPO_A/.claude/settings.json" 2
-
-_run_case "11: .claude/settings.json blocked, cwd in a DIFFERENT repo" \
-  "$REPO_B" "$REPO_A/.claude/settings.json" 2
-
-_run_case "12: .claude/settings.local.json blocked, cwd in a DIFFERENT repo" \
-  "$REPO_B" "$REPO_A/.claude/settings.local.json" 2
-
-# --- Group B (governance source): same-repo passes, cross-repo blocks ---
-
-_run_case "13: baseline/hooks/*.sh passes, cwd in SAME repo as target" \
-  "$REPO_A" "$REPO_A/baseline/hooks/protect-main.sh" 0
-
-_run_case "14: baseline/hooks/*.sh blocked, cwd in a DIFFERENT repo" \
-  "$REPO_B" "$REPO_A/baseline/hooks/protect-main.sh" 2
-
-_run_case "15: .claude/hooks/*.sh passes, cwd in SAME repo as target" \
-  "$REPO_A" "$REPO_A/.claude/hooks/some-hook.sh" 0
-
-_run_case "16: .claude/hooks/*.sh blocked, cwd in a DIFFERENT repo" \
-  "$REPO_B" "$REPO_A/.claude/hooks/some-hook.sh" 2
-
-_run_case "17: baseline/rules/** passes, cwd in SAME repo as target" \
-  "$REPO_A" "$REPO_A/baseline/rules/git-workflow.md" 0
-
-_run_case "18: baseline/rules/** blocked, cwd in a DIFFERENT repo" \
-  "$REPO_B" "$REPO_A/baseline/rules/git-workflow.md" 2
-
-_run_case "19: .claude/rules/** passes, cwd in SAME repo as target" \
-  "$REPO_A" "$REPO_A/.claude/rules/harness/delegation.md" 0
-
-_run_case "20: .claude/rules/** blocked, cwd in a DIFFERENT repo" \
-  "$REPO_B" "$REPO_A/.claude/rules/harness/delegation.md" 2
-
-# --- worktrees of the SAME repo must count as the same repo ---
-# (the scenario this suite's own author was invoked under: a worktree's
-# `git rev-parse --show-toplevel` differs from the main checkout's, but they
-# share one common git dir, which is what the hook compares on)
-
-_run_case "21: cwd in a WORKTREE, target in the main checkout of the SAME repo -> passes" \
-  "$REPO_A_WT" "$REPO_A/baseline/hooks/protect-main.sh" 0
-
-_run_case "22: cwd in the main checkout, target in a WORKTREE of the SAME repo -> passes" \
-  "$REPO_A" "$REPO_A_WT/baseline/rules/git-workflow.md" 0
-
-# --- degradation: cannot positively confirm same-repo -> fail closed ---
-
-_run_case "23: [degradation: no git] git missing from PATH -> blocked" \
-  "$REPO_A" "$REPO_A/baseline/hooks/protect-main.sh" 2 "$NO_GIT_PATH_DIR"
-
-_run_case "24: [degradation: cwd outside any repo] -> blocked" \
-  "$NO_GIT_CWD" "$REPO_A/baseline/hooks/protect-main.sh" 2
-
-_run_case "25: [degradation: target directory does not exist] -> blocked" \
-  "$REPO_A" "$REPO_A/baseline/hooks/not-yet-created/x.sh" 2
-
-# --- change 2 must not be wider than intended: similarly-shaped, legit paths ---
-
-_run_case "26: settings.json outside .claude/ is NOT blocked" \
-  "$TMPDIR_ROOT" "config/settings.json" 0
-
-_run_case "27: a .sh under scripts/ that is not a hook is NOT blocked" \
-  "$TMPDIR_ROOT" "scripts/build.sh" 0
-
 # --- payload without file_path must not block ---
 
 actual_missing=$(cd "$TMPDIR_ROOT" && printf '%s' "$(_make_payload_no_file_path)" | bash "$HOOK" >/dev/null 2>&1; echo $?)
 if [[ "$actual_missing" == "0" ]]; then
-  echo "PASS: 28: payload missing file_path exits 0 (exit $actual_missing)"
+  echo "PASS: 10: payload missing file_path exits 0 (exit $actual_missing)"
   PASS_COUNT=$((PASS_COUNT + 1))
 else
-  echo "FAIL: 28: payload missing file_path exits 0 (expected 0, got $actual_missing)"
+  echo "FAIL: 10: payload missing file_path exits 0 (expected 0, got $actual_missing)"
   FAIL_COUNT=$((FAIL_COUNT + 1))
 fi
 
