@@ -19,11 +19,15 @@ Never claim a change is "done", check a task in `tasks.md`, or open a PR without
 
 ## Discover the commands (do not assume the stack)
 
-Read, in order, until you know how to build and test THIS repo:
+Check first, before anything else: does the repo have an executable `script/test` at its root (the Scripts to Rule Them All convention — `docs/guides/script-setup-and-test.md`)? If so, **that is the gate** — run it instead of rediscovering commands from `AGENTS.md`/`package.json`/etc. It already encodes the repo's own order (install, codegen, typecheck, build, tests) and its own exceptions (e.g. a lint step that only checks, never `--fix`s). Do not second-guess it by also running the steps it already runs.
+
+Without `script/test`, read, in order, until you know how to build and test THIS repo:
 
 1. `AGENTS.md` / `CLAUDE.md` — a "Build, test, lint" (or similar) section usually lists the exact commands.
 2. `package.json` `scripts` (Node), `Makefile`, `pyproject.toml`/`tox.ini` (Python), `Cargo.toml` (Rust), `go.mod` (Go), etc.
 3. The `.claude/rules/` for any stack-specific gotchas.
+
+Same split for getting the environment ready in the first place: if the repo has an executable `script/setup`, run it to install/codegen instead of assembling those steps by hand. Without one, do them individually as below.
 
 ## Use the right runtime
 
