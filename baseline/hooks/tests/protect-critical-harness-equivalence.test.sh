@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 # protect-critical-harness-equivalence.test.sh
 # Compares the current protect-critical.sh / protect-harness.sh pair against
-# the pre-split hook on origin/main (the "oracle" — see
-# `git show origin/main:baseline/hooks/protect-critical.sh`), payload by
+# the pre-split hook (the "oracle" — see ORACLE_REF below), payload by
 # payload, for every case in both protect-critical.test.sh and
 # protect-harness.test.sh.
+#
+# The oracle is pinned to an immutable commit, and that is the whole point.
+# This suite first shipped reading it from `origin/main`, which held the
+# pre-split hook at the time and stopped holding it the moment the split
+# merged. From then on the suite compared the new pair against a copy of
+# itself with the governance half removed, and reported 8 failures of the
+# form `oracle 0, pair 2` — accusing correct code because the reference had
+# moved out from under it. A moving ref is not an oracle.
 #
 # Two rounds of this hook exist:
 #
@@ -41,16 +48,29 @@ fi
 
 REAL_GIT="$(command -v git 2>/dev/null)"
 if [[ -z "$REAL_GIT" ]]; then
-  echo "protect-critical-harness-equivalence.test.sh: no git on PATH, cannot fetch the origin/main oracle" >&2
+  echo "protect-critical-harness-equivalence.test.sh: no git on PATH, cannot read the oracle" >&2
   exit 1
 fi
+
+# The last commit in which protect-critical.sh still held the governance half,
+# i.e. the state this pair has to reproduce. Never a branch name: a branch
+# moves, and this suite's only job is to compare against something that cannot.
+ORACLE_REF="255818d"
 
 TMPDIR_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_ROOT"' EXIT
 
 ORACLE="$TMPDIR_ROOT/oracle-protect-critical.sh"
-if ! git -C "$SCRIPT_DIR" show origin/main:baseline/hooks/protect-critical.sh > "$ORACLE" 2>/dev/null; then
-  echo "protect-critical-harness-equivalence.test.sh: could not read origin/main:baseline/hooks/protect-critical.sh — is origin/main fetched?" >&2
+if ! git -C "$SCRIPT_DIR" show "$ORACLE_REF:baseline/hooks/protect-critical.sh" > "$ORACLE" 2>/dev/null; then
+  echo "protect-critical-harness-equivalence.test.sh: could not read $ORACLE_REF:baseline/hooks/protect-critical.sh — is the full history present? (a shallow clone will not have it)" >&2
+  exit 1
+fi
+
+# Guard against a hollow pass: if the oracle we just read has no governance
+# logic in it, it is the wrong commit, and every governance payload would
+# "agree" with it by both doing nothing. Fail loudly instead.
+if ! grep -q 'governance_source_patterns' "$ORACLE"; then
+  echo "protect-critical-harness-equivalence.test.sh: $ORACLE_REF does not contain the pre-split governance logic — the oracle ref is wrong, refusing to report a meaningless pass" >&2
   exit 1
 fi
 chmod +x "$ORACLE"
