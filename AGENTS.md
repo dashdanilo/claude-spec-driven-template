@@ -127,7 +127,8 @@ Documented in full in `docs/CONSTITUTION.md`. The short version:
 - `CLAUDE.local.md` and `.claude/settings.local.json` (personal, gitignored)
 - `.claude/agent-memory/` (per-subagent memory, gitignored)
 - `.claude/context/` (Repomix snapshot and generated state, gitignored)
-- Applied migrations, lockfiles, generated code (blocked by `protect-critical.sh` hook)
+- Applied migrations, lockfiles, generated code, except files ending in `.example` (blocked by `protect-critical.sh` hook)
+- `.claude/settings.json`/`settings.local.json`, and (when the edit is cross-repo) `baseline/hooks/*.sh`, `.claude/hooks/*.sh`, `baseline/rules/**`, `.claude/rules/**` (blocked by `protect-harness.sh` hook)
 
 ## More context
 

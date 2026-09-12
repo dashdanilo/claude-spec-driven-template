@@ -303,12 +303,16 @@ scripts_dir = os.path.join(here, "baseline", "scripts")
 # Only the portable ones. protect-critical.sh knows about lockfiles and applied
 # migrations, check-snapshot-on-session.sh about a per-repo snapshot: both
 # belong to a repository's own settings, not to something linked over it.
+# protect-harness.sh is the opposite case — it exists specifically to stop a
+# session in THIS adopting project from reaching, by absolute path, into the
+# shared harness checkout and disarming the guard every project depends on —
+# so unlike protect-critical.sh it has to be registered everywhere.
 WANT = {
     "SessionStart": [(None, [scripts_dir + "/check-index.sh", scripts_dir + "/check-baseline.sh"])],
     "SubagentStop": [(None, [hooks_dir + "/log-agent.sh"])],
     "PreToolUse": [
         ("Bash", [hooks_dir + "/block-secrets.sh", hooks_dir + "/protect-main.sh"]),
-        ("Edit|Write|MultiEdit|NotebookEdit", [hooks_dir + "/log-edit.sh"]),
+        ("Edit|Write|MultiEdit|NotebookEdit", [hooks_dir + "/protect-harness.sh", hooks_dir + "/log-edit.sh"]),
     ],
 }
 
