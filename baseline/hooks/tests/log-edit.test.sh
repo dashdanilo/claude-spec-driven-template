@@ -181,37 +181,76 @@ _run_case "14: (( )) arithmetic comparison — not a redirect, not logged" \
   "$(_bash_payload '(( 5 > 3 ))')" \
   ""
 
+# ----------------------------------------- keyword-prefixed [[ ]] (regression)
+# Found by an independent probe after the first pass of this suite: the
+# guard checked only whether the SEGMENT'S FIRST TOKEN was "[[", but a
+# keyword (`if`, `while`, `until`, `elif`, `!`) sits in front of `[[` in the
+# very same segment (the segment runs up to the next `;`/`&&`/etc, and none
+# of those keywords introduce one), so the anchored check never fired and
+# `if [[ 5 > 3 ]]` logged a phantom write to a file named "3". The guard now
+# looks for "[[" / "]]" / "[" / "]" ANYWHERE in the segment, the same way the
+# "((" / "))" arithmetic check already did — these five cases would all have
+# produced a phantom "Bash:redirect" line under the old anchored check.
+_run_case "15: if [[ a > b ]] — keyword prefix, not logged" \
+  "$(_bash_payload 'if [[ 5 > 3 ]]; then echo ok; fi')" \
+  ""
+
+_run_case "16: while [[ a > b ]] — keyword prefix, not logged" \
+  "$(_bash_payload 'while [[ $a > $b ]]; do sleep 1; done')" \
+  ""
+
+_run_case "17: until [[ a > b ]] — keyword prefix, not logged" \
+  "$(_bash_payload 'until [[ $a > $b ]]; do sleep 1; done')" \
+  ""
+
+_run_case "18: if ! [[ a > b ]] — negation prefix, not logged" \
+  "$(_bash_payload 'if ! [[ $a > $b ]]; then echo ok; fi')" \
+  ""
+
+_run_case "19: then inline with [[ ]] in the same segment — not logged" \
+  "$(_bash_payload 'if cond; then [[ $a > $b ]] && echo x; fi')" \
+  ""
+
+# The risk of the fix above: a guard that starts ignoring the whole segment
+# could turn into "ignore anything touching an if/while/until", which would
+# LOSE a real write that happens to sit inside one — worse than the phantom
+# write it replaces. This proves a real redirect in its own segment (split
+# off by the `;` after the test) is still caught.
+_run_case "20: real write inside an if — still logged" \
+  "$(_bash_payload 'if [[ -f x ]]; then echo y > real.txt; fi')" \
+  "main${TAB}Bash:redirect${TAB}real.txt${TAB}"
+
 # -------------------------------------------------------------- unresolvable
-_run_case "15: redirect target is a variable — logged with path=?" \
+_run_case "21: redirect target is a variable — logged with path=?" \
   "$(_bash_payload 'echo hi > "$OUT"')" \
   "main${TAB}Bash:redirect${TAB}?${TAB}"
 
-_run_case "16: mv target is a command substitution — logged with path=?" \
+_run_case "22: mv target is a command substitution — logged with path=?" \
   "$(_bash_payload 'mv out.txt "$(echo sub)/report.txt"')" \
   "main${TAB}Bash:mv${TAB}?${TAB}"
 
 # -------------------------------------------------------------- multiple targets
-_run_case "17: two write commands chained — one line per target" \
+_run_case "23: two write commands chained — one line per target" \
   "$(_bash_payload 'cp out.txt sub/d1.txt && mv out.txt sub/d2.txt')" \
   "main${TAB}Bash:cp${TAB}sub/d1.txt${TAB}
 main${TAB}Bash:mv${TAB}sub/d2.txt${TAB}"
 
-_run_case "18: tee with two targets — one line per target" \
+_run_case "24: tee with two targets — one line per target" \
   "$(_bash_payload 'echo hi | tee sub/t1.txt sub/t2.txt')" \
   "main${TAB}Bash:tee${TAB}sub/t1.txt${TAB}
 main${TAB}Bash:tee${TAB}sub/t2.txt${TAB}"
 
 # -------------------------------------------------------------- Edit/Write — no regression
-_run_case "19: Write, main thread — unchanged behaviour" \
+_run_case "25: Write, main thread — unchanged behaviour" \
   "$(_edit_payload "Write" "$REPO/written.txt" "main")" \
   "main${TAB}Write${TAB}written.txt${TAB}"
 
-_run_case "20: Edit, sub thread (agent_id present) — unchanged behaviour" \
+_run_case "26: Edit, sub thread (agent_id present) — unchanged behaviour" \
   "$(_edit_payload "Edit" "$REPO/edited.txt" "sub")" \
   "sub${TAB}Edit${TAB}edited.txt${TAB}implementer"
 
 # -------------------------------------------------------------- malformed payload
-_run_case "21: malformed JSON payload — exit 0, nothing written" \
+_run_case "27: malformed JSON payload — exit 0, nothing written" \
   "not json at all" \
   "" \
   "0"

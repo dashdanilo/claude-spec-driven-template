@@ -297,12 +297,24 @@ elif tool == "Bash":
         if command:
             tokens = tokenize(command)
             for seg in split_segments(tokens):
-                # Arithmetic/test context: "((" / "))" / a leading "[[" mean a
-                # literal ">" in this segment is a comparison, not a redirect.
-                if any(k == "OP" and v in ("((", "))") for k, v in seg):
-                    continue
-                first_word = next((v for k, v in seg if k == "WORD"), None)
-                if first_word in ("[[", "["):
+                # Arithmetic/test context: "((" / "))" (already anywhere in
+                # the segment) or a "[[" / "]]" / "[" / "]" test-command
+                # bracket ANYWHERE in the segment mean a literal ">" here is
+                # a comparison, not a redirect. Deliberately not anchored to
+                # the first token: a keyword prefix (`if`, `while`, `until`,
+                # `elif`, `!`, `{`) or a leading subshell "(" shifts the
+                # bracket away from position 0 in the very same segment this
+                # hook already walks (`if [[ 5 > 3 ]]; then ...` is one
+                # segment up to the first `;`), so checking only the first
+                # WORD missed every one of those and logged a phantom write
+                # to a file literally named "3". "((" is skipped by the same
+                # "anywhere" rule already, kept together here for one story
+                # instead of two anchoring styles.
+                if any(
+                    (k == "OP" and v in ("((", "))"))
+                    or (k == "WORD" and v in ("[[", "]]", "[", "]"))
+                    for k, v in seg
+                ):
                     continue
 
                 # --- redirects: > and >> only (see header for why not 2>/&>)
