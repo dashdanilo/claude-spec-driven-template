@@ -25,19 +25,36 @@ import sys, os, json, re, collections
 tool_log, agent_log, as_json = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
 
 # ---------------------------------------------------------------- delegation
+# `tool` (column 3) is "Edit"/"Write"/"MultiEdit"/"NotebookEdit" for the
+# original detector, or "Bash:<kind>" (redirect, sed-i, tee, cp, mv) for a
+# write log-edit.sh recovered from a Bash command. Both count toward
+# delegation the same way — a write is a write, and the thread is known
+# either way — but the Bash-sourced ones are also tallied separately so a
+# reader can see how much of the number rests on the newer, less-tested path.
 edits = collections.Counter()
 by_ext = collections.Counter()
 by_specialist = collections.Counter()
+bash_writes = 0
+bash_writes_unresolved = 0
+by_ext_ignored_unresolved = 0
 if os.path.exists(tool_log):
     for line in open(tool_log, encoding="utf-8", errors="replace"):
         parts = line.rstrip("\n").split("\t")
         if len(parts) < 4:
             continue
-        _, thread, _tool, path = parts[0], parts[1], parts[2], parts[3]
+        _, thread, tool_col, path = parts[0], parts[1], parts[2], parts[3]
         agent_type = parts[4] if len(parts) > 4 else ""
         edits[thread] += 1
+        is_bash_write = tool_col.startswith("Bash:")
+        if is_bash_write:
+            bash_writes += 1
+            if path == "?":
+                bash_writes_unresolved += 1
         if thread == "main" and path:
-            by_ext[os.path.splitext(path)[1] or "(no ext)"] += 1
+            if path == "?":
+                by_ext_ignored_unresolved += 1
+            else:
+                by_ext[os.path.splitext(path)[1] or "(no ext)"] += 1
         if thread == "sub" and agent_type:
             by_specialist[agent_type] += 1
 
@@ -86,6 +103,9 @@ out = {
     "subagent_tokens": tokens_total,
     "subagent_cache_reads": cached_total,
     "main_thread_edit_hotspots": dict(by_ext.most_common(5)),
+    "main_thread_edit_hotspots_ignored_unresolved": by_ext_ignored_unresolved,
+    "bash_writes": bash_writes,
+    "bash_writes_unresolved_target": bash_writes_unresolved,
 }
 
 if as_json:
@@ -117,8 +137,16 @@ if edits["?"]:
     line("thread unknown", edits["?"])
 if by_ext:
     line("main-thread edits by type", ", ".join(f"{k} {v}" for k, v in by_ext.most_common(5)))
+    if by_ext_ignored_unresolved:
+        line("  (ignored, unresolved target)", by_ext_ignored_unresolved)
 if by_specialist:
     line("specialist edits by agent", ", ".join(f"{k} {v}" for k, v in by_specialist.most_common()))
+if bash_writes:
+    # Own line, on purpose: a write recovered from a Bash command is a
+    # heuristic (see log-edit.sh's header), not a guaranteed target — a
+    # number a reader cannot audit against the log has to announce itself.
+    detail = f"{bash_writes} (of which {bash_writes_unresolved} have an unresolved target, logged as \"?\")" if bash_writes_unresolved else str(bash_writes)
+    line("writes recovered from Bash", detail)
 
 print()
 print(" dispatch  (docs/dispatching.md)")

@@ -65,6 +65,10 @@
           {
             "type": "command",
             "command": "baseline/hooks/protect-main.sh"
+          },
+          {
+            "type": "command",
+            "command": "baseline/hooks/log-edit.sh"
           }
         ]
       },

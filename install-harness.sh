@@ -307,11 +307,15 @@ scripts_dir = os.path.join(here, "baseline", "scripts")
 # session in THIS adopting project from reaching, by absolute path, into the
 # shared harness checkout and disarming the guard every project depends on —
 # so unlike protect-critical.sh it has to be registered everywhere.
+#
+# log-edit.sh is registered on BOTH matchers: Edit/Write/MultiEdit/
+# NotebookEdit (always has been) and now also Bash, so a write done through a
+# redirect, `sed -i`, `tee`, `cp` or `mv` is no longer invisible to it.
 WANT = {
     "SessionStart": [(None, [scripts_dir + "/check-index.sh", scripts_dir + "/check-baseline.sh"])],
     "SubagentStop": [(None, [hooks_dir + "/log-agent.sh"])],
     "PreToolUse": [
-        ("Bash", [hooks_dir + "/block-secrets.sh", hooks_dir + "/protect-main.sh"]),
+        ("Bash", [hooks_dir + "/block-secrets.sh", hooks_dir + "/protect-main.sh", hooks_dir + "/log-edit.sh"]),
         ("Edit|Write|MultiEdit|NotebookEdit", [hooks_dir + "/protect-harness.sh", hooks_dir + "/log-edit.sh"]),
     ],
 }
