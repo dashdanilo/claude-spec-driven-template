@@ -1,32 +1,61 @@
 #!/usr/bin/env bash
 # protect-main.sh
 # PreToolUse hook for Bash. Blocks commits, pushes, and force operations
-# against the main/master branch of the repository the command actually
-# targets — resolved from an explicit `git -C <path>`, or the last `cd <path>`
-# before the first `git` invocation in command position, falling back to the
-# hook's own cwd only when neither is present. Earlier versions always read
-# the branch of the hook's cwd, which both false-positived (blocked a commit
-# on another repo's feature branch, because the hook's own cwd happened to be
-# on `main`) and false-negatived (`cd <repo-on-main> && git commit` never
-# matched the "is this a git command" gate at all, since it only looked at
-# the start of the line).
+# against the main/master branch of the repository EACH git invocation in a
+# command actually targets. A command can invoke git more than once
+# (multi-line, `&&`-chained, or interspersed with `cd`), and each invocation
+# is resolved and checked independently: its own `git -C <path>` if present,
+# otherwise the most recent literal `cd <path>` seen before it while walking
+# the command in order, otherwise the hook's own cwd. The command is blocked
+# if ANY of its git invocations is a dangerous operation against a protected
+# branch — a later invocation targeting a different, unprotected repo does
+# not clear an earlier one, and a leading read-only invocation on a protected
+# repo does not implicate a later invocation elsewhere.
 #
-# Accepted gap: when the cd target is not a literal path — built from a
+# Two defects fixed after being reproduced, both from evaluating the command
+# as one flat blob instead of per invocation:
+#   - single running target, whole-command match: earlier versions resolved
+#     ONE target directory for the whole command (from the first git, or the
+#     last cd before it) and matched the dangerous patterns against the
+#     ENTIRE command text. A multi-line command whose first git was a
+#     read-only query against a protected repo, followed by a real push to an
+#     unrelated feature worktree, was blocked for no reason it deserved
+#     (false positive); the mirror case — a read-only first git against a
+#     feature worktree followed by a push to a protected repo later in the
+#     same command — passed uninspected (false negative, the worse
+#     direction, since it is the one that lets damage through). Fixed by
+#     walking the normalized lines in order, maintaining a running current
+#     directory that only a literal `cd` updates, and resolving + checking
+#     each git invocation against its own target as it is encountered, so a
+#     later invocation can neither clear nor inherit an earlier one's risk.
+#   - unanchored patterns: `git\s+merge` (and the other five) matched as a
+#     substring anywhere in the line, so `git merge-base --is-ancestor A B`
+#     — a read-only query used to check ancestry, not to merge anything —
+#     tripped the same pattern as `git merge <sha>`. Every pattern now
+#     requires a word boundary right after the subcommand
+#     (`git\s+merge(\s|$)`), so a suffixed subcommand like `merge-base` no
+#     longer matches while `git merge <sha>` still does.
+#
+# Accepted gap: when a cd target is not a literal path — built from a
 # variable, command substitution, or a glob, e.g. `W=<path>` then `cd $W` —
 # this hook does not expand it (expanding input taken from the command being
 # inspected is how you create the accidental execution this hook exists to
-# prevent). It falls back to the branch of the hook's own cwd instead, so
-# `cd $VAR && git commit` against a repo on `main`, run from a cwd on a
-# feature branch, passes undetected. An earlier version treated every
+# prevent). It resets the running current directory to the hook's own cwd
+# instead — the same fallback used before any cd has been seen at all — so a
+# git invocation that follows an unresolvable cd is checked against wherever
+# the hook itself is standing, not the real target. `cd $VAR && git commit`
+# against a repo on `main`, run from a cwd on a feature branch, passes
+# undetected; the same construct run from a cwd already on `main` is
+# (correctly, if conservatively) blocked. An earlier version treated every
 # unresolvable cd as protected unconditionally instead; that blocked
 # legitimate work — a commit in a feature-branch worktree reached through
 # `W=<path>` then `cd $W`, and separately a test script that never ran git at
-# all, because the pattern check below matches text and the script's JSON
-# payload happened to contain the string `cd $S/repo-main && git commit` as
-# data, not a command. A guard with that false-positive rate gets disabled by
-# its own users, which protects nothing. Anyone who needs the guard to hold
-# through a variable cd can make the target resolvable: write the literal
-# path, or use `git -C <path>`.
+# all, because the pattern check matched text and the script's JSON payload
+# happened to contain the string `cd $S/repo-main && git commit` as data, not
+# a command. A guard with that false-positive rate gets disabled by its own
+# users, which protects nothing. Anyone who needs the guard to hold through a
+# variable cd can make the target resolvable: write the literal path, or use
+# `git -C <path>`.
 #
 # Registered in .claude/settings.json under hooks.PreToolUse with matcher "Bash".
 #
@@ -88,13 +117,12 @@ if echo "$command" | grep -qE '(^|[;&|])[[:space:]]*gh[[:space:]]+pr[[:space:]]+
   exit 2
 fi
 
-# --- locate the git invocation and the directory it targets ------------------
+# --- walk the command one git invocation at a time ----------------------------
 # This is a heuristic, not a shell parser: it does not understand quoting, so a
 # ';' or '&&' inside a quoted string (e.g. a commit message) could misfire a
 # split. A cd target the heuristic can't resolve with confidence (a variable,
-# command substitution, or glob) falls back to the hook's own cwd and its
-# branch, same as when there is no cd at all — see the accepted-gap note at
-# the top of this file.
+# command substitution, or glob) resets the running directory to the hook's
+# own cwd — see the accepted-gap note at the top of this file.
 
 _trim() {
   local s="$1"
@@ -102,49 +130,6 @@ _trim() {
   s="${s%"${s##*[![:space:]]}"}"
   printf '%s' "$s"
 }
-
-# Split into one "atomic" command per line at command-position separators, so
-# 'cd x && git y' and 'cd x\ngit y' are walked the same way. Order matters:
-# && / || must be split before the single & / | they contain, or a stray & or
-# | would be left behind. Deliberately pure-bash (no sed \n trick), which
-# behaves differently between GNU and BSD sed.
-_normalized="${command//&&/$'\n'}"
-_normalized="${_normalized//||/$'\n'}"
-_normalized="${_normalized//;/$'\n'}"
-_normalized="${_normalized//|/$'\n'}"
-_normalized="${_normalized//&/$'\n'}"
-
-git_line=""
-git_line_found=0
-cd_target=""
-
-while IFS= read -r _line; do
-  _t=$(_trim "$_line")
-  [[ -z "$_t" ]] && continue
-  if [[ "$git_line_found" -eq 0 ]]; then
-    if [[ "$_t" =~ ^git([[:space:]]|$) ]]; then
-      git_line="$_t"
-      git_line_found=1
-    elif [[ "$_t" =~ ^cd[[:space:]]+(.+)$ ]]; then
-      cd_target="${BASH_REMATCH[1]}"
-    fi
-  fi
-done <<< "$_normalized"
-
-# Only inspect commands that actually invoke git at a command position.
-if [[ "$git_line_found" -eq 0 ]]; then
-  exit 0
-fi
-
-# git_line_normalized: git_line with a leading '-C <path>' stripped, so the
-# dangerous-pattern check below (git\s+commit, etc) still matches
-# 'git -C <path> commit' the same way it matches 'git commit'.
-explicit_dir=""
-git_line_normalized="$git_line"
-if [[ "$git_line" =~ ^git[[:space:]]+-C[[:space:]]+([^[:space:]]+)[[:space:]]*(.*)$ ]]; then
-  explicit_dir="${BASH_REMATCH[1]}"
-  git_line_normalized="git ${BASH_REMATCH[2]}"
-fi
 
 _resolve_path() {
   local p="$1"
@@ -163,95 +148,148 @@ _resolve_path() {
   printf '%s' "$p"
 }
 
-# Precedence: explicit `git -C <path>` first, then the last `cd <path>` seen
-# before the first git invocation, then the hook's own cwd.
-if [[ -n "$explicit_dir" ]]; then
-  target_dir=$(_resolve_path "$explicit_dir")
-elif [[ -n "$cd_target" ]]; then
-  # A cd argument built from a variable, command substitution, or a glob
-  # (e.g. `W=<path>` then `cd $W`, common in agent-issued commands) is not a
-  # literal path, and this hook does not expand it to find out what it
-  # resolves to — see the accepted-gap note at the top of this file. Falling
-  # back to the hook's own cwd here is the same fallback the `else` branch
-  # below uses when there is no cd at all: not a stand-in for the real
-  # target, just "we don't know, so check what we're standing in".
-  _cd_target_stripped="$cd_target"
-  case "$_cd_target_stripped" in
-    \"*\") _cd_target_stripped="${_cd_target_stripped#\"}"; _cd_target_stripped="${_cd_target_stripped%\"}" ;;
-    \'*\') _cd_target_stripped="${_cd_target_stripped#\'}"; _cd_target_stripped="${_cd_target_stripped%\'}" ;;
+# A cd argument built from a variable, command substitution, or a glob
+# (e.g. `W=<path>` then `cd $W`, common in agent-issued commands) is not a
+# literal path, and this hook does not expand it to find out what it
+# resolves to.
+_is_unresolvable_cd_target() {
+  local s="$1"
+  case "$s" in
+    \"*\") s="${s#\"}"; s="${s%\"}" ;;
+    \'*\') s="${s#\'}"; s="${s%\'}" ;;
   esac
-  case "$_cd_target_stripped" in
-    *'$'*|*'`'*|*'*'*|*'?'*)
-      target_dir="$(pwd)"
-      ;;
-    *)
-      target_dir=$(_resolve_path "$cd_target")
-      ;;
+  case "$s" in
+    *'$'*|*'`'*|*'*'*|*'?'*) return 0 ;;
+    *) return 1 ;;
   esac
-else
-  target_dir="$(pwd)"
-fi
+}
 
-if [[ ! -d "$target_dir" ]]; then
-  # A literal, resolvable path that plainly does not exist: nothing to
-  # protect there, same as "not a git repo". This cannot regress into the
-  # gap above, because that gap is specifically an UNRESOLVED path (one this
-  # hook could not determine at all) — an unresolved path never reaches this
-  # branch, since it was already substituted with the hook's own cwd, which
-  # always exists.
-  exit 0
-fi
-
-# Combine the raw command with the -C-stripped git line so the dangerous
-# pattern check below sees a plain 'git commit ...' shape either way.
-check_target="$command"$'\n'"$git_line_normalized"
+# Split into one "atomic" command per line at command-position separators, so
+# 'cd x && git y' and 'cd x\ngit y' are walked the same way. Order matters:
+# && / || must be split before the single & / | they contain, or a stray & or
+# | would be left behind. Deliberately pure-bash (no sed \n trick), which
+# behaves differently between GNU and BSD sed.
+_normalized="${command//&&/$'\n'}"
+_normalized="${_normalized//||/$'\n'}"
+_normalized="${_normalized//;/$'\n'}"
+_normalized="${_normalized//|/$'\n'}"
+_normalized="${_normalized//&/$'\n'}"
 
 # Protected branches
 protected_branches="main master trunk develop production release"
 
-# Determine target branch (silent, don't fail if not a repo)
-current_branch=$(git -C "$target_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-
-if [[ -z "$current_branch" ]]; then
-  # Not in a git repo or detached HEAD, let it pass
-  exit 0
-fi
-
-# Only enforce on protected branches
-is_protected="false"
-for b in $protected_branches; do
-  if [[ "$current_branch" == "$b" ]]; then
-    is_protected="true"
-    break
-  fi
-done
-
-if [[ "$is_protected" != "true" ]]; then
-  exit 0
-fi
-
-# Patterns that are dangerous on a protected branch
+# Patterns that are dangerous on a protected branch. Anchored with a word
+# boundary right after the subcommand so a suffixed subcommand (`merge-base`,
+# a read-only ancestry query) cannot match the same pattern as the real
+# subcommand (`merge`) — see defect note at the top of this file.
 dangerous_patterns=(
-  'git\s+commit'
-  'git\s+push'
-  'git\s+merge'
-  'git\s+rebase'
-  'git\s+reset\s+--hard'
-  'git\s+cherry-pick'
+  'git\s+commit(\s|$)'
+  'git\s+push(\s|$)'
+  'git\s+merge(\s|$)'
+  'git\s+rebase(\s|$)'
+  'git\s+reset\s+--hard(\s|$)'
+  'git\s+cherry-pick(\s|$)'
 )
 
-for pattern in "${dangerous_patterns[@]}"; do
-  if echo "$check_target" | grep -qE "$pattern"; then
-    echo "BLOCKED by protect-main.sh: dangerous git operation on protected branch '$current_branch'" >&2
-    echo "" >&2
-    echo "Create a feature branch first:" >&2
-    echo "  git switch -c feature/<slug>" >&2
-    echo "" >&2
-    echo "Then repeat the operation." >&2
-    echo "" >&2
-    echo "Protected branches: $protected_branches" >&2
-    exit 2  # 2 = block. Exit 1 is a non-blocking error: the tool call proceeds.
+current_dir="$(pwd)"
+git_found=0
+blocked=0
+blocked_branch=""
+
+while IFS= read -r _line; do
+  _t=$(_trim "$_line")
+  [[ -z "$_t" ]] && continue
+
+  if [[ "$_t" =~ ^cd[[:space:]]+(.+)$ ]]; then
+    _cd_target="${BASH_REMATCH[1]}"
+    if _is_unresolvable_cd_target "$_cd_target"; then
+      current_dir="$(pwd)"
+    else
+      current_dir=$(_resolve_path "$_cd_target")
+    fi
+    continue
   fi
-done
+
+  if [[ "$_t" =~ ^git([[:space:]]|$) ]]; then
+    git_found=1
+    git_line="$_t"
+
+    # explicit_dir: this invocation's own `-C <path>`, stripped from the line
+    # so the dangerous-pattern check below sees a plain 'git commit ...'
+    # shape either way.
+    explicit_dir=""
+    git_line_normalized="$git_line"
+    if [[ "$git_line" =~ ^git[[:space:]]+-C[[:space:]]+([^[:space:]]+)[[:space:]]*(.*)$ ]]; then
+      explicit_dir="${BASH_REMATCH[1]}"
+      git_line_normalized="git ${BASH_REMATCH[2]}"
+    fi
+
+    # Precedence for THIS invocation: its own `git -C <path>` first, then the
+    # running current directory (the last literal `cd` seen, or the hook's
+    # own cwd if none has been seen yet).
+    if [[ -n "$explicit_dir" ]]; then
+      target_dir=$(_resolve_path "$explicit_dir")
+    else
+      target_dir="$current_dir"
+    fi
+
+    if [[ ! -d "$target_dir" ]]; then
+      # A literal, resolvable path that plainly does not exist: nothing to
+      # protect there for THIS invocation. Skip it and keep walking, rather
+      # than aborting the whole check — a later invocation may still target
+      # something real.
+      continue
+    fi
+
+    # Determine this invocation's branch (silent, don't fail if not a repo)
+    inv_branch=$(git -C "$target_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+
+    if [[ -z "$inv_branch" ]]; then
+      # Not a git repo, or detached HEAD: nothing to protect there. Skip.
+      continue
+    fi
+
+    inv_is_protected="false"
+    for b in $protected_branches; do
+      if [[ "$inv_branch" == "$b" ]]; then
+        inv_is_protected="true"
+        break
+      fi
+    done
+
+    if [[ "$inv_is_protected" != "true" ]]; then
+      continue
+    fi
+
+    for pattern in "${dangerous_patterns[@]}"; do
+      if echo "$git_line_normalized" | grep -qE "$pattern"; then
+        blocked=1
+        blocked_branch="$inv_branch"
+        break
+      fi
+    done
+
+    if [[ "$blocked" -eq 1 ]]; then
+      break
+    fi
+  fi
+done <<< "$_normalized"
+
+# Only inspect commands that actually invoke git at a command position.
+if [[ "$git_found" -eq 0 ]]; then
+  exit 0
+fi
+
+if [[ "$blocked" -eq 1 ]]; then
+  echo "BLOCKED by protect-main.sh: dangerous git operation on protected branch '$blocked_branch'" >&2
+  echo "" >&2
+  echo "Create a feature branch first:" >&2
+  echo "  git switch -c feature/<slug>" >&2
+  echo "" >&2
+  echo "Then repeat the operation." >&2
+  echo "" >&2
+  echo "Protected branches: $protected_branches" >&2
+  exit 2  # 2 = block. Exit 1 is a non-blocking error: the tool call proceeds.
+fi
 
 exit 0
