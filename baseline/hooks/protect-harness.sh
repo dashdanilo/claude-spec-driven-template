@@ -57,48 +57,20 @@ fi
 # .env.example / .env.test.example / etc are templates whose entire purpose is
 # to hold NO secret. The same exemption applies here so a governance-shaped
 # template — e.g. .claude/settings.json.example — is not treated the same as
-# the real file it documents. Matched by FILENAME before either governance
-# group below ever sees it.
+# the real file it documents. Matched by FILENAME before the governance
+# patterns below ever see it.
 if echo "$file_path" | grep -qE '\.example$'; then
   exit 0
 fi
 
 # The governance machinery itself: the hooks, the config that registers them,
-# and the rules an agent is supposed to be following. Split into two groups
-# with different blocking rules, because "governance" means two different
-# things in THIS repo (the harness's own source checkout):
-#
-#   Group A — runtime config that registers hooks (.claude/settings.json,
-#   .claude/settings.local.json). Blocked unconditionally, in every repo, no
-#   exceptions: this file IS the trust boundary. Editing it changes what the
-#   CURRENT session's hooks do, in the same repo the session is already in —
-#   there is no "same repo, so it's fine" here, because same-repo is exactly
-#   the attack.
-#
-#   Group B — governance SOURCE CODE (baseline/hooks/*.sh, .claude/hooks/*.sh,
-#   baseline/rules/**, .claude/rules/**). In THIS repo, baseline/hooks/ and
-#   baseline/rules/ are the product being built, not installed governance —
-#   editing protect-harness.sh on a feature branch, behind this repo's own
-#   PR and review, is the intended workflow (this file was edited exactly
-#   that way for this task). What has to be blocked instead is a DIFFERENT
-#   repo reaching in: install-harness.sh registers hooks in a consuming
-#   project's .claude/settings.local.json by ABSOLUTE PATH into this
-#   checkout's baseline/hooks/ — so a session running in, say, njord-back can
-#   Edit /Users/.../claude-spec-driven-template/baseline/hooks/protect-main.sh
-#   directly, no .claude/ in the path at all, and disarm the guard every
-#   project sharing this harness depends on. That absolute-path reach is real,
-#   not hypothetical, because that is how install-harness.sh wires hooks.
-#
-#   Group B is therefore blocked only when the session's cwd and the edited
-#   file resolve to DIFFERENT git repositories, and allowed when they are the
-#   SAME repo (that edit is governed by that repo's own PR process, which is
-#   this hook's job to stay out of).
-governance_config_patterns=(
+# and the rules an agent is supposed to be following. Every one of these
+# paths is judged by the SAME rule now — see below for why the earlier
+# two-group split (config blocked always, source blocked only cross-repo) was
+# wrong, not just differently organized.
+governance_patterns=(
   '(^|/)\.claude/settings\.json$'
   '(^|/)\.claude/settings\.local\.json$'
-)
-
-governance_source_patterns=(
   '(^|/)baseline/hooks/.*\.sh$'
   '(^|/)\.claude/hooks/.*\.sh$'
   '(^|/)baseline/rules/'
@@ -123,17 +95,11 @@ _block_governance() {
   exit 2  # 2 = block. Exit 1 is a non-blocking error: the tool call proceeds.
 }
 
-for pattern in "${governance_config_patterns[@]}"; do
-  if echo "$file_path" | grep -qE "$pattern"; then
-    _block_governance "$pattern" ""
-  fi
-done
-
-# Only pay for git subprocess calls when the path already matched a Group B
-# pattern — a path that is not governance source must not pay anything here,
-# since this hook runs on every Edit/Write in the session.
+# Only pay for git subprocess calls once a governance pattern has actually
+# matched — a path that is not governance must not pay anything here, since
+# this hook runs on every Edit/Write in the session.
 matched_pattern=""
-for pattern in "${governance_source_patterns[@]}"; do
+for pattern in "${governance_patterns[@]}"; do
   if echo "$file_path" | grep -qE "$pattern"; then
     matched_pattern="$pattern"
     break
@@ -168,7 +134,7 @@ if [[ -n "$matched_pattern" ]]; then
   # fall out of whatever git happens to return: every case where this hook
   # CANNOT positively confirm "same repo" fails CLOSED (blocks). The
   # alternative — pass when uncertain — would make the exact cross-repo
-  # attack this group exists to stop into a silent bypass on any machine
+  # attack this hook exists to stop into a silent bypass on any machine
   # missing git, or for any target path that does not yet exist. A false
   # positive here costs one blocked edit and a human decision; a false
   # negative here is a disarmed shared guard.
@@ -192,7 +158,55 @@ if [[ -n "$matched_pattern" ]]; then
     _block_governance "$matched_pattern" \
       "The session is in a different git repository than the file being edited — this looks like an absolute-path reach into another repo's governance surface, not a same-repo change under that repo's own review."
   fi
-  # Same repo (including two worktrees of it): fall through, not blocked.
+
+  # Same repo (including two worktrees of it): the earlier version of this
+  # hook stopped here and let same-repo through unconditionally for source,
+  # while blocking .claude/settings*.json unconditionally regardless of repo.
+  # That was backwards. What actually makes an edit safe is not WHERE it
+  # happens but whether a human reviewer will ever see it: this repo's own
+  # PR process is a real check ONLY for a path that shows up in a diff.
+  #
+  #   - .claude/settings.json is tracked: an edit here is a line in `git
+  #     diff`, and the PR that carries it is the review. Blocking it
+  #     unconditionally bought nothing but friction — meanwhile
+  #     baseline/hooks/*.sh, arguably more dangerous (it IS the guard code),
+  #     passed same-repo with no review requirement at all. An agent could
+  #     already rewrite protect-main.sh to `exit 0` in this very repo; a
+  #     stricter rule on the config that merely REGISTERS that hook was
+  #     protecting something weaker than what it left open next to it.
+  #   - .claude/settings.local.json is gitignored: an edit here is invisible
+  #     to `git diff`, invisible to the PR, invisible to any reviewer who
+  #     only looks at what git tracks. Same-repo does not make this safe —
+  #     it makes it undetectable, which is worse than a change nobody has
+  #     reviewed YET (a new file). A brand-new governance file that does not
+  #     exist on disk yet is not gitignored (unless a .gitignore pattern
+  #     already covers it): it will be `git add`-ed and appear in the PR
+  #     diff like any other new file, so creating one passes here — only a
+  #     path a .gitignore pattern actually excludes is judged unreviewable.
+  #
+  # git check-ignore is the right test, not "is it tracked yet": a brand-new
+  # rule or hook is untracked (it is not in the index) but not ignored, and
+  # blocking on "untracked" would stop the exact workflow that created THIS
+  # hook. Only a path matched by a .gitignore pattern is judged unreviewable.
+  _is_gitignored() {
+    # $1 = file_path. Run from the file's own directory so this resolves the
+    # same way whether file_path is relative or absolute, and whether or not
+    # the file exists yet — check-ignore works on paths, not inodes.
+    git -C "$(dirname -- "$1")" check-ignore -q -- "$1" >/dev/null 2>&1
+  }
+
+  if _is_gitignored "$file_path"; then
+    _block_governance "$matched_pattern" \
+      "This path is in the SAME repo but is gitignored — it would never appear in a 'git diff' or a PR, so no reviewer would ever see the change. Gitignored is worse than new: a brand-new file still lands in a commit and a diff. Failing closed."
+  else
+    ignore_rc=$?
+    if [[ "$ignore_rc" -ne 1 ]]; then
+      _block_governance "$matched_pattern" \
+        "Could not determine whether this path is gitignored ('git check-ignore' exited $ignore_rc, expected 0 or 1). Failing closed."
+    fi
+    # exit 1 from check-ignore: genuinely not ignored (tracked, or untracked
+    # but not covered by any .gitignore pattern) -> reviewable -> pass.
+  fi
 fi
 
 exit 0

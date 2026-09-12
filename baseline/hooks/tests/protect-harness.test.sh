@@ -5,29 +5,32 @@
 # PreToolUse calls (`{"tool_input":{"file_path":"..."}}`) and asserts the exit
 # code (2 = blocked, 0 = passes).
 #
-# Split out of protect-critical.test.sh alongside the governance logic itself
-# — these are the cases that used to live there under "Group A" / "Group B".
+# The hook judges every governance path (`.claude/settings*.json`,
+# `baseline/hooks/*.sh`, `.claude/hooks/*.sh`, `baseline/rules/**`,
+# `.claude/rules/**`) by ONE rule, not two:
 #
-# Two groups of cases need real git fixtures (built under a mktemp dir,
-# removed on exit via trap — never inside a real repo):
+#   1. cwd repo != target repo -> blocked (unchanged: cross-repo reach into
+#      another project's governance surface)
+#   2. same repo AND the target is gitignored -> blocked (invisible to any
+#      reviewer — never shows up in `git diff` or a PR)
+#   3. same repo AND not gitignored -> passes (tracked, or new-and-not-yet-
+#      ignored: either way it lands in a commit and a diff someone reviews)
 #
-#   Group A (config: .claude/settings.json, .claude/settings.local.json) —
-#   blocked unconditionally, so these cases don't need real repos, just any
-#   cwd/file_path pairing.
+# That collapsed an earlier two-group split (config blocked unconditionally,
+# source blocked only cross-repo) that was judging reviewability by WHICH
+# FILE it was rather than whether a human would ever see the change. Fixture
+# repos build an explicit per-repo `.gitignore` for `.claude/settings.local.json`
+# rather than relying on any ignore rule inherited from outside the disposable
+# repo, since the whole point of the new rule is that gitignore status is
+# resolved with `git check-ignore`, not guessed.
 #
-#   Group B (governance source: baseline/hooks/*.sh, .claude/hooks/*.sh,
-#   baseline/rules/**, .claude/rules/**) — blocked only when the session's
-#   cwd and the edited file resolve to DIFFERENT git repositories, so these
-#   cases build two disposable repos (REPO_A, REPO_B) plus a worktree of
-#   REPO_A, to prove: same-repo passes, cross-repo blocks, and a worktree of
-#   the SAME repo counts as the same repo (not a different one) even though
-#   `git rev-parse --show-toplevel` would report a different path for it —
-#   which is exactly the scenario this suite's own author was invoked under.
-#
-# Degradation cases (no git on PATH, cwd outside any repo, target directory
-# that does not exist) construct their own minimal environment per case
-# rather than relying on the ambient one, so the suite's own result does not
-# depend on whether git happens to be installed on the machine running it.
+# Real git fixtures (built under a mktemp dir, removed on exit via trap —
+# never inside a real repo): REPO_A/REPO_B (same-repo vs cross-repo), a
+# worktree of REPO_A (a worktree of the SAME repo must count as the same
+# repo, not a different one, even though `git rev-parse --show-toplevel`
+# would report a different path for it), a PATH with no `git` (degradation),
+# and a PATH whose `git` shim makes `check-ignore` fail with exit 128
+# (degradation).
 #
 # Run: bash baseline/hooks/tests/protect-harness.test.sh
 
@@ -50,10 +53,16 @@ else
   exit 1
 fi
 
+REAL_GIT="$(command -v git 2>/dev/null)"
+if [[ -z "$REAL_GIT" ]]; then
+  echo "protect-harness.test.sh: no git on PATH, cannot build fixture repos" >&2
+  exit 1
+fi
+
 TMPDIR_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_ROOT"' EXIT
 
-# --- disposable git repos for the Group B same-repo / cross-repo cases ---
+# --- disposable git repos ---
 
 REPO_A="$TMPDIR_ROOT/repo-a"          # simulates "this harness checkout"
 REPO_B="$TMPDIR_ROOT/repo-b"          # simulates a different consuming project (e.g. njord-back)
@@ -71,6 +80,12 @@ _init_repo() {
   printf '# rule\n' > "$dir/.claude/rules/harness/delegation.md"
   printf '# rule\n' > "$dir/baseline/rules/git-workflow.md"
   printf '{}\n' > "$dir/.claude/settings.json"
+  # .claude/settings.local.json is gitignored in a real adopting project
+  # (install-harness.sh appends it to .git/info/exclude). Replicated here
+  # with an explicit, per-repo .gitignore — not inherited from anywhere
+  # outside this disposable repo — so `git add -A` leaves it untracked and
+  # `git check-ignore` reports it ignored, exactly like the real thing.
+  printf '.claude/settings.local.json\n' > "$dir/.gitignore"
   printf '{}\n' > "$dir/.claude/settings.local.json"
   git -C "$dir" add -A
   git -C "$dir" commit -q -m "init"
@@ -94,6 +109,30 @@ for tool in bash cat "$PYTHON_BIN" grep dirname; do
   src=$(command -v "$tool" 2>/dev/null) || continue
   ln -sf "$src" "$NO_GIT_PATH_DIR/$(basename "$src")"
 done
+
+# A PATH whose `git` is a shim: every subcommand except `check-ignore` is
+# forwarded to the real git, `check-ignore` always exits 128 (git's own code
+# for "error", distinct from 0=ignored/1=not-ignored). Proves the hook fails
+# CLOSED when it cannot determine ignore status, the same policy already
+# applied to the other two degradations.
+GIT_CHECK_IGNORE_ERRORS_DIR="$TMPDIR_ROOT/git-check-ignore-errors"
+mkdir -p "$GIT_CHECK_IGNORE_ERRORS_DIR"
+for tool in bash cat "$PYTHON_BIN" grep dirname; do
+  src=$(command -v "$tool" 2>/dev/null) || continue
+  ln -sf "$src" "$GIT_CHECK_IGNORE_ERRORS_DIR/$(basename "$src")"
+done
+cat > "$GIT_CHECK_IGNORE_ERRORS_DIR/git" <<EOF
+#!/usr/bin/env bash
+# The hook invokes this as \`git -C <dir> check-ignore -q -- <path>\`, so the
+# subcommand is not always \$1 — match it anywhere in the argument list.
+for arg in "\$@"; do
+  if [[ "\$arg" == "check-ignore" ]]; then
+    exit 128
+  fi
+done
+exec "$REAL_GIT" "\$@"
+EOF
+chmod +x "$GIT_CHECK_IGNORE_ERRORS_DIR/git"
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -127,10 +166,13 @@ _run_case() {
   fi
 }
 
-# --- Group A (config): blocked unconditionally, same-repo or cross-repo ---
+# --- reviewability, not location: same-repo tracked config now PASSES ---
+# (this is the verdict that changed: the old Group A blocked this unconditionally)
 
-_run_case "1: .claude/settings.json blocked, cwd in SAME repo as target" \
-  "$REPO_A" "$REPO_A/.claude/settings.json" 2
+_run_case "1: .claude/settings.json (tracked) passes, cwd in SAME repo as target" \
+  "$REPO_A" "$REPO_A/.claude/settings.json" 0
+
+# --- cross-repo is still an unconditional block, for both files ---
 
 _run_case "2: .claude/settings.json blocked, cwd in a DIFFERENT repo" \
   "$REPO_B" "$REPO_A/.claude/settings.json" 2
@@ -138,65 +180,84 @@ _run_case "2: .claude/settings.json blocked, cwd in a DIFFERENT repo" \
 _run_case "3: .claude/settings.local.json blocked, cwd in a DIFFERENT repo" \
   "$REPO_B" "$REPO_A/.claude/settings.local.json" 2
 
-# --- Group B (governance source): same-repo passes, cross-repo blocks ---
+# --- same-repo but gitignored: invisible to review -> blocked (new) ---
 
-_run_case "4: baseline/hooks/*.sh passes, cwd in SAME repo as target" \
+_run_case "4: .claude/settings.local.json (gitignored) blocked, cwd in SAME repo as target" \
+  "$REPO_A" "$REPO_A/.claude/settings.local.json" 2
+
+# --- governance source: same-repo tracked passes, cross-repo blocks (unchanged verdicts) ---
+
+_run_case "5: baseline/hooks/*.sh passes, cwd in SAME repo as target" \
   "$REPO_A" "$REPO_A/baseline/hooks/protect-main.sh" 0
 
-_run_case "5: baseline/hooks/*.sh blocked, cwd in a DIFFERENT repo" \
+_run_case "6: baseline/hooks/*.sh blocked, cwd in a DIFFERENT repo" \
   "$REPO_B" "$REPO_A/baseline/hooks/protect-main.sh" 2
 
-_run_case "6: .claude/hooks/*.sh passes, cwd in SAME repo as target" \
+_run_case "7: .claude/hooks/*.sh passes, cwd in SAME repo as target" \
   "$REPO_A" "$REPO_A/.claude/hooks/some-hook.sh" 0
 
-_run_case "7: .claude/hooks/*.sh blocked, cwd in a DIFFERENT repo" \
+_run_case "8: .claude/hooks/*.sh blocked, cwd in a DIFFERENT repo" \
   "$REPO_B" "$REPO_A/.claude/hooks/some-hook.sh" 2
 
-_run_case "8: baseline/rules/** passes, cwd in SAME repo as target" \
+_run_case "9: baseline/rules/** passes, cwd in SAME repo as target" \
   "$REPO_A" "$REPO_A/baseline/rules/git-workflow.md" 0
 
-_run_case "9: baseline/rules/** blocked, cwd in a DIFFERENT repo" \
+_run_case "10: baseline/rules/** blocked, cwd in a DIFFERENT repo" \
   "$REPO_B" "$REPO_A/baseline/rules/git-workflow.md" 2
 
-_run_case "10: .claude/rules/** passes, cwd in SAME repo as target" \
+_run_case "11: .claude/rules/** passes, cwd in SAME repo as target" \
   "$REPO_A" "$REPO_A/.claude/rules/harness/delegation.md" 0
 
-_run_case "11: .claude/rules/** blocked, cwd in a DIFFERENT repo" \
+_run_case "12: .claude/rules/** blocked, cwd in a DIFFERENT repo" \
   "$REPO_B" "$REPO_A/.claude/rules/harness/delegation.md" 2
+
+# --- a brand-new governance file, not yet on disk and not gitignored -> passes (new) ---
+# (the case that proves this is NOT a "must already be tracked" rule: a file
+# that does not exist yet cannot be in the index, but it is also not matched
+# by any .gitignore pattern, so it is reviewable the moment it is created —
+# exactly the workflow that created protect-harness.sh itself)
+
+_run_case "13: brand-new baseline/rules/*.md, not gitignored, passes" \
+  "$REPO_A" "$REPO_A/baseline/rules/not-yet-created-rule.md" 0
 
 # --- worktrees of the SAME repo must count as the same repo ---
 # (the scenario this suite's own author was invoked under: a worktree's
 # `git rev-parse --show-toplevel` differs from the main checkout's, but they
 # share one common git dir, which is what the hook compares on)
 
-_run_case "12: cwd in a WORKTREE, target in the main checkout of the SAME repo -> passes" \
+_run_case "14: cwd in a WORKTREE, target in the main checkout of the SAME repo -> passes" \
   "$REPO_A_WT" "$REPO_A/baseline/hooks/protect-main.sh" 0
 
-_run_case "13: cwd in the main checkout, target in a WORKTREE of the SAME repo -> passes" \
+_run_case "15: cwd in the main checkout, target in a WORKTREE of the SAME repo -> passes" \
   "$REPO_A" "$REPO_A_WT/baseline/rules/git-workflow.md" 0
 
 # --- degradation: cannot positively confirm same-repo -> fail closed ---
 
-_run_case "14: [degradation: no git] git missing from PATH -> blocked" \
+_run_case "16: [degradation: no git] git missing from PATH -> blocked" \
   "$REPO_A" "$REPO_A/baseline/hooks/protect-main.sh" 2 "$NO_GIT_PATH_DIR"
 
-_run_case "15: [degradation: cwd outside any repo] -> blocked" \
+_run_case "17: [degradation: cwd outside any repo] -> blocked" \
   "$NO_GIT_CWD" "$REPO_A/baseline/hooks/protect-main.sh" 2
 
-_run_case "16: [degradation: target directory does not exist] -> blocked" \
+_run_case "18: [degradation: target directory does not exist] -> blocked" \
   "$REPO_A" "$REPO_A/baseline/hooks/not-yet-created/x.sh" 2
+
+# --- degradation: cannot determine gitignore status -> fail closed (new) ---
+
+_run_case "19: [degradation: check-ignore errors] git check-ignore exits 128 -> blocked" \
+  "$REPO_A" "$REPO_A/baseline/hooks/protect-main.sh" 2 "$GIT_CHECK_IGNORE_ERRORS_DIR"
 
 # --- must not be wider than intended: similarly-shaped, legit paths ---
 
-_run_case "17: settings.json outside .claude/ is NOT blocked" \
+_run_case "20: settings.json outside .claude/ is NOT blocked" \
   "$TMPDIR_ROOT" "config/settings.json" 0
 
-_run_case "18: a .sh under scripts/ that is not a hook is NOT blocked" \
+_run_case "21: a .sh under scripts/ that is not a hook is NOT blocked" \
   "$TMPDIR_ROOT" "scripts/build.sh" 0
 
 # --- the .example exemption applies to governance-shaped paths too ---
 
-_run_case "19: .claude/settings.json.example passes (exemption, not Group A)" \
+_run_case "22: .claude/settings.json.example passes (exemption)" \
   "$REPO_A" "$REPO_A/.claude/settings.json.example" 0
 
 echo ""
