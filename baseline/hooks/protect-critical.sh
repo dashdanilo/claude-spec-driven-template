@@ -93,43 +93,135 @@ for pattern in "${critical_patterns[@]}"; do
 done
 
 # The governance machinery itself: the hooks, the config that registers them,
-# and the rules an agent is supposed to be following. None of this is covered
-# above, which means an agent can currently edit baseline/hooks/protect-main.sh
-# or .claude/settings.json and quietly disarm the very guard watching it — the
-# supervised does not turn off the supervisor. These are matched separately
-# from critical_patterns because the fix is never "regenerate" or "use the
-# package manager": it is a change for the human operator to make outside the
-# agent session, deliberately, with their own judgment about the tradeoff —
-# not something this hook can hand back a self-service recipe for.
+# and the rules an agent is supposed to be following. Split into two groups
+# with different blocking rules, because "governance" means two different
+# things in THIS repo (the harness's own source checkout):
 #
-# Scoped narrowly on purpose: baseline/hooks/*.sh and .claude/hooks/*.sh (not
-# every .sh in the repo — a build script under scripts/ is untouched), and
-# .claude/settings*.json anchored to the .claude/ directory (not any
-# settings.json anywhere, e.g. a project's own config/settings.json), and
-# .claude/rules/** / baseline/rules/** (not agents/ or skills/, which this
-# task did not ask to lock down).
-governance_patterns=(
-  '(^|/)baseline/hooks/.*\.sh$'
-  '(^|/)\.claude/hooks/.*\.sh$'
+#   Group A — runtime config that registers hooks (.claude/settings.json,
+#   .claude/settings.local.json). Blocked unconditionally, in every repo, no
+#   exceptions: this file IS the trust boundary. Editing it changes what the
+#   CURRENT session's hooks do, in the same repo the session is already in —
+#   there is no "same repo, so it's fine" here, because same-repo is exactly
+#   the attack.
+#
+#   Group B — governance SOURCE CODE (baseline/hooks/*.sh, .claude/hooks/*.sh,
+#   baseline/rules/**, .claude/rules/**). In THIS repo, baseline/hooks/ and
+#   baseline/rules/ are the product being built, not installed governance —
+#   editing protect-critical.sh on a feature branch, behind this repo's own
+#   PR and review, is the intended workflow (this file was edited exactly
+#   that way for this task). What has to be blocked instead is a DIFFERENT
+#   repo reaching in: install-harness.sh registers hooks in a consuming
+#   project's .claude/settings.local.json by ABSOLUTE PATH into this
+#   checkout's baseline/hooks/ — so a session running in, say, njord-back can
+#   Edit /Users/.../claude-spec-driven-template/baseline/hooks/protect-main.sh
+#   directly, no .claude/ in the path at all, and disarm the guard every
+#   project sharing this harness depends on. That absolute-path reach is real,
+#   not hypothetical, because that is how install-harness.sh wires hooks.
+#
+#   Group B is therefore blocked only when the session's cwd and the edited
+#   file resolve to DIFFERENT git repositories, and allowed when they are the
+#   SAME repo (that edit is governed by that repo's own PR process, which is
+#   this hook's job to stay out of).
+governance_config_patterns=(
   '(^|/)\.claude/settings\.json$'
   '(^|/)\.claude/settings\.local\.json$'
-  '(^|/)\.claude/rules/'
-  '(^|/)baseline/rules/'
 )
 
-for pattern in "${governance_patterns[@]}"; do
+governance_source_patterns=(
+  '(^|/)baseline/hooks/.*\.sh$'
+  '(^|/)\.claude/hooks/.*\.sh$'
+  '(^|/)baseline/rules/'
+  '(^|/)\.claude/rules/'
+)
+
+_block_governance() {
+  # $1 = pattern that matched, $2 = extra reason line (may be empty)
+  echo "BLOCKED by protect-critical.sh: '$file_path' matches governance pattern '$1'" >&2
+  echo "" >&2
+  echo "This is part of the harness's own governance surface: a hook, the config" >&2
+  echo "that registers hooks, or a rule agents are held to. An agent editing it" >&2
+  echo "would let the supervised session disarm its own supervisor." >&2
+  if [[ -n "${2:-}" ]]; then
+    echo "" >&2
+    echo "$2" >&2
+  fi
+  echo "" >&2
+  echo "This change is for the human operator to make outside this agent session," >&2
+  echo "not something to route around from inside it. If it genuinely needs to" >&2
+  echo "change, stop and ask the human to make the edit themselves." >&2
+  exit 2  # 2 = block. Exit 1 is a non-blocking error: the tool call proceeds.
+}
+
+for pattern in "${governance_config_patterns[@]}"; do
   if echo "$file_path" | grep -qE "$pattern"; then
-    echo "BLOCKED by protect-critical.sh: '$file_path' matches governance pattern '$pattern'" >&2
-    echo "" >&2
-    echo "This is part of the harness's own governance surface: a hook, the config" >&2
-    echo "that registers hooks, or a rule agents are held to. An agent editing it" >&2
-    echo "would let the supervised session disarm its own supervisor." >&2
-    echo "" >&2
-    echo "This change is for the human operator to make outside this agent session," >&2
-    echo "not something to route around from inside it. If it genuinely needs to" >&2
-    echo "change, stop and ask the human to make the edit themselves." >&2
-    exit 2  # 2 = block. Exit 1 is a non-blocking error: the tool call proceeds.
+    _block_governance "$pattern" ""
   fi
 done
+
+# Only pay for git subprocess calls when the path already matched a Group B
+# pattern — a path that is not governance source must not pay anything here,
+# since this hook runs on every Edit/Write in the session.
+matched_pattern=""
+for pattern in "${governance_source_patterns[@]}"; do
+  if echo "$file_path" | grep -qE "$pattern"; then
+    matched_pattern="$pattern"
+    break
+  fi
+done
+
+if [[ -n "$matched_pattern" ]]; then
+  # Identify a git repo by its COMMON git dir, not by `rev-parse
+  # --show-toplevel`. Two worktrees of the SAME repo have different
+  # toplevels (each worktree is its own directory) but share one common git
+  # dir, so toplevel would report them as different repos — which is exactly
+  # backwards for this hook's purpose (a feature-branch worktree editing this
+  # repo's own hooks must still count as "same repo") and is how this very
+  # task was carried out.
+  _repo_id() {
+    local dir="$1" common_dir rel
+    [[ -d "$dir" ]] || return 1
+    common_dir=$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || true
+    if [[ -z "$common_dir" ]]; then
+      # Fallback for git < 2.31, which has no --path-format and may print a
+      # path relative to $dir instead of absolute.
+      rel=$(git -C "$dir" rev-parse --git-common-dir 2>/dev/null) || return 1
+      [[ -n "$rel" ]] || return 1
+      if [[ "$rel" = /* ]]; then common_dir="$rel"; else common_dir="$dir/$rel"; fi
+    fi
+    # Canonicalize (resolve any ".." left in the path) so two different
+    # spellings of the same directory compare equal.
+    (cd "$common_dir" 2>/dev/null && pwd) || return 1
+  }
+
+  # Degraded-environment policy, decided and fixed here rather than left to
+  # fall out of whatever git happens to return: every case where this hook
+  # CANNOT positively confirm "same repo" fails CLOSED (blocks). The
+  # alternative — pass when uncertain — would make the exact cross-repo
+  # attack this group exists to stop into a silent bypass on any machine
+  # missing git, or for any target path that does not yet exist. A false
+  # positive here costs one blocked edit and a human decision; a false
+  # negative here is a disarmed shared guard.
+  #   - git missing from PATH entirely: cannot resolve either side -> block.
+  #   - cwd is not inside a git repo: cannot resolve the session's side -> block.
+  #   - target's directory does not exist or is not inside a git repo
+  #     (includes writing a brand-new file into a brand-new, not-yet-created
+  #     directory): cannot resolve the target's side -> block.
+  if ! command -v git >/dev/null 2>&1; then
+    _block_governance "$matched_pattern" \
+      "Could not verify this is a same-repo edit: no 'git' on PATH. Failing closed."
+  fi
+
+  cwd_repo="$(_repo_id "$PWD" || true)"
+  target_repo="$(_repo_id "$(dirname -- "$file_path")" || true)"
+
+  if [[ -z "$cwd_repo" || -z "$target_repo" ]]; then
+    _block_governance "$matched_pattern" \
+      "Could not verify this is a same-repo edit: the session's cwd or the target's directory is not inside a resolvable git repository. Failing closed."
+  elif [[ "$cwd_repo" != "$target_repo" ]]; then
+    _block_governance "$matched_pattern" \
+      "The session is in a different git repository than the file being edited — this looks like an absolute-path reach into another repo's governance surface, not a same-repo change under that repo's own review."
+  fi
+  # Same repo (including two worktrees of it): fall through, not blocked.
+fi
 
 exit 0
