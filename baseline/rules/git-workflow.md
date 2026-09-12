@@ -130,7 +130,7 @@ If you ever need to undo, you want the granularity to be fine.
 
 Recommendation for teams to define and document. This template does not enforce a choice.
 
-## Branching, merging and the three rules that came from breaking them
+## Branching, merging and the four rules that came from breaking them
 
 These are not style. Each one is here because skipping it put someone else's
 unreviewed work on a shared branch.
@@ -184,6 +184,41 @@ routing around it.
 failure mode is someone else's unreviewed code landing on a protected branch. The
 cost of the mistake is not paid by the person who makes it, and it is invisible
 once merged.
+
+### Merge a stacked PR by deleting its branch
+
+```bash
+gh pr merge <n> --squash --delete-branch
+```
+
+A stacked PR is one whose base is another feature branch instead of the
+integration branch. Merging the bottom PR **and deleting its branch** is what
+makes GitHub retarget the PRs above it onto the integration branch. Leave the
+branch alive and the PR on top merges into a branch that is already dead: the
+merge succeeds, the PR shows *Merged*, and the content never reaches the
+integration branch.
+
+On 2026-09-11 in `dashdanilo/claude-spec-driven-template`, #45 was stacked on
+#44's branch. #44 was merged without deleting `fix/install-link-docs-and-scripts`,
+#45 was merged right after and landed in that dead branch, and nothing of it
+reached `main`. It had to be reapplied in #47.
+
+Two checks catch this before the merge, and the second one catches its
+neighbour too:
+
+```bash
+gh pr view <n> --json baseRefName,headRefOid   # base is the one you expect, head is the commit you pushed
+gh pr merge <n> --match-head-commit <sha>      # refuses to merge if the head moved
+```
+
+The neighbour: #42 was merged while GitHub was still showing an older head, and
+its last commit (`f81a2f4`) never reached `main` either. That one was reapplied
+inside #44.
+
+**Why this is a rule:** both failures report success. Nothing turns red, the PR
+says *Merged*, and the only symptom is content missing from the integration
+branch, noticed days later, if at all, and then paid for a second time as a
+reapply. A rule is cheaper than the archaeology.
 
 ## Pull requests
 
