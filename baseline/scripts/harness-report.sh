@@ -16,13 +16,35 @@ set -uo pipefail
 
 TOOL_LOG=".claude/tool-log.txt"
 AGENT_LOG=".claude/agent-log.txt"
+BASELINE_DOC=".claude/docs/harness/harness-baseline.md"
 JSON=0
 [[ "${1:-}" == "--json" ]] && JSON=1
 
-python3 - "$TOOL_LOG" "$AGENT_LOG" "$JSON" <<'PY'
+python3 - "$TOOL_LOG" "$AGENT_LOG" "$BASELINE_DOC" "$JSON" <<'PY'
 import sys, os, json, re, collections
 
-tool_log, agent_log, as_json = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
+tool_log, agent_log, baseline_doc, as_json = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] == "1"
+
+# ------------------------------------------------------------- instrument epoch
+# harness-baseline.md marks, in prose, every date on which a fix to these two
+# hooks made everything logged before it unusable for a headline number (see
+# its 2026-09-09 section). The marker is a plain HTML comment,
+# `<!-- instrument-epoch: YYYY-MM-DD -->`, so a future fix only has to add
+# another one there — this script always takes the latest it finds, so it
+# never needs its own edit when the next one lands. Missing the file (a repo
+# that never linked the docs) or finding no marker means "no epoch known":
+# nothing gets excluded, exactly like today with no fix pending.
+def read_epoch(path):
+    if not os.path.exists(path):
+        return None
+    try:
+        text = open(path, encoding="utf-8", errors="replace").read()
+    except Exception:
+        return None
+    dates = re.findall(r"<!--\s*instrument-epoch:\s*(\d{4}-\d{2}-\d{2})\s*-->", text)
+    return max(dates) if dates else None
+
+epoch_date = read_epoch(baseline_doc)
 
 # ---------------------------------------------------------------- delegation
 # `tool` (column 3) is "Edit"/"Write"/"MultiEdit"/"NotebookEdit" for the
@@ -63,16 +85,36 @@ known = edits["main"] + edits["sub"]
 delegated_pct = round(100 * edits["sub"] / known) if known else None
 
 # ---------------------------------------------------------------- dispatches
-# agent-log.txt lines look like: "<iso> agent=<type> desc=... tokens=N cached=N dur=Ns tools=N [approx=1]"
+# agent-log.txt lines look like:
+#   "[<ts>] subagent_stop  agent=<type> desc=... tokens=N cached=N dur=Ns
+#    tools=N [approx=1] [dup=1] session=..."
+#
+# Two lines never enter the headline "reliable" numbers:
+#   - anything timestamped before the instrument epoch above — a different
+#     era of the hook, mixed in it describes the detector, not this run.
+#   - approx=1 lines' tokens/cached — a degree-3 guess (see log-agent.sh),
+#     kept out of the total instead of dressed up as a measurement. A dup=1
+#     line (a same-transcript collision the hook caught) has no tokens=
+#     field at all, so it already contributes 0 without special-casing.
+# Both are still counted and reported, on their own line, with the reason —
+# never dropped in silence.
 agents = collections.Counter()
 tokens_total = 0
 cached_total = 0
 dispatches = 0
 unknown_agent = 0
 approx_attribution = 0
+approx_tokens = 0
+dup_dispatches = 0
+pre_epoch_lines = 0
 if os.path.exists(agent_log):
     for line in open(agent_log, encoding="utf-8", errors="replace"):
         if not line.strip():
+            continue
+        date_m = re.match(r"^\[(\d{4}-\d{2}-\d{2})", line)
+        line_date = date_m.group(1) if date_m else None
+        if epoch_date and line_date and line_date < epoch_date:
+            pre_epoch_lines += 1
             continue
         dispatches += 1
         m = re.search(r"agent=(\S+)", line)
@@ -81,13 +123,19 @@ if os.path.exists(agent_log):
             unknown_agent += 1
         agents[a] += 1
         t = re.search(r"tokens=(\d+)", line)
-        if t:
-            tokens_total += int(t.group(1))
         c = re.search(r"cached=(\d+)", line)
-        if c:
-            cached_total += int(c.group(1))
-        if re.search(r"approx=1\b", line):
+        is_approx = re.search(r"approx=1\b", line) is not None
+        if re.search(r"dup=1\b", line):
+            dup_dispatches += 1
+        if is_approx:
             approx_attribution += 1
+            if t:
+                approx_tokens += int(t.group(1))
+        else:
+            if t:
+                tokens_total += int(t.group(1))
+            if c:
+                cached_total += int(c.group(1))
 
 out = {
     "edits_total": total_edits,
@@ -99,6 +147,10 @@ out = {
     "dispatch_types": dict(agents.most_common()),
     "unattributed_dispatches": unknown_agent,
     "approximate_attribution": approx_attribution,
+    "approximate_attribution_tokens": approx_tokens,
+    "dup_dispatches": dup_dispatches,
+    "instrument_epoch": epoch_date,
+    "pre_epoch_lines_excluded": pre_epoch_lines,
     "specialist_edits_by_agent": dict(by_specialist.most_common()),
     "subagent_tokens": tokens_total,
     "subagent_cache_reads": cached_total,
@@ -120,8 +172,13 @@ print("harness report")
 print("─" * 52)
 
 if total_edits == 0 and dispatches == 0:
-    print("  no data yet — the logs are gitignored and start empty.")
-    print("  run some work first, then re-run this.")
+    if pre_epoch_lines:
+        print(f"  no post-epoch dispatch data yet — {pre_epoch_lines} line(s) in")
+        print(f"  {agent_log} predate the {epoch_date} instrument fix and are")
+        print("  excluded (see harness-baseline.md). Run some work, then re-run this.")
+    else:
+        print("  no data yet — the logs are gitignored and start empty.")
+        print("  run some work first, then re-run this.")
     print()
     sys.exit(0)
 
@@ -150,17 +207,22 @@ if bash_writes:
 
 print()
 print(" dispatch  (docs/dispatching.md)")
+if pre_epoch_lines:
+    line("pre-epoch lines excluded", f"{pre_epoch_lines}  (before {epoch_date} instrument fix — see harness-baseline.md)")
 line("dispatches logged", dispatches)
 if agents:
     line("by agent", ", ".join(f"{k} {v}" for k, v in agents.most_common(6)))
 if unknown_agent:
     line("unattributed", f"{unknown_agent}  (log-agent.sh could not resolve the type)")
-if approx_attribution:
-    line("approximate attribution", f"{approx_attribution}  (fallback by mtime; unreliable in parallel waves)")
 if tokens_total:
-    line("subagent tokens", f"{tokens_total:,}")
+    line("subagent tokens (reliable)", f"{tokens_total:,}")
 if cached_total:
     line("  of which cache reads", f"{cached_total:,}")
+if approx_attribution:
+    detail = f"{approx_attribution} dispatches, {approx_tokens:,} tokens — out of the total (fallback by mtime, unreliable in a parallel wave)"
+    if dup_dispatches:
+        detail += f"; {dup_dispatches} of those had no metric at all (dup=1, a same-transcript collision the hook caught)"
+    line("approximate attribution", detail)
 
 print()
 print(" compare against .claude/docs/harness/harness-baseline.md")
