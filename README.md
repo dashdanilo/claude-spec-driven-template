@@ -120,6 +120,11 @@ the session-start check tells you when that copy has fallen behind.
 `--adopt` sets aside a harness a repo already copied, `--unlink` puts it back,
 `--status` says what is linked here.
 
+Two more scripts, `script/setup` and `script/test`, are optional and yours to
+write — the harness calls them when they exist (`spec-worktree` runs
+`script/setup`, `verify-before-done` runs `script/test` as the gate) and is a
+no-op without them. See [`docs/guides/script-setup-and-test.md`](./docs/guides/script-setup-and-test.md).
+
 ### Quick start
 
 For a step-by-step walkthrough (both new projects and existing codebases), read [`docs/guides/initial-setup.md`](./docs/guides/initial-setup.md).
@@ -144,7 +149,7 @@ You do not need everything at once. Three adoption levels:
 
 **Full:** adopt the complete structure. Use this when you have a team and want consistent AI workflows across people.
 
-### Option 3: Install Superpowers alongside
+### Option 4: Install Superpowers alongside
 
 The spec-driven workflow in this template is compatible with the [Superpowers plugin](https://github.com/obra/superpowers):
 

@@ -59,14 +59,25 @@ Once you understand the patterns:
 - Delete `.claude/docs/libs/example-lib.md` when you add your first real lib doc
 - Rename `docs/CONSTITUTION.md.example` to `docs/CONSTITUTION.md` and fill in
 
-### 6. Commit the baseline
+### 6. Optional: add `script/setup` and `script/test`
+
+If your team wants one command that takes a clone (or worktree) to "ready to
+work in", and one command that is the verification gate, add executable
+`script/setup` and `script/test` at the repo root. The harness only *calls*
+these when they exist — `spec-worktree` runs `script/setup` after creating a
+worktree, and `verify-before-done` uses `script/test` as the gate instead of
+guessing commands. It does not generate them for you, and a repo without them
+loses nothing: the step is a no-op. See
+[`docs/guides/script-setup-and-test.md`](./script-setup-and-test.md).
+
+### 7. Commit the baseline
 
 ```bash
 git add .
 git commit -m "chore: adopt claude-spec-driven-template as v0.1 baseline"
 ```
 
-### 7. Start using it
+### 8. Start using it
 
 For your first feature:
 
@@ -139,13 +150,24 @@ git add .
 git commit -m "chore: adopt claude-spec-driven-template with generated baseline"
 ```
 
-### 5. Optional: install recommended plugins
+### 5. Optional: add `script/setup` and `script/test`
+
+If your team wants one command that takes a clone (or worktree) to "ready to
+work in", and one command that is the verification gate, add executable
+`script/setup` and `script/test` at the repo root. The harness only *calls*
+these when they exist — `spec-worktree` runs `script/setup` after creating a
+worktree, and `verify-before-done` uses `script/test` as the gate instead of
+guessing commands. It does not generate them for you, and a repo without them
+loses nothing: the step is a no-op. See
+[`docs/guides/script-setup-and-test.md`](./script-setup-and-test.md).
+
+### 6. Optional: install recommended plugins
 
 - [Ponytail](https://github.com/DietrichGebert/ponytail) for cross-tool YAGNI enforcement
 - [Superpowers](https://github.com/obra/superpowers) for enforced spec-driven flow (Claude-only)
 - [OpenSpec](https://github.com/Fission-AI/OpenSpec) for cross-tool spec workflow
 
-### 6. First feature using the template
+### 7. First feature using the template
 
 ```
 /skill explore                    # discuss what to build
