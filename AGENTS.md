@@ -67,7 +67,7 @@ Applied both to the template's own content and recommended for adopters:
 
 - English for all documentation
 - Markdown for all files (no MDX, no preprocessing)
-- No em-dashes in copy
+- No NEW em-dashes in copy, enforced by a hook; existing ones are debt and do not block edits near them
 - One H1 per file, used as the title
 - Code blocks have language tags
 - File paths in inline code with backticks
