@@ -138,7 +138,10 @@ buys consistency, not only budget.
   had. The bias runs in favour of the old driver, and it still cost 4.34x.
 - Run 2's delegation reads 100% because the orchestrator edited its own
   documents through `Bash`, which `log-edit.sh` does not see. The two
-  percentages are not comparable. Instrumentation hole, still open.
+  percentages are not comparable. Instrumentation hole, **closed 2026-09-12**
+  — see that dated section below for what changed and why every number in
+  this file predates a wider definition of "edit" than any report produced
+  after that date.
 - Two run-2 dispatches were killed by a rate limit and never fired
   `SubagentStop`; the log understates run 2 by at least 97,478 tokens.
 - n=1 per driver.
@@ -150,6 +153,44 @@ than kept by keeping the old driver: review per cluster, falsifiability in the
 implementation handoff, an environment-variation checklist for the branch
 review, and no verification agent writing to a tracked file. Projection, not
 measurement: ~2.3M for the same spec, still ~3.3x under the old driver.
+
+## 2026-09-12 — the Bash write blind spot is closed; the delegation series has a new denominator
+
+`log-edit.sh` was only ever registered on `PreToolUse` for
+`Edit|Write|MultiEdit|NotebookEdit`. A write done through `Bash` — a redirect,
+`sed -i`, `tee`, `cp`, `mv` — was invisible to it. The 2026-09-10 A/B above
+caught this in the act: run 2's orchestrator edited its own tracked documents
+through `Bash` and reported **100% delegated**, which was never a real number,
+only a blind spot reading as perfection. The error runs optimistic — the worst
+direction for a report whose whole job is "is this being used as designed."
+
+`log-edit.sh` now also runs on `PreToolUse`/`Bash`. It recovers a write from
+the command with a small character-level lexer (not a full shell parser —
+tracks quote state, recognizes `>`/`>>`, `sed -i`, `tee`, `cp`, `mv`, and
+explicitly skips `2>`/`&>`/`>&` and `[[ ]]`/`(( ))`), and logs the target only
+when it resolves **inside the repo** — `/dev/null`, `/tmp`, the session
+scratchpad and anything else outside the project are silently dropped, by one
+rule instead of a growing exclude list. A target it cannot resolve to a
+literal path (a shell variable, a command substitution) is not dropped either:
+it is logged with `path` equal to `?`, because the thread is still known and
+the delegation count still needs it — only the by-extension breakdown loses
+that row, and `harness-report.sh` says how many it dropped rather than doing
+it quietly.
+
+**This changes the denominator, not just the detector.** Every delegation
+percentage in this file — the 29% baseline, the 92%/100% A/B pair above — was
+computed over Edit/Write/MultiEdit/NotebookEdit only. A percentage measured
+after 2026-09-12 also counts Bash-recovered writes, so it can move for a
+reason that has nothing to do with how much work is actually delegated: the
+set of things being counted got bigger. **Do not compare a pre-2026-09-12
+delegation number against a post-2026-09-12 one as if they were the same
+series.** Read each on its own side of that date; a rise or fall across it is
+not yet evidence of anything.
+
+**What is still not measured.** How much of real delegation was previously
+uncounted because it happened through Bash — that requires a report from a
+real implementation session run after this fix, compared against one run
+before it on the same kind of work. No such pair exists yet.
 
 ## Reading a report honestly
 

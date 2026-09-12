@@ -15,9 +15,10 @@ If it says there is no data, say so and stop. An empty log means the hooks have 
 
 Read `.claude/docs/harness/harness-baseline.md` and compare. Report the **direction**, not just the value:
 
-- **Edit delegated** vs the 29% baseline — this is the headline. Below or near 29% means `rules/delegation.md` did not change behaviour.
+- **Edit delegated** vs the 29% baseline — this is the headline. Below or near 29% means `rules/delegation.md` did not change behaviour. Since 2026-09-12 this count also includes writes recovered from `Bash` (a redirect, `sed -i`, `tee`, `cp`, `mv`), not only Edit/Write/MultiEdit/NotebookEdit — a number measured before that date is not comparable to one measured after it, because the denominator changed (see `harness-baseline.md`'s 2026-09-12 section).
 - **Dispatch count and mix** — a healthy run shows several dispatches and more than one agent type. All `general-purpose` means the stack plugin is missing specialists, which costs multiples per task.
 - **Unattributed dispatches** — should be near zero now that `log-agent.sh` falls back to the subagent transcript. If it is high again, the hook regressed.
+- **Writes recovered from Bash** — shown on its own line when nonzero, with how many of those had an unresolved target (logged as `?` because a shell variable or command substitution can't be resolved to a literal path, not dropped). This is a heuristic on shell text, not a shell parser; a large share unresolved is worth a look, not necessarily a defect.
 
 ## 3 — Say what the numbers do not cover
 
