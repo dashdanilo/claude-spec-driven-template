@@ -61,7 +61,7 @@ For this repo, in `.claude/settings.json`. For a project that linked the harness
 - `SessionStart`: `check-snapshot-on-session.sh` warns if the Repomix snapshot is stale-major
 - `SessionStart`: `check-index.sh` warns when `CLAUDE.md` and the machinery (`baseline/`, `.claude/`, and `~/.claude/` for names only) have drifted apart — not listed, listed but gone, or malformed (bad frontmatter, name/filename mismatch, hook without `+x`). `--strict` exits 1 for CI
 - `SessionStart`: `check-baseline.sh` warns when your harness checkout is behind its remote, or has **uncommitted** edits under `baseline/` — those are live in every project on the machine, unreviewed. Does not fetch and does not pin
-- `SubagentStop`: `log-agent.sh` appends one audit line per subagent run to the gitignored `.claude/agent-log.txt` — agent type, task description, tokens, duration and tool count, recovered from the subagent's own transcript when the hook payload omits them
+- `SubagentStop`: `log-agent.sh` appends one audit line per subagent run to the gitignored `.claude/agent-log.txt` — agent type, task description, tokens, duration and tool count, recovered from the subagent's own transcript when the hook payload omits them. When it has to guess the transcript (older clients only), it checks a small gitignored "already charged" registry first so a parallel wave can never bill the same transcript's tokens twice — a repeat hit gets the agent type (still reliable) and `dup=1`, never a copied metric
 
 ### Rules with path scope
 

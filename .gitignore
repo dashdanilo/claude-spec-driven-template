@@ -3,6 +3,7 @@ CLAUDE.local.md
 .claude/settings.local.json
 .claude/agent-memory/
 .claude/agent-log.txt
+.claude/.agent-log-consumed
 
 # Generated context (Repomix snapshot, etc)
 # The folder itself has a local .gitignore that keeps README.md and .gitignore

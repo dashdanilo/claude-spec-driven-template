@@ -59,6 +59,15 @@ Numbers this harness now acts on that came from **someone else's benchmark**. Th
 
 ## 2026-09-09 — the instrument was broken; no report before this date is usable
 
+<!-- instrument-epoch: 2026-09-09 -->
+<!-- harness-report.sh reads this marker to know where "current" data starts;
+     agent-log.txt lines timestamped before it are excluded from headline
+     stats and reported separately, with the reason. If a future fix
+     invalidates everything before it the same way, add another
+     `instrument-epoch:` marker in that section — the script takes the
+     latest one it finds, so this file is the only place that needs editing. -->
+
+
 The first attempt to re-measure the four claims above found that the two hooks
 producing the data were wrong in three ways. All three were caught by capturing
 real hook payloads and comparing them against what the hooks logged, in one
@@ -191,6 +200,54 @@ not yet evidence of anything.
 uncounted because it happened through Bash — that requires a report from a
 real implementation session run after this fix, compared against one run
 before it on the same kind of work. No such pair exists yet.
+
+## 2026-09-12 — subagent token totals were double-counted; the headline now only counts reliable metric
+
+`log-agent.sh`'s degree-3 fallback (no `agent_transcript_path`, no `agent_id`
+in the payload — older clients only) picks the newest-by-mtime transcript in
+the session's `subagents/` directory and was always marked `approx=1` for
+that reason. What the comment did not account for: in a parallel wave, every
+`SubagentStop` in that wave resolves to the **same** newest file, and degree
+3 copied that file's metrics into every line, not just the first. The lines
+did not merely guess wrong — they summed the same transcript's tokens once
+per subagent in the wave.
+
+Measured on this machine's own `.claude/agent-log.txt` (135 lines) before the
+fix: 22 lines carried `approx=1`, all with the correct `agent=` (that part
+comes straight from the payload, not the guessed file, so attribution was
+never the problem — the metrics were). Three of those lines shared
+`tokens=486296`, two shared `tokens=293605`, two shared `tokens=115571` — six
+lines, three transcripts, charged as six. Total subagent tokens reported:
+11,718,022. Of that, 4,830,845 (41%) sat in `approx=1` lines — a number with
+the same weight in the total as every measured one, presented with no visual
+difference from it.
+
+**The fix.** `log-agent.sh` now keeps an "already charged" registry
+(`.claude/.agent-log-consumed`, gitignored, keyed by session) and checks it
+before degree 3 reports a transcript's metrics. The first `SubagentStop` to
+land on a given file in a session gets its real tokens/cached/dur/tools; every
+later one that resolves to the *same* file gets `agent=` (still reliable) and
+`dup=1`, with no metric fields at all — a missing number, not someone else's
+number. `harness-report.sh` now excludes every `approx=1` line's tokens from
+the headline "subagent tokens" total (a `dup=1` line, having no `tokens=`
+field, already contributes 0) and reports the approximate share on its own
+line instead — see the report's own output for the shape.
+
+**This changes comparability again, the same way the 2026-09-12 delegation
+entry above does for edits.** Every "subagent tokens" figure in this file —
+11.5M in the original baseline, 1,776,741 / 7,708,367 in the A/B — was read
+off a total that mixed reliable and (sometimes doubled) approximate metric
+with no way to tell them apart after the fact. A token total measured after
+this fix only counts lines with real, uniquely-attributed metric; a total
+measured before it does not, and the two are not the same series. Read each
+on its own side of this date.
+
+**What is still not measured.** Whether degree 3 still fires at all against
+a current Claude Code client — the fallback exists for older clients that
+omit `agent_transcript_path`/`agent_id`, and if the current client always
+sends one of those, this whole path (and the bug in it) may already be
+dormant in practice. That requires checking a live payload from a current
+session, not a hook-log after the fact.
 
 ## Reading a report honestly
 
