@@ -106,6 +106,7 @@ For this repo specifically, "new code" almost always means new markdown or shell
 | Contribution rules and checklists | `CONTRIBUTING.md` |
 | Version history | `CHANGELOG.md` |
 | Adoption walkthrough | `docs/guides/initial-setup.md` |
+| `script/setup` / `script/test` contract | `docs/guides/script-setup-and-test.md` |
 | Recommended external tools | `README.md` section "Recommended ecosystem" |
 | Architecture decision records | `docs/decisions/` |
 

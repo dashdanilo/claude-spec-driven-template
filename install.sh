@@ -205,14 +205,28 @@ merge_gitignore
 # --- Repo-owned guards -------------------------------------------------------
 # These are guards, not method: they must hold for everyone who touches the
 # repo, including a teammate who never installed the harness and CI. So they are
-# COPIED and committed, unlike the machinery, which is linked. install-harness.sh
-# deliberately does not register them for exactly this reason.
+# COPIED and committed, unlike the machinery, which is linked.
+#
+# protect-critical.sh and check-snapshot-on-session.sh are excluded from
+# install-harness.sh's portable set for exactly this reason (see that
+# script's comments). protect-harness.sh is different: install-harness.sh
+# registers it everywhere ON PURPOSE, because it is the guard that stops a
+# session from reaching into the shared harness checkout by absolute path and
+# disarming everyone else's copy — it has to hold even for a project that
+# never runs THIS script. So a project that runs both installers ends up with
+# protect-harness.sh registered twice (once here, by repo-relative path in
+# settings.json; once by install-harness.sh, by absolute path in
+# settings.local.json). Verified empirically: both fire on the same Edit/Write
+# and produce the same block twice. Left as-is rather than made conditional —
+# same guard, same verdict, harmless, and a registration that has to know how
+# to un-register itself later (on --unlink, on --status) is worse than a
+# duplicate that fails to the safe side.
 #
 # The settings.json we just copied lists hooks at baseline/..., which is where
 # they live in the harness checkout and nowhere else. Rewrite it to the repo's
 # own paths and drop the portable hooks, which arrive via settings.local.json
 # when someone links the harness.
-REPO_HOOKS=(protect-critical.sh check-snapshot-on-session.sh)
+REPO_HOOKS=(protect-critical.sh check-snapshot-on-session.sh protect-harness.sh)
 REPO_SCRIPTS=(check-snapshot.sh)
 
 if ! $DRY_RUN; then
@@ -243,7 +257,7 @@ try:
 except Exception:
     sys.exit(0)
 
-KEEP = {"protect-critical.sh", "check-snapshot-on-session.sh"}
+KEEP = {"protect-critical.sh", "check-snapshot-on-session.sh", "protect-harness.sh"}
 hooks = d.get("hooks", {})
 for event in list(hooks):
     groups = []

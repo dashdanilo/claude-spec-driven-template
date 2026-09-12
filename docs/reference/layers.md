@@ -121,11 +121,12 @@ Permissions (`allow` and `deny`), hook registrations, and default model. Commit 
 
 Hooks are deterministic side effects on tool lifecycle events. They do not load into context.
 
-This template ships four hooks:
+This template ships these hooks:
 
 - **`block-secrets.sh`** intercepts `Bash` tool calls and blocks commands that try to read `.env` files or print secret-named environment variables
 - **`protect-main.sh`** intercepts `Bash` tool calls and blocks `commit`, `push`, `merge`, `rebase`, and `reset --hard` when the current branch is protected (main, master, trunk, develop, production, release)
-- **`protect-critical.sh`** intercepts `Edit` and `Write` calls and blocks modifications to lockfiles, applied migrations, generated code, and other critical files
+- **`protect-critical.sh`** intercepts `Edit` and `Write` calls and blocks modifications to a repo's own critical files — lockfiles, applied migrations, generated code, `.env`, `/secrets/` — except files ending in `.example`
+- **`protect-harness.sh`** intercepts `Edit` and `Write` calls and blocks modifications to the harness's own governance surface (its hooks, the config that registers them, its rules). The criterion is reviewability: an edit that will show up in this repo's own diff is allowed, an edit reaching into another repo's checkout or into a gitignored file is not — see `CLAUDE.md` for the exact scope
 - **`check-snapshot-on-session.sh`** runs at session start, checks Repomix snapshot staleness, and warns you if it's stale-major
 
 That is a good fit for hooks because it is:
@@ -140,5 +141,16 @@ Bad fits for hooks:
 - anything that needs to load into context
 - anything that makes network calls
 - anything slow or unreliable
+
+---
+
+## What `script/setup` and `script/test` are doing here
+
+Neither ships with the template — they are optional, team-written, executable
+files at a *consuming* repo's root. The harness only calls them when they
+exist: `spec-worktree` runs `script/setup` after creating a worktree, and
+`verify-before-done` runs `script/test` as the gate instead of rediscovering
+commands from `AGENTS.md`. A repo without either is unaffected; the step is a
+no-op. See [`docs/guides/script-setup-and-test.md`](../guides/script-setup-and-test.md).
 
 ---

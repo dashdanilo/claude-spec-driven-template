@@ -4,6 +4,15 @@
 
 ## Claude Code specific: what this project ships
 
+### `script/setup` and `script/test`, if this repo has them
+
+Optional, and not shipped by the harness — the team writes them, once, at the
+repo root. When they exist and are executable, `spec-worktree` runs
+`script/setup` after creating a worktree, and `verify-before-done` runs
+`script/test` as the gate instead of rediscovering commands. A repo without
+either loses nothing: the step is a no-op. See
+[`docs/guides/script-setup-and-test.md`](./docs/guides/script-setup-and-test.md).
+
 ### Skills available
 
 The skills in `baseline/skills/` are workflows Claude Code auto-invokes based on their descriptions. Linked into a project with `./install-harness.sh` (opt-in, per repo), they land in that project's `.claude/skills/`:

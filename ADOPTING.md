@@ -107,6 +107,14 @@ Depois, personalize o `AGENTS.md`. É de lá que o `verify-before-done` descobre
 comandos de install, build e teste, então o gate não funciona enquanto ele não
 estiver preenchido.
 
+Se o seu time já tem (ou vai escrever) um `script/setup` e um `script/test`
+executáveis na raiz do repo, o harness passa a **chamá-los** em vez de
+redescobrir comandos: o `spec-worktree` roda o `script/setup` ao criar um
+worktree, e o `verify-before-done` usa o `script/test` como o próprio gate. O
+harness não gera esses scripts — só o time sabe o que "pronto" e "verificado"
+significam ali — e um repo sem eles não perde nada, o passo vira no-op. Ver
+[`docs/guides/script-setup-and-test.md`](./docs/guides/script-setup-and-test.md).
+
 ### Windows
 
 Se você estiver no **Git Bash nativo**, o `ln -s` não cria symlink sem **Modo de
@@ -229,11 +237,17 @@ sempre pode sobrescrever. (Com skills é o contrário, vale lembrar.)
 
 **Hooks** são proteções que rodam independente do que o Claude decidir. Os
 portáveis são registrados pelo `install-harness.sh`: `block-secrets.sh`,
-`protect-main.sh`, `log-agent.sh`, `log-edit.sh`.
+`protect-main.sh`, `protect-harness.sh`, `log-agent.sh`, `log-edit.sh`.
 
-Dois **não** entram junto com o método de propósito, porque são guardas que o
-repositório deve a todos, inclusive a quem nunca instalou isto. O `install.sh` os
-copia para dentro do repo: `protect-critical.sh` e `check-snapshot-on-session.sh`.
+Três **não** entram junto com o método de propósito, porque são guardas que o
+repositório deve a todos, inclusive a quem nunca instalou isto. O `install.sh`
+os copia para dentro do repo: `protect-critical.sh`, `check-snapshot-on-session.sh`
+e `protect-harness.sh`. Os dois primeiros ficam só na cópia — dizem respeito ao
+repositório (lockfile, migration, snapshot), não a uma máquina. `protect-harness.sh`
+é o caso oposto e por isso entra nos dois lugares: é a própria governança do
+harness, e a regra dela é o critério, não a lista de padrões (essa está no
+`CLAUDE.md`) — um agente pode mexer no que vai aparecer num review deste repo,
+nunca no de outro repo, nunca no que é gitignorado e por isso invisível.
 
 ---
 
