@@ -16,7 +16,7 @@ From `$ARGUMENTS`: either a spec folder (take the next unchecked tasks from its 
 
 Keep the batch to a handful of clusters. **Clusters must touch disjoint files**, since they go out together; inside a cluster the tasks may share files freely, because one specialist runs them in order. If you cannot split them cleanly, run the batch as one cluster.
 
-Pick one specialist per cluster from `.claude/agents/` (stack specialists arrive via a stack plugin). No specialist for this stack → dispatch the baseline's `implementer` (the portable fallback, which reads the repo first) **and say which specialist is missing**. Not the built-in `general-purpose` agent.
+Pick one specialist per cluster from `.claude/agents/` (stack specialists arrive via a stack plugin). **If the project's context declares a specialist routing map** — a `specialists:` key in an imported knowledge catalog, or an equivalent table in `AGENTS.md`/`CLAUDE.md` — route each cluster to the specialist the map assigns to its task class instead of guessing from the stack alone; without a map, pick by stack as above. An agent shipped by a plugin is namespaced (`<plugin>:<agent>`) — the name in the map must match exactly what the Agent tool accepts. No specialist for this stack → dispatch the baseline's `implementer` (the portable fallback, which reads the repo first) **and say which specialist is missing**. Not the built-in `general-purpose` agent.
 
 ## 2 — Confirm branch
 

@@ -25,9 +25,7 @@ Also: `scripts/` (shell helpers, e.g. `spec-worktree.sh`, `check-index.sh`), `co
 
 ## Three principles
 
-1. **One home per topic.** A fact lives in exactly one skill/rule; others cross-link, never copy.
-2. **Rule vs skill.** A **rule** states *what* (one line, path-scoped, always in context for that path). A **skill** shows *how + why + example* (loads by task). Project-specific conventions are rules; the richer teaching is skills.
-3. **One owner per document.** When `/orchestrate` or `/wave` runs specialists in parallel, each writes only its own outputs — `tasks.md` belongs to the orchestrator (it checks the boxes), `spec.md`/`plan.md` to the author, and a specialist never edits another wave's files. ADRs are append-only (`.claude/rules/adr.md`). This is what keeps parallel agents from clobbering each other.
+See [`docs/principles.md`](docs/principles.md) — delivered to a linked project as `.claude/docs/harness/principles.md`, so it is the one piece of this file that agents can actually resolve from inside `.claude/`.
 
 ## Delegation and dispatch
 
