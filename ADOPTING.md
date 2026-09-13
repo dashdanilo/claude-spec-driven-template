@@ -9,7 +9,7 @@ momento.
 
 ## O que você ganha
 
-Dezenove skills, sete subagents, cinco rules e um conjunto de hooks de proteção.
+Vinte skills, oito subagents, cinco rules e um conjunto de hooks de proteção.
 Uma forma de trabalhar spec-driven que é a mesma em todo repositório onde você
 ligar, e ausente nos que você não ligar.
 
@@ -95,6 +95,137 @@ carregaria a regra duas vezes. O `--unlink` devolve todos eles.
 > `git checkout -- .claude`, que é autoritativo, e remover a sobra à mão.
 > **Desfaça antes de mergear, re-adote depois.**
 
+O `--adopt` resolve o **método**: as pastas de skills, agents e rules que
+colidem. Ele não sabe nada sobre um plugin de stack, nunca toca o
+`settings.json` commitado do repo, e não toca sozinho cópias antigas soltas em
+`.claude/docs`, `.claude/scripts` ou `.claude/hooks`: essas convivem em paz ao
+lado das subpastas `harness/` que o link cria, então o `--adopt` não tem
+motivo pra mexer nelas. Se a cópia antiga também tinha specialists de stack
+(agents e skills que vieram de um plugin, não deste harness), migre nesta
+ordem:
+
+1. **Habilite e atualize o plugin de stack antes de adotar** (seção "Plugins de
+   stack" acima). O `--adopt` põe a pasta inteira de skills vendorizadas de
+   lado; as skills de stack só voltam pelo plugin, e uma cópia velha do plugin
+   é pior do que nenhuma, porque parece funcionar.
+2. **Abra a sessão de dentro do repo que vai migrar**, não do clone do
+   harness. O `protect-harness.sh` bloqueia, por desenho, edição de
+   `.claude/settings.json`, hooks e rules de **outro** repositório, e decide o
+   que é "outro repo" pelo diretório em que a sessão está rodando. Uma sessão
+   aberta no clone do harness não consegue fazer esta migração num projeto
+   diferente, e isso é a guarda funcionando, não um bug.
+3. **Classifique os arquivos versionados antes de rodar `--adopt`, contra as
+   duas fontes possíveis.** Conteúdo em `.claude/skills`, `.claude/agents`,
+   `.claude/rules`, `.claude/docs`, `.claude/scripts` ou `.claude/hooks` deste
+   repo não é necessariamente vendorizado do harness: parte pode ter vindo do
+   plugin de stack, e o `--adopt` só sabe procurar na primeira fonte. Compare
+   o hash de cada arquivo rastreado contra o histórico do clone do harness E
+   contra o clone do marketplace que o próprio Claude Code mantém em
+   `~/.claude/plugins/marketplaces/<marketplace>` (existe em qualquer máquina
+   que já instalou o plugin; troque `<marketplace>` pelo nome usado, `njord`
+   no exemplo):
+
+   ```bash
+   HARNESS=$(git -C ~/Sites/harness rev-list --all --objects | awk '{print $1}')
+   MKT=$(git -C ~/.claude/plugins/marketplaces/njord rev-list --all --objects | awk '{print $1}')
+   git ls-files .claude/skills .claude/agents .claude/rules .claude/docs .claude/scripts .claude/hooks | while read -r f; do
+     h=$(git hash-object "$f")
+     if printf '%s\n' "$HARNESS" | grep -qxF "$h"; then echo "harness  $f"
+     elif printf '%s\n' "$MKT" | grep -qxF "$h"; then echo "plugin   $f"
+     else echo "LOCAL    $f"; fi
+   done
+   ```
+
+   Três baldes:
+   - `harness` e `plugin`: o conteúdo já existiu, idêntico ou em versão
+     antiga, na fonte que o nome diz. Sai do repo (passo 7).
+   - `LOCAL`: não apareceu em nenhuma das duas fontes. **Não quer dizer
+     "manter"**, quer dizer "leia antes de decidir" (passo 5).
+
+   Como referência do que esperar, rodado no njord-back em 2026-09-13: 43
+   arquivos caíram em `harness`, 88 em `plugin`, 10 em `LOCAL`. Só esse último
+   grupo pede leitura arquivo por arquivo; os outros dois já estão decididos.
+4. Rode `--adopt` primeiro em modo de leitura, depois de verdade:
+   ```bash
+   ~/Sites/harness/install-harness.sh --adopt --dry-run
+   ~/Sites/harness/install-harness.sh --adopt
+   ```
+5. **Decida o que caiu no balde `LOCAL` do passo 3.** No njord-back os 10
+   misturavam três coisas: o que é do repo por natureza (uma rule de stack,
+   uma guarda que o próprio time escreveu), um ajuste local antigo que o
+   harness já absorveu de outro jeito, e edição real que vale subir para o
+   harness ou para o plugin. Só a leitura de cada um separa os três; qual
+   decisão cabe a cada arquivo é trabalho da sessão que está migrando, não
+   deste guia.
+
+   Duas regras para quem for manter uma guarda:
+
+   - **Guarda vendorizada pode imprimir "BLOCKED" sem bloquear.** Confira que
+     o caminho de bloqueio dela termina em `exit 2`; no Claude Code, `exit 2`
+     bloqueia a chamada e `exit 1` só mostra a mensagem e deixa a ação
+     acontecer. Não precisa ler o script inteiro: rode o hook com um payload
+     que deveria ser bloqueado e olhe o código de saída, comparando com a
+     mesma guarda em `baseline/hooks/` num repo descartável, por exemplo:
+     ```bash
+     printf '%s' '{"tool_input": {"file_path": "yarn.lock"}}' | bash baseline/hooks/protect-critical.sh; echo $?
+     ```
+     Escolha um payload assim, que não dispare as guardas **vivas** da sua
+     própria sessão: um exemplo que cite `.env` ou monte um commit de
+     verdade aciona o `block-secrets.sh` ou o `protect-main.sh` da sua sessão
+     atual antes mesmo de chegar no hook que você queria testar.
+   - **Ao atualizar uma guarda do repo a partir do `baseline/hooks/`, leve
+     junto os padrões que só o repo tinha.** Uma guarda de arquivos críticos
+     pode proteger caminhos que o baseline não conhece (uma pasta de
+     migrations do ORM do repo, um arquivo de schema gerado). Copiar o
+     baseline por cima apaga essa proteção em silêncio, e é exatamente o tipo
+     de arquivo que a classificação do passo 3 já marcou como `LOCAL`.
+6. **Edite o `settings.json` commitado do repo:** remova as entradas dos
+   hooks portáveis que **estiverem** registradas ali, nem todo repo registrou
+   os mesmos. Os candidatos, conferidos no `install-harness.sh` deste
+   harness, são seis: `block-secrets.sh`, `protect-main.sh` e `log-edit.sh`
+   (em `Bash`/`Edit|Write|MultiEdit|NotebookEdit`), `log-agent.sh`
+   (`SubagentStop`), e `check-index.sh` e `check-baseline.sh`
+   (`SessionStart`); no njord-back, por exemplo, `log-edit.sh` e
+   `check-baseline.sh` nunca estiveram commitados ali, não tem entrada para
+   tirar. Remova também os hooks que o plugin de stack já registra sozinho
+   (seção "Plugins de stack"), mantenha as guardas que são do repositório, e
+   registre o `protect-harness.sh` no grupo `Edit|Write|MultiEdit|
+   NotebookEdit`: esse fica nos dois lugares de propósito, não é removido.
+   Tirar a entrada sem apagar o arquivo do hook deixa uma cópia velha no
+   repo: o arquivo sai junto, pelo balde do passo 3 (`harness` ou `plugin`).
+7. **Suba as remoções com `git rm --cached <caminho>`, nunca com
+   `git add -A`.** Para cada arquivo dos baldes `harness` e `plugin` (passo
+   3), rode `git rm --cached` no caminho original: o `--adopt` já tirou o
+   arquivo do working tree, então isso só confirma a remoção no índice.
+   Cuidado com um caso: se um arquivo do balde `harness` for uma das guardas
+   que o `install.sh` copia de propósito para dentro do repo
+   (`protect-critical.sh`, `check-snapshot-on-session.sh`,
+   `protect-harness.sh`) e ela ainda está registrada no `settings.json` como
+   guarda deste repositório, não é lixo vendorizado, é a cópia que deve
+   ficar; confirme pelo `settings.json`, o balde sozinho não basta para esses
+   três. Testado num repo descartável: `git add -A` sobe o symlink em si como
+   um arquivo normal (modo `120000`, o alvo do link como conteúdo, sem seguir
+   para dentro dele) e sobe qualquer pasta `.claude/<nome>.pre-harness`
+   inteira como arquivos novos, o oposto do que se quer. As pastas
+   `.pre-harness` nunca chegaram a ser rastreadas com esse nome; apague-as do
+   disco à parte, fora do git, depois de commitar. Confira o `git status`
+   inteiro antes de commitar.
+8. **Corrija a documentação do repo que aponta para caminhos que agora vêm do
+   harness ou do plugin** (por exemplo, um script que estava em
+   `.claude/scripts/spec-worktree.sh` passa a ser
+   `.claude/scripts/harness/spec-worktree.sh`; uma skill que passou a vir do
+   plugin de stack não tem mais caminho dentro do repo).
+9. **Verifique:**
+   ```bash
+   ~/Sites/harness/install-harness.sh --status
+   bash .claude/scripts/harness/check-index.sh --strict
+   ```
+   e a suíte de testes do próprio repo.
+10. **Um PR só com as remoções.** As pastas `.pre-harness` só podem sumir de
+    verdade depois do merge desse PR. Enquanto a migração estiver feita mas
+    não commitada, vale o mesmo aviso do bloco acima: não commite, não faça
+    merge, não dê pull nesse estado.
+
 ### 4. Projeto novo, ainda sem contexto
 
 ```bash
@@ -153,6 +284,80 @@ mostra o que está linkado no repo atual.
 
 ---
 
+## Plugins de stack
+
+O harness sozinho não traz nenhum specialist de stack. Os agents como `backend`,
+`database` ou `graphql`, e as skills como `prisma-*`, `graphql-codefirst`,
+`nestjs-module`, `testing`, `backend-*` ou `file-uploads`, vêm de um **plugin**,
+não deste repositório. No njord-back é o `backend-nest@njord`, habilitado em
+`enabledPlugins` no `.claude/settings.json` **commitado** do repo (não no seu
+`settings.local.json`). Com o plugin ativo, o Agent tool mostra esses
+specialists com o namespace do plugin na frente, por exemplo
+`backend-nest:backend`.
+
+Sem o plugin habilitado, a regra de delegação não trava: ela cai para o
+`implementer` deste harness, o fallback portátil. Ele funciona (lê o
+`AGENTS.md`, as rules do repo, o código ao lado da mudança) mas não conhece a
+stack, e diz isso no próprio relatório. Se você esperava ver
+`backend-nest:backend` num despacho e apareceu `implementer`, o plugin não está
+habilitado.
+
+**Plugin não carrega rules.** O manifest de um plugin não tem campo para isso;
+o marketplace do njord removeu a pasta `rules/` de dentro do plugin porque ela
+nunca era lida (commit `6d47157`). Por isso as rules de stack (no njord-back,
+`nestjs-module.md`, `prisma-database.md`, `code-quality.md`) moram no
+`.claude/rules/` do próprio repositório, não no plugin. A ADR 0002 do
+marketplace do njord registra essa divisão.
+
+**Plugin registra os próprios hooks**, pelo `hooks/hooks.json` de dentro dele.
+O `backend-nest`, por exemplo, registra um `protect-prisma.sh` igual ao que o
+njord-back já tem em `.claude/hooks/`. Se o repo continuar registrando a cópia
+dele no `settings.json` depois de habilitar o plugin, a guarda roda duas vezes
+por chamada. Ao migrar um repo que já tinha essa cópia (próxima seção), pare de
+registrar a cópia do repo e deixe o plugin cuidar disso.
+
+**A cópia instalada do plugin pode estar velha, e nada avisa sozinho.** O
+Claude Code guarda o plugin em cache por versão, em
+`~/.claude/plugins/cache/<marketplace>/<plugin>/<versão>/`, e identifica a
+instalação pelo campo `version`, não pelo commit. Um plugin do marketplace
+njord pode ter recebido commits de conteúdo sem nunca subir de versão (o
+`backend-nest` recebeu três e continua em `0.1.0`), e nesse caso a sua cópia
+instalada não muda mesmo depois do marketplace mudar.
+
+Para atualizar:
+
+```bash
+claude plugin update backend-nest@njord
+```
+
+Reinicie a sessão depois: o próprio comando avisa que a atualização só é
+aplicada num processo novo.
+
+Verificado em 2026-09-13: rodando `claude plugin update backend-nest@njord
+--json`, a resposta foi `"updateOutcome":"up_to_date"`, com a mensagem
+"backend-nest is already at the latest version (0.1.0)", isso mesmo com o
+clone de marketplace do Claude Code já num commit mais novo (11/09) do que a
+instalação (14/07). O `gitCommitSha` do plugin em `installed_plugins.json` e a
+pasta de cache continuaram exatamente como antes do `update`. O comando
+compara **versão**, não commit: sem o marketplace subir a versão do plugin, o
+`update` não traz conteúdo novo, mesmo com o marketplace à frente. Quando a
+versão subir, o mesmo comando traz.
+
+Continue conferindo o `gitCommitSha` antes e depois do `update`: é assim que
+você sabe se ele de fato trouxe algo novo. O default do comando é
+`--scope user`; se o plugin foi instalado por projeto, use `--scope project`
+para atualizar a instalação certa.
+
+```bash
+claude plugin details backend-nest@njord
+```
+
+mostra o inventário de componentes que a cópia instalada de fato tem (skills,
+agents, hooks), útil para conferir se bate com o que você espera antes de
+confiar nela.
+
+---
+
 ## Qual skill, quando
 
 Digite `/nome` para invocar. O Claude também as escolhe sozinho quando a tarefa
@@ -166,6 +371,7 @@ casa: as descrições são o gatilho.
 | **`grilling`** | você precisa **fechar** decisões em aberto. Uma pergunta por vez, percorrendo a árvore de decisão, com recomendação em cada uma |
 | **`devils-advocate`** | uma spec ou plano parece pronto. Pre-mortem, red-team, falsificar as premissas antes de gastar a semana |
 | **`find-existing-first`** | você está prestes a criar arquivo, componente ou util novo. Procura o que já existe antes |
+| **`jury`** | precisa **decidir entre opções concorrentes** (arquitetura, vendor, caminho de migração) e errar sai caro. Um painel de 3 a 5 subagents argumenta às cegas, depois em duas rodadas, e termina num veredito com o dissenso preservado |
 | **`codebase-explorer`** *(agent)* | precisa entender uma área desconhecida antes de dimensionar. Somente leitura |
 
 ### Virando trabalho
@@ -181,7 +387,7 @@ casa: as descrições são o gatilho.
 |---|---|
 | **`wave`** | **na maior parte das vezes.** Um lote de clusters coesos (5-7 tasks cada, um specialist por cluster), despachados em paralelo, um gate, e para. Sem spec, sem tabela de aprovação, sem PR |
 | **`orchestrate`** | uma spec inteira, do começo ao fim. Reconcilia os checkboxes contra o código, classifica cada task para escolher os gates, agrupa em **clusters coesos de 5-7 tasks** (um agent por task foi a pior arquitetura medida), planeja waves, pede aprovação, executa uma wave por vez e abre o PR. Mais cerimônia: use quando o trabalho merecer |
-| **`verify-before-done`** | antes de dizer que algo está pronto. Roda o install, typecheck, build e testes **deste** repo, descobertos do `AGENTS.md` |
+| **`verify-before-done`** | antes de dizer que algo está pronto. Se o repo tem um `script/test` executável na raiz, roda ele; senão descobre install, typecheck, build e testes do `AGENTS.md` **deste** repo |
 | **`diagnosing-bugs`** | bug difícil ou regressão de performance. O gate é um loop de feedback reprodutível **antes** de qualquer hipótese |
 
 ### Fechando
@@ -216,6 +422,7 @@ A maioria é despachada pelas skills acima; você também pode pedir pelo nome.
 | `spec-reviewer` | audita o `spec.md` antes de virar plano. O `write-spec` chama sozinho |
 | `code-reviewer` | revisa a implementação contra a spec, o plano e as tasks ativas |
 | `reviewer` | revisão de branch inteira em nível sênior, roda a verificação do repo e pode abrir o PR |
+| `implementer` | implementador portátil de fallback: usado só quando não existe specialist de stack para o trabalho. Lê o `AGENTS.md`, as rules e o código ao lado da mudança antes de escrever, e nomeia no relatório qual specialist deveria existir |
 | `tester` | escreve e roda testes usando o framework **deste** repo, descoberto do tooling |
 | `researcher` | mergulha numa lib ou API externa. Mantém memória entre sessões |
 | `security-auditor` | auth, segredos, validação de input. Barato e afiado, vale rodar antes de release |
@@ -275,6 +482,11 @@ remova a duplicata de `.claude/rules/`.
 
 **O gate não sabe o que rodar.** O `verify-before-done` lê os comandos do
 `AGENTS.md`. Preencha.
+
+**Um agente não consegue registrar hook nenhum no `settings.local.json`.**
+Esse arquivo é gitignorado, e o `protect-harness.sh` bloqueia governança que
+não aparece em nenhum review por desenho. Quem registra os hooks portáveis ali
+é o `install-harness.sh`, rodado por você, uma pessoa, no terminal.
 
 ---
 
