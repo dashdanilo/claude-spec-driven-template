@@ -65,7 +65,6 @@ See the tree diagram in `README.md` for the complete layout.
 
 Applied both to the template's own content and recommended for adopters:
 
-- English for all documentation
 - Markdown for all files (no MDX, no preprocessing)
 - No NEW em-dashes in copy, enforced by a hook; existing ones are debt and do not block edits near them
 - One H1 per file, used as the title
