@@ -32,8 +32,12 @@ o raciocínio e os custos.
 ### 1. Clone este repo, uma vez, num lugar definitivo
 
 ```bash
-git clone https://github.com/dashdanilo/claude-spec-driven-template ~/Sites/harness
+export HARNESS=~/Sites/harness   # escolha o caminho com calma, ver aviso abaixo
+git clone https://github.com/dashdanilo/claude-spec-driven-template "$HARNESS"
 ```
+
+O resto deste guia usa `$HARNESS` em todo bloco. Se você abrir uma sessão nova,
+exporte a variável de novo antes de colar qualquer comando daqui.
 
 **Escolha o caminho com calma e não mova depois.** Os links são absolutos: se
 você mover esse diretório, todo projeto que optou passa a apontar para o nada,
@@ -44,18 +48,18 @@ causar.
 
 ```bash
 cd ~/Sites/algum-projeto
-~/Sites/harness/install-harness.sh --dry-run   # veja antes
-~/Sites/harness/install-harness.sh
+"$HARNESS/install-harness.sh" --dry-run   # veja antes
+"$HARNESS/install-harness.sh"
 ```
 
 Isso cria cinco symlinks e registra os hooks portáveis:
 
 ```
-.claude/skills          -> ~/Sites/harness/baseline/skills
-.claude/agents          -> ~/Sites/harness/baseline/agents
-.claude/rules/harness   -> ~/Sites/harness/baseline/rules
-.claude/docs/harness    -> ~/Sites/harness/baseline/docs
-.claude/scripts/harness -> ~/Sites/harness/baseline/scripts
+.claude/skills          -> $HARNESS/baseline/skills
+.claude/agents          -> $HARNESS/baseline/agents
+.claude/rules/harness   -> $HARNESS/baseline/rules
+.claude/docs/harness    -> $HARNESS/baseline/docs
+.claude/scripts/harness -> $HARNESS/baseline/scripts
 ```
 
 Os dois últimos ficam num subdiretório pelo mesmo motivo que `rules/harness`: não
@@ -73,7 +77,7 @@ Repita em cada projeto que você quiser. Repo onde você nunca rodar fica intact
 ### 3. Se o repo já tem uma cópia antiga do harness
 
 ```bash
-~/Sites/harness/install-harness.sh --adopt
+"$HARNESS/install-harness.sh" --adopt
 ```
 
 Sem `--adopt`, o instalador **para** em vez de sobrescrever qualquer coisa. Com
@@ -105,60 +109,110 @@ motivo pra mexer nelas. Se a cópia antiga também tinha specialists de stack
 ordem:
 
 1. **Habilite e atualize o plugin de stack antes de adotar** (seção "Plugins de
-   stack" acima). O `--adopt` põe a pasta inteira de skills vendorizadas de
+   stack", abaixo). O `--adopt` põe a pasta inteira de skills vendorizadas de
    lado; as skills de stack só voltam pelo plugin, e uma cópia velha do plugin
    é pior do que nenhuma, porque parece funcionar.
+
+   Às vezes o `update` não traz nada mesmo com o marketplace à frente, porque
+   o comando compara **versão**, não commit (ver a seção abaixo). Não dá para
+   esperar por isso. Siga a migração mesmo assim e liste, na decisão do balde
+   `LOCAL` (passo 5), o que fica indisponível localmente até o plugin
+   realmente atualizar de versão. Não invente o conteúdo que falta.
 2. **Abra a sessão de dentro do repo que vai migrar**, não do clone do
    harness. O `protect-harness.sh` bloqueia, por desenho, edição de
    `.claude/settings.json`, hooks e rules de **outro** repositório, e decide o
    que é "outro repo" pelo diretório em que a sessão está rodando. Uma sessão
    aberta no clone do harness não consegue fazer esta migração num projeto
    diferente, e isso é a guarda funcionando, não um bug.
-3. **Classifique os arquivos versionados antes de rodar `--adopt`, contra as
-   duas fontes possíveis.** Conteúdo em `.claude/skills`, `.claude/agents`,
-   `.claude/rules`, `.claude/docs`, `.claude/scripts` ou `.claude/hooks` deste
-   repo não é necessariamente vendorizado do harness: parte pode ter vindo do
-   plugin de stack, e o `--adopt` só sabe procurar na primeira fonte. Compare
-   o hash de cada arquivo rastreado contra o histórico do clone do harness E
-   contra o clone do marketplace que o próprio Claude Code mantém em
-   `~/.claude/plugins/marketplaces/<marketplace>` (existe em qualquer máquina
-   que já instalou o plugin; troque `<marketplace>` pelo nome usado, `njord`
-   no exemplo):
+3. **Classifique os arquivos versionados antes de rodar `--adopt`, pelo que
+   cada fonte entrega hoje, não pelo que ela já teve.** Conteúdo em
+   `.claude/skills`, `.claude/agents`, `.claude/rules`, `.claude/docs`,
+   `.claude/scripts` ou `.claude/hooks` deste repo não é necessariamente
+   vendorizado do harness: parte pode ter vindo do plugin de stack, e o
+   `--adopt` só sabe procurar na primeira fonte.
+
+   **Não** compare contra o histórico inteiro de cada fonte (`rev-list --all`):
+   isso prova que um arquivo **existiu** ali algum dia, não que a fonte o
+   **entrega hoje**, e derruba no balde errado qualquer coisa que a fonte já
+   teve e removeu, por exemplo uma rule de stack que um plugin chegou a
+   embutir antes de a própria comunidade decidir que plugin não carrega rule.
+   O critério certo é por caminho, contra a árvore atual de cada fonte: skills,
+   agents, docs e scripts do harness chegam pela árvore atual do clone
+   (`$HARNESS/baseline/<categoria>/<caminho>`, o mesmo que o link expõe);
+   skills e agents de stack chegam pela cópia hoje instalada do plugin
+   (`~/.claude/plugins/cache/<marketplace>/<plugin>/<versão>/<categoria>/
+   <caminho>`); hooks podem vir de qualquer uma das duas. **Rules nunca chegam
+   por plugin** (ver "Plugins de stack", abaixo), então uma rule só sai se o
+   harness a entrega hoje; se não entrega, ela fica, mesmo que uma cópia
+   antiga tenha circulado num plugin no passado.
 
    ```bash
-   HARNESS=$(git -C ~/Sites/harness rev-list --all --objects | awk '{print $1}')
-   MKT=$(git -C ~/.claude/plugins/marketplaces/njord rev-list --all --objects | awk '{print $1}')
+   harness_has() { [[ -e "$HARNESS/baseline/$1" ]]; }
+   plugin_has() {
+     local rel=$1 d
+     for d in ~/.claude/plugins/cache/njord/*/*/; do
+       [[ -e "${d}${rel}" ]] && return 0
+     done
+     return 1
+   }
+
    git ls-files .claude/skills .claude/agents .claude/rules .claude/docs .claude/scripts .claude/hooks | while read -r f; do
-     h=$(git hash-object "$f")
-     if printf '%s\n' "$HARNESS" | grep -qxF "$h"; then echo "harness  $f"
-     elif printf '%s\n' "$MKT" | grep -qxF "$h"; then echo "plugin   $f"
-     else echo "LOCAL    $f"; fi
+     cat=${f#.claude/}; cat=${cat%%/*}
+     rel=${f#.claude/$cat/}
+     if harness_has "$cat/$rel"; then
+       echo "harness  $f"
+     elif [[ "$cat" != rules && "$cat" != docs && "$cat" != scripts ]] && plugin_has "$cat/$rel"; then
+       echo "plugin   $f"
+     else
+       echo "LOCAL    $f"
+     fi
    done
    ```
 
-   Três baldes:
-   - `harness` e `plugin`: o conteúdo já existiu, idêntico ou em versão
-     antiga, na fonte que o nome diz. Sai do repo (passo 7).
-   - `LOCAL`: não apareceu em nenhuma das duas fontes. **Não quer dizer
-     "manter"**, quer dizer "leia antes de decidir" (passo 5).
+   Troque `njord` pelo nome do marketplace usado neste projeto. Três baldes:
+   - `harness` e `plugin`: a fonte entrega esse arquivo, nesse caminho, hoje.
+     Sai do repo (passo 7).
+   - `LOCAL`: nenhuma das duas entrega esse caminho agora. **Não quer dizer
+     "manter"**, quer dizer "leia antes de decidir" (passo 5), inclusive
+     quando a causa é o plugin desatualizado do passo 1: um arquivo que já
+     subiu ao marketplace mas ainda não chegou à cópia instalada aparece aqui
+     como `LOCAL`, e a decisão costuma ser "fica indisponível localmente até o
+     plugin atualizar", não inventar o conteúdo.
 
-   Como referência do que esperar, rodado no njord-back em 2026-09-13: 43
-   arquivos caíram em `harness`, 88 em `plugin`, 10 em `LOCAL`. Só esse último
-   grupo pede leitura arquivo por arquivo; os outros dois já estão decididos.
+   O hash contra o histórico ainda serve como pista de proveniência ("isso já
+   foi da fonte, então não é invenção local"), mas não decide o balde.
+
+   Rodado assim, sem tocar histórico nenhum, contra `origin/develop` do
+   njord-back em 2026-09-13 (141 arquivos rastreados nos seis diretórios): 49
+   em `harness`, 87 em `plugin`, 5 em `LOCAL` - `rules/code-quality.md`,
+   `rules/nestjs-module.md`, `rules/prisma-database.md`,
+   `hooks/require-tests-before-push.sh` e
+   `skills/testing/rules/test-no-global-state-assertions.md` (esse último é o
+   caso do parágrafo acima: já subiu ao marketplace, ainda não chegou à cópia
+   instalada). As três rules de stack ficam, como manda a seção "Plugins de
+   stack" mais abaixo: nenhum plugin carrega `rules/`.
 4. Rode `--adopt` primeiro em modo de leitura, depois de verdade:
    ```bash
-   ~/Sites/harness/install-harness.sh --adopt --dry-run
-   ~/Sites/harness/install-harness.sh --adopt
+   "$HARNESS/install-harness.sh" --adopt --dry-run
+   "$HARNESS/install-harness.sh" --adopt
    ```
-5. **Decida o que caiu no balde `LOCAL` do passo 3.** No njord-back os 10
-   misturavam três coisas: o que é do repo por natureza (uma rule de stack,
-   uma guarda que o próprio time escreveu), um ajuste local antigo que o
-   harness já absorveu de outro jeito, e edição real que vale subir para o
-   harness ou para o plugin. Só a leitura de cada um separa os três; qual
+5. **Decida o que caiu no balde `LOCAL` do passo 3.** No njord-back, contra
+   `origin/develop`, os 5 misturavam duas coisas: o que é do repo por natureza
+   (três rules de stack e uma guarda que o próprio time escreveu, nenhuma das
+   quatro chega por harness nem por plugin), e um arquivo que o plugin já
+   entrega numa versão mais nova do marketplace mas a cópia instalada ainda
+   não tem, caso do passo 1. Só a leitura de cada um separa os dois; qual
    decisão cabe a cada arquivo é trabalho da sessão que está migrando, não
    deste guia.
 
-   Duas regras para quem for manter uma guarda:
+   Três regras para quem for manter uma guarda:
+
+   - **Se o conserto de uma guarda que você vai manter já está em andamento
+     num PR à parte, mexendo nos mesmos arquivos, não duplique o conserto
+     aqui.** Espere esse PR mergear, rebase a migração em cima dele e resolva
+     os arquivos que colidem com uma tabela no topo do seu próprio PR (arquivo,
+     o que cada PR faz ali, qual versão fica) em vez de reescrever a guarda
+     duas vezes em paralelo.
 
    - **Guarda vendorizada pode imprimir "BLOCKED" sem bloquear.** Confira que
      o caminho de bloqueio dela termina em `exit 2`; no Claude Code, `exit 2`
@@ -187,24 +241,59 @@ ordem:
    (`SubagentStop`), e `check-index.sh` e `check-baseline.sh`
    (`SessionStart`); no njord-back, por exemplo, `log-edit.sh` e
    `check-baseline.sh` nunca estiveram commitados ali, não tem entrada para
-   tirar. Remova também os hooks que o plugin de stack já registra sozinho
-   (seção "Plugins de stack"), mantenha as guardas que são do repositório, e
-   registre o `protect-harness.sh` no grupo `Edit|Write|MultiEdit|
-   NotebookEdit`: esse fica nos dois lugares de propósito, não é removido.
+   tirar.
+
+   **Só remova a entrada de um hook do repo que o plugin de stack também
+   registra depois de provar, com payload, que a cópia instalada do plugin de
+   fato bloqueia.** A seção "Plugins de stack" (abaixo) diz quando um plugin
+   registra hook próprio; rode o mesmo teste de `exit 2` do passo 5 contra o
+   caminho do hook **dentro do cache instalado do plugin**
+   (`~/.claude/plugins/cache/<marketplace>/<plugin>/<versão>/hooks/<nome>.sh`),
+   não contra o do repo. Se a cópia do plugin ainda sai `exit 1`, mantenha as
+   duas guardas registradas: rodar duas vezes não faz mal, e o repo ficar sem
+   nenhuma que bloqueie faz.
+
+   Mantenha as guardas que são do repositório, e registre o
+   `protect-harness.sh` e qualquer guarda de edição do repo que continuar
+   registrada no mesmo matcher amplo, `Edit|Write|MultiEdit|NotebookEdit`
+   (`protect-harness.sh` fica nos dois lugares de propósito, não é removido).
+   Um repo antigo costuma ter essas guardas só em `Edit|Write`, deixando
+   `MultiEdit` e `NotebookEdit` passarem por fora; alinhe o matcher ao mesmo
+   tempo em que edita a entrada, não depois.
    Tirar a entrada sem apagar o arquivo do hook deixa uma cópia velha no
    repo: o arquivo sai junto, pelo balde do passo 3 (`harness` ou `plugin`).
-7. **Suba as remoções com `git rm --cached <caminho>`, nunca com
-   `git add -A`.** Para cada arquivo dos baldes `harness` e `plugin` (passo
-   3), rode `git rm --cached` no caminho original: o `--adopt` já tirou o
-   arquivo do working tree, então isso só confirma a remoção no índice.
-   Cuidado com um caso: se um arquivo do balde `harness` for uma das guardas
-   que o `install.sh` copia de propósito para dentro do repo
-   (`protect-critical.sh`, `check-snapshot-on-session.sh`,
-   `protect-harness.sh`) e ela ainda está registrada no `settings.json` como
-   guarda deste repositório, não é lixo vendorizado, é a cópia que deve
-   ficar; confirme pelo `settings.json`, o balde sozinho não basta para esses
-   três. Testado num repo descartável: `git add -A` sobe o symlink em si como
-   um arquivo normal (modo `120000`, o alvo do link como conteúdo, sem seguir
+7. **Suba as remoções, nunca com `git add -A`, e escolha `git rm` ou
+   `git rm --cached` conforme o que o `--adopt` fez com aquela pasta.** O
+   `--adopt` só troca por symlink as pastas de `.claude/skills`,
+   `.claude/agents` e as rules individuais que colidiram (postas de lado como
+   `.pre-harness`, ver passo 3): nessas, o caminho original já resolve **pelo
+   clone do harness**, então um `git rm` normal apagaria o arquivo real do seu
+   clone, não uma cópia; use `git rm --cached <caminho>`, que só tira do
+   índice e não toca o working tree. Já `.claude/hooks`, `.claude/docs` e
+   `.claude/scripts` o `--adopt` não toca: a cópia antiga continua sentada no
+   disco como um arquivo comum, e `git rm --cached` ali deixaria essa cópia
+   solta e sem rastreamento; use `git rm` normal, que apaga do índice e do
+   disco de uma vez, sem sobra.
+
+   Antes de apagar qualquer arquivo do balde `harness` do passo 3, procure com
+   `grep` quem, entre os arquivos que ficam, aponta para ele:
+   ```bash
+   grep -rn "check-snapshot.sh" .claude --include='*.sh'
+   ```
+   No njord-back isso mostra que `.claude/hooks/check-snapshot-on-session.sh`
+   chama `.claude/scripts/check-snapshot.sh` (`if [[ ! -x
+   ".claude/scripts/check-snapshot.sh" ]]; then exit 0; fi`): removido em
+   silêncio, o hook para de avisar sobre snapshot velho sem dar erro nenhum.
+   Isso soma quatro exceções ao balde `harness`, não três: se um arquivo for
+   uma destas guardas que o `install.sh` copia de propósito para dentro do
+   repo (`protect-critical.sh`, `check-snapshot-on-session.sh`,
+   `protect-harness.sh`) ou a dependência dela (`scripts/check-snapshot.sh`) e
+   ainda está registrada/referenciada como coisa do repositório, não é lixo
+   vendorizado, é a cópia que deve ficar; confirme pelo `settings.json`, o
+   balde sozinho não basta para essas quatro.
+
+   Testado num repo descartável: `git add -A` sobe o symlink em si como um
+   arquivo normal (modo `120000`, o alvo do link como conteúdo, sem seguir
    para dentro dele) e sobe qualquer pasta `.claude/<nome>.pre-harness`
    inteira como arquivos novos, o oposto do que se quer. As pastas
    `.pre-harness` nunca chegaram a ser rastreadas com esse nome; apague-as do
@@ -214,13 +303,30 @@ ordem:
    harness ou do plugin** (por exemplo, um script que estava em
    `.claude/scripts/spec-worktree.sh` passa a ser
    `.claude/scripts/harness/spec-worktree.sh`; uma skill que passou a vir do
-   plugin de stack não tem mais caminho dentro do repo).
+   plugin de stack não tem mais caminho dentro do repo). Revise também os
+   arquivos que ficam fora dos seis diretórios classificados no passo 3:
+   `.claude/*.md` soltos (um `.claude/README.md` de época costuma descrever a
+   cópia vendorizada que acabou de sair) e `.claude/settings.json.example`,
+   que costuma registrar os mesmos hooks antigos que o passo 6 acabou de
+   tirar do `settings.json` de verdade. Os dois ficam errados em silêncio se
+   ninguém olhar, porque nada nesta lista de passos os toca sozinho.
 9. **Verifique:**
    ```bash
-   ~/Sites/harness/install-harness.sh --status
+   "$HARNESS/install-harness.sh" --status
    bash .claude/scripts/harness/check-index.sh --strict
    ```
-   e a suíte de testes do próprio repo.
+   O `check-index.sh` ignora pastas `*.pre-harness` e arquivos gitignorados, e
+   acha docs em subpasta, então rodar isso com as `.pre-harness` ainda no
+   disco (passo 10) dá `--strict` **0**; se der outra coisa, é um ponteiro de
+   verdade, não a sobra esperada.
+
+   Antes de rodar a suíte de testes do próprio repo, prepare-o como se fosse
+   um clone novo, não o ambiente que já está aberto: se o repo tem um
+   `script/setup` executável, rode-o; senão siga o setup do `AGENTS.md` do
+   repo (versão do runtime a partir do `.nvmrc` ou equivalente, install,
+   qualquer geração de código que o setup exija). No njord-back, sem rodar o
+   `prisma generate` que o `AGENTS.md` pede antes dos testes, 6 suítes
+   unitárias nem chegam a carregar, o que parece falha da migração e não é.
 10. **Um PR só com as remoções.** As pastas `.pre-harness` só podem sumir de
     verdade depois do merge desse PR. Enquanto a migração estiver feita mas
     não commitada, vale o mesmo aviso do bloco acima: não commite, não faça
@@ -230,8 +336,8 @@ ordem:
 
 ```bash
 cd ~/Sites/projeto-novo
-~/Sites/harness/install.sh          # AGENTS.md, CLAUDE.md, docs/, specs/, guardas
-~/Sites/harness/install-harness.sh  # o método
+"$HARNESS/install.sh"          # AGENTS.md, CLAUDE.md, docs/, specs/, guardas
+"$HARNESS/install-harness.sh"  # o método
 ```
 
 Depois, personalize o `AGENTS.md`. É de lá que o `verify-before-done` descobre os
@@ -266,7 +372,7 @@ de symlink e o `git pull` volta a bastar.
 ### Atualizar
 
 ```bash
-git -C ~/Sites/harness pull
+git -C "$HARNESS" pull
 ```
 
 Esse é o mecanismo de atualização inteiro — **desde que os seus sejam symlinks**. Se o `--status` disser `COPIED`, rode o instalador de novo depois do pull. Todo projeto que você linkou recebe na
@@ -276,7 +382,7 @@ hora, porque todos leem os mesmos arquivos.
 
 ```bash
 cd ~/Sites/algum-projeto
-~/Sites/harness/install-harness.sh --unlink
+"$HARNESS/install-harness.sh" --unlink
 ```
 
 Restaura o que o `--adopt` tiver posto de lado e limpa o que criou. O `--status`
@@ -313,8 +419,10 @@ marketplace do njord registra essa divisão.
 O `backend-nest`, por exemplo, registra um `protect-prisma.sh` igual ao que o
 njord-back já tem em `.claude/hooks/`. Se o repo continuar registrando a cópia
 dele no `settings.json` depois de habilitar o plugin, a guarda roda duas vezes
-por chamada. Ao migrar um repo que já tinha essa cópia (próxima seção), pare de
-registrar a cópia do repo e deixe o plugin cuidar disso.
+por chamada. Ao migrar um repo que já tinha essa cópia (seção 3, "Se o repo já
+tem uma cópia antiga do harness", acima), só pare de registrar a cópia do repo
+depois de confirmar com payload que a cópia instalada do plugin bloqueia de
+verdade (passo 6 daquela seção).
 
 **A cópia instalada do plugin pode estar velha, e nada avisa sozinho.** O
 Claude Code guarda o plugin em cache por versão, em
@@ -466,7 +574,7 @@ erro nisso**: as skills simplesmente não estão lá e a sessão parece normal. 
 `check-baseline.sh` avisa no início da sessão. Resolve rodando o instalador de novo.
 
 ```bash
-~/Sites/harness/install-harness.sh --status   # o que está linkado aqui
+"$HARNESS/install-harness.sh" --status   # o que está linkado aqui
 ```
 
 **Worktree novo sem harness.** Não deveria acontecer: o `spec-worktree.sh` leva
