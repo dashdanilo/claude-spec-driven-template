@@ -115,95 +115,207 @@ ordem:
 
    Às vezes o `update` não traz nada mesmo com o marketplace à frente, porque
    o comando compara **versão**, não commit (ver a seção abaixo). Não dá para
-   esperar por isso. Siga a migração mesmo assim e liste, na decisão do balde
-   `LOCAL` (passo 5), o que fica indisponível localmente até o plugin
-   realmente atualizar de versão. Não invente o conteúdo que falta.
+   esperar por isso. Siga a migração mesmo assim: um arquivo que o plugin já
+   tem no marketplace mas a cópia instalada ainda não entrega cai no balde
+   `fica` do passo 3, não `LOCAL`, porque nenhuma fonte o entrega hoje. Liste
+   o que ficou assim, indisponível localmente até o plugin realmente
+   atualizar de versão, e não invente o conteúdo que falta.
 2. **Abra a sessão de dentro do repo que vai migrar**, não do clone do
    harness. O `protect-harness.sh` bloqueia, por desenho, edição de
    `.claude/settings.json`, hooks e rules de **outro** repositório, e decide o
    que é "outro repo" pelo diretório em que a sessão está rodando. Uma sessão
    aberta no clone do harness não consegue fazer esta migração num projeto
    diferente, e isso é a guarda funcionando, não um bug.
-3. **Classifique os arquivos versionados antes de rodar `--adopt`, pelo que
-   cada fonte entrega hoje, não pelo que ela já teve.** Conteúdo em
-   `.claude/skills`, `.claude/agents`, `.claude/rules`, `.claude/docs`,
-   `.claude/scripts` ou `.claude/hooks` deste repo não é necessariamente
-   vendorizado do harness: parte pode ter vindo do plugin de stack, e o
-   `--adopt` só sabe procurar na primeira fonte.
+3. **Classifique os arquivos versionados antes de rodar `--adopt`, com duas
+   perguntas independentes.** Conteúdo em `.claude/skills`, `.claude/agents`,
+   `.claude/rules`, `.claude/docs`, `.claude/scripts` ou `.claude/hooks` deste
+   repo não é necessariamente vendorizado do harness: parte pode ter vindo do
+   plugin de stack, e parte pode ser edição do próprio repo num caminho que
+   uma fonte também usa. O `--adopt` só sabe procurar na primeira hipótese.
 
-   **Não** compare contra o histórico inteiro de cada fonte (`rev-list --all`):
-   isso prova que um arquivo **existiu** ali algum dia, não que a fonte o
-   **entrega hoje**, e derruba no balde errado qualquer coisa que a fonte já
-   teve e removeu, por exemplo uma rule de stack que um plugin chegou a
-   embutir antes de a própria comunidade decidir que plugin não carrega rule.
-   O critério certo é por caminho, contra a árvore atual de cada fonte: skills,
-   agents, docs e scripts do harness chegam pela árvore atual do clone
-   (`$HARNESS/baseline/<categoria>/<caminho>`, o mesmo que o link expõe);
-   skills e agents de stack chegam pela cópia hoje instalada do plugin
+   **Pergunta 1: a fonte entrega esse caminho hoje?** Por caminho, contra a
+   árvore atual de cada fonte, não contra o histórico, e não só "existe um
+   arquivo de mesmo nome na fonte": tem que ser o mecanismo que realmente
+   entrega aquele caminho. Skills, agents, docs e scripts do harness chegam
+   pela árvore atual do clone (`$HARNESS/baseline/<categoria>/<caminho>`, o
+   mesmo que o link em `.claude/<categoria>/` ou `.claude/<categoria>/
+   harness/` expõe). **Rules chegam pelo harness**, pelo mesmo link
+   (`.claude/rules/harness/` aponta para `baseline/rules/`), **mas nunca pelo
+   plugin**: o manifest de um plugin não tem campo para rule (ver "Plugins de
+   stack", abaixo), então uma rule só passa na pergunta 1 contra o harness.
+   Skills e agents de stack chegam pela cópia hoje instalada do plugin
    (`~/.claude/plugins/cache/<marketplace>/<plugin>/<versão>/<categoria>/
-   <caminho>`); hooks podem vir de qualquer uma das duas. **Rules nunca chegam
-   por plugin** (ver "Plugins de stack", abaixo), então uma rule só sai se o
-   harness a entrega hoje; se não entrega, ela fica, mesmo que uma cópia
-   antiga tenha circulado num plugin no passado.
+   <caminho>`), sem precisar de registro individual: o plugin declara a pasta
+   inteira.
+
+   **Hooks são o caso especial: o harness não linka `.claude/hooks/` nenhum.**
+   Um hook chega registrado por caminho absoluto no `settings.local.json`
+   (portáveis) ou copiado uma vez para dentro do repo pelo `install.sh`
+   (vendorizados), nunca por uma pasta que se atualiza sozinha. Testar só "o
+   harness tem um `baseline/hooks/<nome>` de mesmo nome" erra: `protect-
+   critical.sh` e `check-snapshot-on-session.sh` existem em `baseline/hooks/`
+   mas **não** são portáveis, são as guardas que o `install.sh` copia de
+   propósito para dentro do repo (`REPO_HOOKS`, dentro do próprio
+   `install.sh`), o par que quase saiu em silêncio no #885. Por isso a
+   pergunta 1, para hooks, é contra três conjuntos nomeados, lidos direto dos
+   instaladores, não contra um diretório:
+   - nome está em `REPO_HOOKS` (`install.sh`) ou `REPO_SCRIPTS` (mesmo
+     arquivo, para `.claude/scripts`): é do repo por definição, entra direto
+     no balde `fica`, **independente do conteúdo**. O critério aqui não é
+     proveniência, é "isto é o repo por desenho".
+   - senão, nome está no dict `WANT` do `install-harness.sh`: entregue pelo
+     harness (portátil).
+   - senão, nome está registrado no `hooks/hooks.json` do plugin instalado:
+     entregue pelo plugin.
+   - nenhum dos três: nenhuma fonte entrega esse hook, vai para `fica`.
+
+   Para scripts, raciocínio parecido, mais simples: nome em `REPO_SCRIPTS` é
+   `fica` por definição; senão, existir em `baseline/scripts/<caminho>` conta
+   como harness; scripts nunca vêm de plugin.
+
+   Essa pergunta 1 sozinha só decide se o arquivo **pode** sair; não decide
+   se pode sair **sem ler**.
+
+   **Pergunta 2: o conteúdo desse arquivo veio da fonte?** Hash contra o
+   arquivo atual da fonte **ou** contra qualquer versão do histórico dela
+   (`git -C $HARNESS rev-list --all --objects` para o harness,
+   `git -C ~/.claude/plugins/marketplaces/<marketplace> rev-list --all
+   --objects` para o plugin). Um histórico inteiro aqui é o uso certo do
+   hash: ele não decide sozinho **se** o arquivo sai (isso é a pergunta 1),
+   só se pode sair sem alguém ler o conteúdo primeiro.
+
+   Cruzando as duas, três baldes, não dois:
+   - **`sai`**: a fonte entrega esse caminho hoje **e** o conteúdo já foi
+     dessa fonte, atual ou passada. Sem edição local para perder. Remove sem
+     ler (passo 7).
+   - **`LOCAL`**: a fonte entrega esse caminho hoje, **mas** o conteúdo nunca
+     esteve nela. É edição local por cima de um caminho que a fonte controla,
+     e some em silêncio se você confiar só na pergunta 1. **Leia antes de
+     decidir** (passo 5): pode ter um padrão para levar junto, uma correção
+     para subir à fonte, ou ser descartável mesmo.
+   - **`fica`**: nenhuma fonte entrega esse caminho hoje, **ou** é do repo por
+     definição (hook/script em `REPO_HOOKS`/`REPO_SCRIPTS`, independente do
+     conteúdo). Rule de stack, guarda que só o repo tem, ou algo que uma fonte
+     já teve e removeu (inclusive um plugin ainda não atualizado, caso do
+     passo 1). Continua no repo.
+
+   Leia os conjuntos direto dos instaladores em vez de copiá-los à mão: se um
+   deles mudar, o snippet muda sozinho, e o guia não fica desatualizado em
+   silêncio.
 
    ```bash
+   MARKETPLACE=njord   # troque pelo nome usado neste projeto
+
+   PORTABLE_HOOKS=$(grep -oE 'hooks_dir \+ "/[^"]+"' "$HARNESS/install-harness.sh" | sed -E 's#.*/([^"]+)"#\1#' | sort -u)
+   eval "$(grep -oE 'REPO_HOOKS=\([^)]*\)' "$HARNESS/install.sh")"
+   eval "$(grep -oE 'REPO_SCRIPTS=\([^)]*\)' "$HARNESS/install.sh")"
+   PLUGIN_HOOK_NAMES=$(for d in ~/.claude/plugins/cache/"$MARKETPLACE"/*/*/; do
+     [[ -f "${d}hooks/hooks.json" ]] || continue
+     grep -oE '"command":[[:space:]]*"[^"]+"' "${d}hooks/hooks.json" | sed -E 's#.*/([^"/]+)"$#\1#'
+   done | sort -u)
+
+   in_list() { local x=$1; shift; local i; for i in "$@"; do [[ "$i" == "$x" ]] && return 0; done; return 1; }
    harness_has() { [[ -e "$HARNESS/baseline/$1" ]]; }
-   plugin_has() {
+   plugin_has_path() {
      local rel=$1 d
-     for d in ~/.claude/plugins/cache/njord/*/*/; do
+     for d in ~/.claude/plugins/cache/"$MARKETPLACE"/*/*/; do
        [[ -e "${d}${rel}" ]] && return 0
      done
      return 1
    }
 
+   HARNESS_HASHES=$(git -C "$HARNESS" rev-list --all --objects | awk '{print $1}')
+   MKT_HASHES=$(git -C ~/.claude/plugins/marketplaces/"$MARKETPLACE" rev-list --all --objects | awk '{print $1}')
+   from_source() { local h="${2:-$h}"; [[ "$1" == harness ]] && printf '%s\n' "$HARNESS_HASHES" | grep -qxF "$h" || printf '%s\n' "$MKT_HASHES" | grep -qxF "$h"; }
+
    git ls-files .claude/skills .claude/agents .claude/rules .claude/docs .claude/scripts .claude/hooks | while read -r f; do
      cat=${f#.claude/}; cat=${cat%%/*}
      rel=${f#.claude/$cat/}
-     if harness_has "$cat/$rel"; then
-       echo "harness  $f"
-     elif [[ "$cat" != rules && "$cat" != docs && "$cat" != scripts ]] && plugin_has "$cat/$rel"; then
-       echo "plugin   $f"
+     base=$(basename "$rel")
+     h=$(git hash-object "$f")
+     src=""
+     if [[ "$cat" == hooks ]] && in_list "$base" "${REPO_HOOKS[@]}"; then
+       from_source harness "$h" && echo "fica     $f  (conteudo igual ao harness)" || echo "fica     $f  (conteudo difere, leia antes de atualizar)"; continue
+     elif [[ "$cat" == scripts ]] && in_list "$base" "${REPO_SCRIPTS[@]}"; then
+       from_source harness "$h" && echo "fica     $f  (conteudo igual ao harness)" || echo "fica     $f  (conteudo difere, leia antes de atualizar)"; continue
+     elif [[ "$cat" == hooks ]] && printf '%s\n' "$PORTABLE_HOOKS" | grep -qxF "$base"; then
+       src=harness
+     elif [[ "$cat" == hooks ]] && printf '%s\n' "$PLUGIN_HOOK_NAMES" | grep -qxF "$base"; then
+       src=plugin
+     elif [[ "$cat" != hooks ]] && harness_has "$cat/$rel"; then
+       src=harness
+     elif [[ "$cat" == skills || "$cat" == agents ]] && plugin_has_path "$cat/$rel"; then
+       src=plugin
+     fi
+     if [[ -z "$src" ]]; then
+       echo "fica     $f"
+     elif from_source "$src" "$h"; then
+       echo "sai      $f"
      else
        echo "LOCAL    $f"
      fi
    done
    ```
 
-   Troque `njord` pelo nome do marketplace usado neste projeto. Três baldes:
-   - `harness` e `plugin`: a fonte entrega esse arquivo, nesse caminho, hoje.
-     Sai do repo (passo 7).
-   - `LOCAL`: nenhuma das duas entrega esse caminho agora. **Não quer dizer
-     "manter"**, quer dizer "leia antes de decidir" (passo 5), inclusive
-     quando a causa é o plugin desatualizado do passo 1: um arquivo que já
-     subiu ao marketplace mas ainda não chegou à cópia instalada aparece aqui
-     como `LOCAL`, e a decisão costuma ser "fica indisponível localmente até o
-     plugin atualizar", não inventar o conteúdo.
+   Rodado assim contra `origin/develop` do njord-back em 2026-09-14 (141
+   arquivos rastreados nos seis diretórios): 127 em `sai`, 6 em `LOCAL`, 8 em
+   `fica`.
 
-   O hash contra o histórico ainda serve como pista de proveniência ("isso já
-   foi da fonte, então não é invenção local"), mas não decide o balde.
+   `LOCAL` (a fonte entrega esse caminho hoje, mas o conteúdo nunca esteve
+   nela; leia antes): `hooks/block-secrets.sh`, `hooks/protect-main.sh`,
+   `rules/git-workflow.md`, `scripts/spec-worktree.sh`,
+   `skills/skill-architect/SKILL.md` e `skills/testing/rules/_sections.md`.
+   Esse último diverge do que o #885 decidiu (a tabela "Decisão sobre os
+   `LOCAL`" da descrição daquele PR tratou o par
+   `{_sections,test-no-global-state-assertions}.md` como "sai" os dois): o
+   plugin instalado entrega hoje um `_sections.md` nesse caminho, mas o
+   conteúdo do njord-back tem uma linha a mais (a entrada da rule
+   `test-no-global-state-assertions`, que o njord escreveu localmente antes
+   de ela subir ao plugin) que nunca existiu em nenhum commit do marketplace;
+   o #885 removeu um arquivo com edição local sem ler, exatamente o risco que
+   este balde existe para pegar.
 
-   Rodado assim, sem tocar histórico nenhum, contra `origin/develop` do
-   njord-back em 2026-09-13 (141 arquivos rastreados nos seis diretórios): 49
-   em `harness`, 87 em `plugin`, 5 em `LOCAL` - `rules/code-quality.md`,
-   `rules/nestjs-module.md`, `rules/prisma-database.md`,
-   `hooks/require-tests-before-push.sh` e
-   `skills/testing/rules/test-no-global-state-assertions.md` (esse último é o
-   caso do parágrafo acima: já subiu ao marketplace, ainda não chegou à cópia
-   instalada). As três rules de stack ficam, como manda a seção "Plugins de
-   stack" mais abaixo: nenhum plugin carrega `rules/`.
+   `fica` (nenhuma fonte entrega esse caminho hoje, ou é do repo por
+   definição): `rules/code-quality.md`, `rules/nestjs-module.md`,
+   `rules/prisma-database.md`, `hooks/require-tests-before-push.sh`,
+   `hooks/protect-critical.sh` (conteúdo difere do harness: o njord-back
+   ainda protege `prisma/migrations/` e `src/schema.gql`, que o baseline não
+   conhece, leia ao atualizar), `hooks/check-snapshot-on-session.sh` e
+   `scripts/check-snapshot.sh` (conteúdo igual, são `REPO_HOOKS`/
+   `REPO_SCRIPTS` por definição, ficam mesmo idênticos) e
+   `skills/testing/rules/test-no-global-state-assertions.md`. As três rules
+   de stack ficam, como manda a seção "Plugins de stack" mais abaixo: nenhum
+   plugin carrega `rules/`. `test-no-global-state-assertions.md` fica pelo
+   motivo do passo 1: já subiu ao marketplace em `3c3cb8e`, mas a cópia
+   instalada nesta máquina é de 14/07, anterior a esse commit, e não entrega
+   esse caminho ainda; quando o plugin atualizar, ele passa a ser entregue.
+
+   `sai` inclui `hooks/log-agent.sh` e `hooks/protect-prisma.sh`: este último
+   sai pelo critério (o plugin o entrega e o conteúdo é dele), mas o passo 6
+   continua mandando manter as duas guardas registradas até provar, com
+   payload, que a cópia do plugin bloqueia de verdade.
+
+   "Entregue hoje" sozinho **não autoriza remover**: só o balde `sai`
+   autoriza, porque soma as duas perguntas. Um caminho entregue hoje com
+   conteúdo que nunca esteve na fonte é `LOCAL`, e pede leitura antes de
+   qualquer `git rm`.
 4. Rode `--adopt` primeiro em modo de leitura, depois de verdade:
    ```bash
    "$HARNESS/install-harness.sh" --adopt --dry-run
    "$HARNESS/install-harness.sh" --adopt
    ```
 5. **Decida o que caiu no balde `LOCAL` do passo 3.** No njord-back, contra
-   `origin/develop`, os 5 misturavam duas coisas: o que é do repo por natureza
-   (três rules de stack e uma guarda que o próprio time escreveu, nenhuma das
-   quatro chega por harness nem por plugin), e um arquivo que o plugin já
-   entrega numa versão mais nova do marketplace mas a cópia instalada ainda
-   não tem, caso do passo 1. Só a leitura de cada um separa os dois; qual
-   decisão cabe a cada arquivo é trabalho da sessão que está migrando, não
-   deste guia.
+   `origin/develop`, os 6 são todos a mesma coisa: edição local por cima de um
+   caminho que o harness ou o plugin entregam hoje (dois hooks portáteis
+   reescritos com lógica própria, uma rule de stack que colide com o nome de
+   uma rule do harness, um script e uma skill de época, e uma skill de plugin
+   com uma linha a mais que o njord escreveu antes de o plugin ter essa
+   entrada). Nenhum é "manter por natureza": o balde `fica` do passo 3 já
+   separa esses (rule de stack de verdade, guarda só do repo, guarda/script
+   vendorizado por definição). Só a leitura de cada `LOCAL` diz se ele é uma
+   correção que vale subir à fonte, um padrão para levar junto ao atualizar,
+   ou descartável mesmo; qual decisão cabe a cada arquivo é trabalho da sessão
+   que está migrando, não deste guia.
 
    Três regras para quem for manter uma guarda:
 
@@ -231,8 +343,9 @@ ordem:
      junto os padrões que só o repo tinha.** Uma guarda de arquivos críticos
      pode proteger caminhos que o baseline não conhece (uma pasta de
      migrations do ORM do repo, um arquivo de schema gerado). Copiar o
-     baseline por cima apaga essa proteção em silêncio, e é exatamente o tipo
-     de arquivo que a classificação do passo 3 já marcou como `LOCAL`.
+     baseline por cima apaga essa proteção em silêncio. É exatamente o aviso
+     "conteúdo difere" que o passo 3 já anexa a todo hook do balde `fica` que
+     é do repo por definição (`protect-critical.sh`, no njord-back).
 6. **Edite o `settings.json` commitado do repo:** remova as entradas dos
    hooks portáveis que **estiverem** registradas ali, nem todo repo registrou
    os mesmos. Os candidatos, conferidos no `install-harness.sh` deste
@@ -261,7 +374,8 @@ ordem:
    `MultiEdit` e `NotebookEdit` passarem por fora; alinhe o matcher ao mesmo
    tempo em que edita a entrada, não depois.
    Tirar a entrada sem apagar o arquivo do hook deixa uma cópia velha no
-   repo: o arquivo sai junto, pelo balde do passo 3 (`harness` ou `plugin`).
+   repo: se o balde do passo 3 marcou esse hook como `sai`, o arquivo sai
+   junto.
 7. **Suba as remoções, nunca com `git add -A`, e escolha `git rm` ou
    `git rm --cached` conforme o que o `--adopt` fez com aquela pasta.** O
    `--adopt` só troca por symlink as pastas de `.claude/skills`,
@@ -275,8 +389,17 @@ ordem:
    solta e sem rastreamento; use `git rm` normal, que apaga do índice e do
    disco de uma vez, sem sobra.
 
-   Antes de apagar qualquer arquivo do balde `harness` do passo 3, procure com
-   `grep` quem, entre os arquivos que ficam, aponta para ele:
+   Com o critério do passo 3, `check-snapshot-on-session.sh`,
+   `scripts/check-snapshot.sh` e `protect-critical.sh` já ficam no balde
+   `fica` (são `REPO_HOOKS`/`REPO_SCRIPTS` por definição), não em `sai`: a
+   lista de exceções que este guia mantinha para esses três não é mais o
+   único mecanismo que os protege, o balde já os separa sozinho.
+
+   Ainda assim, antes de apagar qualquer arquivo do balde `sai`, procure com
+   `grep` quem, entre os arquivos que ficam, aponta para ele. Isso continua
+   valendo como rede de segurança, para o caso de um repo cujo `install.sh`
+   seja mais velho que o `REPO_HOOKS`/`REPO_SCRIPTS` de hoje, ou de qualquer
+   outra referência que o critério automático não previu:
    ```bash
    grep -rn "check-snapshot.sh" .claude --include='*.sh'
    ```
@@ -284,13 +407,9 @@ ordem:
    chama `.claude/scripts/check-snapshot.sh` (`if [[ ! -x
    ".claude/scripts/check-snapshot.sh" ]]; then exit 0; fi`): removido em
    silêncio, o hook para de avisar sobre snapshot velho sem dar erro nenhum.
-   Isso soma quatro exceções ao balde `harness`, não três: se um arquivo for
-   uma destas guardas que o `install.sh` copia de propósito para dentro do
-   repo (`protect-critical.sh`, `check-snapshot-on-session.sh`,
-   `protect-harness.sh`) ou a dependência dela (`scripts/check-snapshot.sh`) e
-   ainda está registrada/referenciada como coisa do repositório, não é lixo
-   vendorizado, é a cópia que deve ficar; confirme pelo `settings.json`, o
-   balde sozinho não basta para essas quatro.
+   Neste repo, como os dois já caem em `fica`, o `grep` não muda a decisão;
+   ele importa quando o balde `sai` incluir um arquivo que outro arquivo
+   mantido ainda referencia por caminho.
 
    Testado num repo descartável: `git add -A` sobe o symlink em si como um
    arquivo normal (modo `120000`, o alvo do link como conteúdo, sem seguir
