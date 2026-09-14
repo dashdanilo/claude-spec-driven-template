@@ -131,12 +131,17 @@ for f in "$root"/commands/*.md; do
 done; done
 
 # ---------------------------------------------------------------- docs
+# Docs can live in a subdirectory (`docs/harness/*.md`, the harness's own
+# AI-only docs, still reachable in a consumer repo through its `.claude/docs/
+# harness` symlink) so this walks recursively, the same as rules already do
+# above — a flat glob only sees `docs/*.md` and reports every nested one as
+# stale.
 for root in ${OWNED[@]+"${OWNED[@]}"}; do
-for f in "$root"/docs/*.md; do
+while IFS= read -r f; do
   [[ -e "$f" ]] || continue
   base=$(basename "$f")
   know "$base"; know "${base%.md}"
-done; done
+done < <(find -L "$root/docs" -name '*.md' -type f 2>/dev/null); done
 
 # ---------------------------------------------------------------- hooks
 # A hook without the executable bit is registered, never runs, and reports nothing.
@@ -181,6 +186,46 @@ done
 # finds nothing. Resolved from the repo root, the same way every pointer in
 # this codebase is written.
 #
+# Two things must stay out of the file list this scans, or it reports drift
+# that isn't real:
+#   - any path with a component ending in `.pre-harness` — install-harness.sh
+#     --adopt renames the old skills/agents dirs to `skills.pre-harness/`,
+#     `agents.pre-harness/` and the adopting guide says to keep them on disk
+#     until the migration PR merges. Their broken cross-references are old
+#     copies, not something an agent will ever be sent to read.
+#   - files git considers ignored (e.g. a generated `.claude/context/
+#     repomix-snapshot.md`) — their content is a machine-written snapshot,
+#     not authored prose someone is expected to keep pointers current in.
+# `find -L` still follows symlinks either way: that is how a consumer's own
+# `.claude/skills` and `.claude/docs/harness` links resolve at all.
+#
+# The gitignore check needs `git`. When it is unavailable (no git on PATH, or
+# this tree is not a git repository at all — a tarball export, for instance)
+# the safe default is to skip nothing: an unverifiable "probably ignored"
+# guess could hide a real dangling pointer, which is the exact failure class
+# this script exists to catch. Erring toward reporting is the same trade-off
+# `broken` already makes when frontmatter parsing is inconclusive.
+GIT_AVAILABLE=0
+if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  GIT_AVAILABLE=1
+fi
+
+is_pre_harness_path() {
+  local path="$1" part
+  local IFS=/
+  for part in $path; do
+    case "$part" in
+      *.pre-harness) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+is_git_ignored() {
+  [[ $GIT_AVAILABLE -eq 1 ]] || return 1
+  git check-ignore -q -- "$1" 2>/dev/null
+}
+#
 # Two pointer shapes are exempt, not because the regex cannot see them but
 # because they are correct without ever resolving in THIS checkout:
 #   - `.claude/scripts/check-snapshot.sh` — install.sh (not install-harness.sh)
@@ -209,6 +254,8 @@ done
 for root in ${OWNED[@]+"${OWNED[@]}"}; do
   while IFS= read -r f; do
     [[ -e "$f" ]] || continue
+    is_pre_harness_path "$f" && continue
+    is_git_ignored "$f" && continue
     ptr_files+=("$f")
   done < <(find -L "$root" -type f \( -name '*.md' -o -name '*.sh' \) 2>/dev/null)
 done
