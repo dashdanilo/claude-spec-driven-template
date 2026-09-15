@@ -471,6 +471,43 @@ harness não gera esses scripts — só o time sabe o que "pronto" e "verificado
 significam ali — e um repo sem eles não perde nada, o passo vira no-op. Ver
 [`docs/guides/script-setup-and-test.md`](./docs/guides/script-setup-and-test.md).
 
+### 5. O repo já migrou, e o seu checkout tinha a cópia antiga
+
+Terceiro caso, diferente dos dois acima: ninguém está migrando agora, alguém já
+migrou (rodou a seção 3 e removeu a cópia vendorizada de `.claude/skills`/
+`.claude/agents` do controle de versão remoto). O seu checkout local ainda
+tinha essa cópia rastreada quando você deu `git switch`/`git pull`. O git
+remove do disco os arquivos que ele rastreava, mas às vezes a pasta continua
+existindo, porque sobrou dentro dela algo que o git nunca rastreou, por
+exemplo o `.DS_Store` do Finder no macOS: git não apaga diretório com
+conteúdo.
+
+Se depois do `pull` o `install-harness.sh` parar dizendo que `.claude/skills`
+(ou `.claude/agents`) existe e não é link, quase sempre é isso: sobra não
+rastreada, não uma pasta com conteúdo real seu.
+
+Confira o que sobrou antes de rodar `--adopt`:
+
+```bash
+ls -la .claude/skills
+git ls-files .claude/skills
+```
+
+Se `git ls-files` não listar nada, é só sobra. `install-harness.sh --adopt`
+resolve sem apagar nada: põe a pasta de lado como `.claude/skills.pre-harness`
+e liga por cima. O instalador não imprime mais o aviso de "arquivos
+rastreados foram deletados" nesse caso, porque deixou de ser verdade; a pasta
+`.pre-harness` pode ser apagada quando você quiser, não tem nada para
+restaurar.
+
+Se você tem uma skill ou agent seu, que nunca chegou a ser commitado no
+repositório remoto que migrou, `git ls-files` não vai listá-lo (não é
+rastreado), mas ele continua sendo conteúdo seu. Olhe o `ls -la` de qualquer
+jeito, mesmo com `git ls-files` vazio: o `--adopt` põe a pasta inteira de
+lado como `.pre-harness` sem diferenciar o que é sobra do que é seu, e ela
+deixa de carregar enquanto estiver lá. Mova o que quiser manter para fora de
+`.claude/skills` antes de rodar `--adopt`.
+
 ### Windows
 
 Se você estiver no **Git Bash nativo**, o `ln -s` não cria symlink sem **Modo de
