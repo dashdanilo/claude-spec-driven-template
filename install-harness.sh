@@ -100,6 +100,26 @@ done
 say()  { printf '%s\n' "$*"; }
 warn() { printf '%s\n' "$*" >&2; }
 
+# Set by has_tracked() whenever an --adopt run buries something git already
+# tracks. Drives which closing NOTE prints: a repo where the only thing in the
+# way was untracked or ignored content (a stray .DS_Store, say) never has git
+# reporting a deletion, so the "do not commit while adopted" warning would be
+# false there and just scares someone who did nothing wrong.
+SET_ASIDE_TRACKED=0
+
+# True if git, run from the parent of $1, sees any tracked file at or under
+# $1. Works for a single file or a whole directory, and for both repo and
+# --global scope, because it asks git to discover the repository itself
+# instead of trusting TARGET/DEST — which would be wrong for --global, where
+# the thing being adopted lives under $HOME, not inside the target repo.
+has_tracked() {
+  local p="$1" parent base
+  [[ -e "$p" ]] || return 1
+  parent=$(dirname -- "$p")
+  base=$(basename -- "$p")
+  [[ -n "$(git -C "$parent" ls-files -- "$base" 2>/dev/null | head -n1)" ]]
+}
+
 [[ -d "$BASE" ]] || { warn "no baseline/ next to this script — run it from the harness checkout"; exit 2; }
 
 if [[ $SCOPE == global ]]; then
@@ -242,6 +262,7 @@ for i in "${!NAMES[@]}"; do
         warn "STOP       $kept already exists — refusing to bury a second copy."
         exit 2
       fi
+      has_tracked "$dst" && SET_ASIDE_TRACKED=1
       say "set aside  .claude/$n -> .claude/$n.pre-harness"
       [[ $MODE == dryrun ]] || mv "$dst" "$kept"
     else
@@ -268,6 +289,7 @@ collide() {
   local t="$1" action="$2"
   if [[ $action == aside ]]; then
     [[ -f "$t" && ! -L "$t" && ! -e "$t.pre-harness" ]] || return 0
+    has_tracked "$t" && SET_ASIDE_TRACKED=1
     say "set aside  ${t#$DEST/} -> $(basename "$t").pre-harness"
     [[ $MODE == dryrun ]] || mv "$t" "$t.pre-harness"
   else
@@ -426,10 +448,17 @@ case $MODE in
           say "linked. Update everything that opted in with: git -C $HERE pull"
           if [[ $ADOPT -eq 1 ]]; then
             say ""
-            say "NOTE: the files you set aside are tracked, so git now reports them as"
-            say "      deleted. Do not commit while adopted — run --unlink to put them"
-            say "      back, or delete the .pre-harness copies deliberately once you are"
-            say "      satisfied and commit that as its own change."
+            if [[ $SET_ASIDE_TRACKED -eq 1 ]]; then
+              say "NOTE: the files you set aside are tracked, so git now reports them as"
+              say "      deleted. Do not commit while adopted — run --unlink to put them"
+              say "      back, or delete the .pre-harness copies deliberately once you are"
+              say "      satisfied and commit that as its own change."
+            else
+              say "note: what you set aside was untracked or ignored (e.g. a stray"
+              say "      .DS_Store), so git reports nothing as deleted and there is"
+              say "      nothing to commit. Delete the .pre-harness copies whenever"
+              say "      you like."
+            fi
           fi ;;
 esac
 
