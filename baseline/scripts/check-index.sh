@@ -221,10 +221,23 @@ is_pre_harness_path() {
   return 1
 }
 
-is_git_ignored() {
-  [[ $GIT_AVAILABLE -eq 1 ]] || return 1
-  git check-ignore -q -- "$1" 2>/dev/null
-}
+# A directory that holds its own `.git` (file or folder) is a nested git
+# checkout — most often a worktree parked under `.claude/worktrees/` — and
+# everything under it belongs to that other repository, not this scan.
+# `node_modules` gets the same treatment: never authored pointers, only
+# vendored ones. Both are pruned in the `find` below so the walk never
+# descends into them at all, instead of visiting every file underneath and
+# discarding it one at a time — the difference between a stray worktree's
+# `node_modules` (tens of thousands of files) taking seconds instead of
+# minutes.
+#
+# The gitignore check is batched the same way: every remaining candidate is
+# collected first, then handed to ONE `git check-ignore --stdin` call,
+# instead of one `git` process per file. `check-ignore` exits 1 when NONE of
+# the paths it was given are ignored — that is a normal empty result, not an
+# error; only an exit above 1 is a real failure, and the safe response to a
+# real failure is the same as having no git at all (see above): report
+# everything rather than guess.
 #
 # Two pointer shapes are exempt, not because the regex cannot see them but
 # because they are correct without ever resolving in THIS checkout:
@@ -251,14 +264,40 @@ for f in "$CLAUDE" AGENTS.md; do
   [[ -f "$f" ]] || continue
   ptr_files+=("$f")
 done
+candidates=()
 for root in ${OWNED[@]+"${OWNED[@]}"}; do
   while IFS= read -r f; do
     [[ -e "$f" ]] || continue
     is_pre_harness_path "$f" && continue
-    is_git_ignored "$f" && continue
-    ptr_files+=("$f")
-  done < <(find -L "$root" -type f \( -name '*.md' -o -name '*.sh' \) 2>/dev/null)
+    candidates+=("$f")
+  done < <(find -L "$root" \
+    \( -type d \( -name node_modules -o -name '*.pre-harness' \) -prune \) \
+    -o \( -type d -mindepth 1 -exec test -e {}/.git \; -prune \) \
+    -o -type f \( -name '*.md' -o -name '*.sh' \) -print 2>/dev/null)
 done
+
+ignored=""
+if [[ $GIT_AVAILABLE -eq 1 && ${#candidates[@]} -gt 0 ]]; then
+  # Trust stdout, not the exit code. A candidate whose ancestor is a
+  # symlink pointing outside the work tree — exactly what a repo that
+  # linked the harness has at .claude/agents, .claude/skills, etc. — makes
+  # git print "fatal: pathspec '...' is beyond a symbolic link" for THAT
+  # line and the whole invocation exits non-zero, but git still evaluates
+  # every other line correctly and still prints its own ignored paths to
+  # stdout. Discarding the batch on a non-zero exit would throw away
+  # correct results for every other candidate because of one unrelated
+  # line. Exit 1 alone ("nothing in the batch is ignored") is not an error
+  # either; $ignored is already empty in that case.
+  ignored="$(printf '%s\n' "${candidates[@]}" | git check-ignore --stdin 2>/dev/null)"
+fi
+
+if [[ -n "$ignored" ]]; then
+  while IFS= read -r f; do
+    ptr_files+=("$f")
+  done < <(printf '%s\n' "${candidates[@]}" | grep -vxF -- "$ignored")
+else
+  ptr_files+=(${candidates[@]+"${candidates[@]}"})
+fi
 
 for f in ${ptr_files[@]+"${ptr_files[@]}"}; do
   real=$( (cd -- "$(dirname -- "$f")" 2>/dev/null && pwd -P) )/$(basename -- "$f")
