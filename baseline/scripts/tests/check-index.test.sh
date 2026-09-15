@@ -275,6 +275,246 @@ _assert_not_contains "no-git: pre-harness suppression still holds without git" \
 _assert_eq "--strict exits 1 when the no-git fallback surfaces a real dangling pointer" \
   "$EXIT_NO_GIT" "1"
 
+# ---------------------------------------------------------------- repo D
+# A nested git checkout parked under .claude/worktrees/ — the shape of a
+# real spec-worktree session left behind, or a `git worktree add` gone
+# stale. Its own .git makes it a separate repository; the broken pointer
+# inside it belongs to that repository, not to this scan, and must never
+# surface here regardless of whether it is tracked, ignored, or untracked
+# in the nested checkout itself.
+REPO_NESTED="$TMPDIR_ROOT/repo-nested-checkout"
+mkdir -p "$REPO_NESTED/.claude/rules" "$REPO_NESTED/.claude/worktrees/other-session/.claude"
+
+git -C "$REPO_NESTED" init -q -b test
+git -C "$REPO_NESTED" config user.email "test@example.com"
+git -C "$REPO_NESTED" config user.name "Test"
+
+cat > "$REPO_NESTED/.claude/rules/tracked-rule.md" <<'EOF'
+---
+paths: "**"
+---
+
+No dangling pointer here.
+EOF
+
+cat > "$REPO_NESTED/CLAUDE.md" <<'EOF'
+# Test project
+
+## Rules
+
+- tracked-rule.md - a clean rule, no dangling pointer
+EOF
+
+git -C "$REPO_NESTED" add CLAUDE.md .claude/rules
+git -C "$REPO_NESTED" commit -q -m "fixture"
+
+# The nested checkout itself: a second, independent repository living
+# inside the first one's .claude/worktrees/.
+git -C "$REPO_NESTED/.claude/worktrees/other-session" init -q -b nested
+git -C "$REPO_NESTED/.claude/worktrees/other-session" config user.email "test@example.com"
+git -C "$REPO_NESTED/.claude/worktrees/other-session" config user.name "Test"
+
+cat > "$REPO_NESTED/.claude/worktrees/other-session/.claude/broken.md" <<EOF
+See ${DC}/scripts/does-not-exist-nested-checkout.sh for details.
+EOF
+
+OUT_NESTED="$TMPDIR_ROOT/out-nested.txt"
+(cd "$REPO_NESTED" && bash "$SCRIPT" --strict) > "$OUT_NESTED" 2>&1
+EXIT_NESTED=$?
+
+_assert_not_contains "nested git checkout: broken pointer inside it is not reported" \
+  "$OUT_NESTED" "does-not-exist-nested-checkout.sh"
+
+_assert_eq "nested git checkout: --strict exits 0 (the only dangling pointer is inside it)" \
+  "$EXIT_NESTED" "0"
+
+# ---------------------------------------------------------------- repo E
+# node_modules under .claude/ with a broken pointer, left untracked (as a
+# real node_modules tree normally is) so the prune cannot be relying on git
+# to skip it.
+REPO_NM="$TMPDIR_ROOT/repo-node-modules"
+mkdir -p "$REPO_NM/.claude/rules" "$REPO_NM/.claude/node_modules/some-pkg"
+
+git -C "$REPO_NM" init -q -b test
+git -C "$REPO_NM" config user.email "test@example.com"
+git -C "$REPO_NM" config user.name "Test"
+
+cat > "$REPO_NM/.claude/rules/tracked-rule.md" <<'EOF'
+---
+paths: "**"
+---
+
+No dangling pointer here.
+EOF
+
+cat > "$REPO_NM/CLAUDE.md" <<'EOF'
+# Test project
+
+## Rules
+
+- tracked-rule.md - a clean rule, no dangling pointer
+EOF
+
+git -C "$REPO_NM" add CLAUDE.md .claude/rules
+git -C "$REPO_NM" commit -q -m "fixture"
+
+cat > "$REPO_NM/.claude/node_modules/some-pkg/README.md" <<EOF
+See ${DC}/scripts/does-not-exist-node-modules.sh for details.
+EOF
+
+OUT_NM="$TMPDIR_ROOT/out-node-modules.txt"
+(cd "$REPO_NM" && bash "$SCRIPT" --strict) > "$OUT_NM" 2>&1
+EXIT_NM=$?
+
+_assert_not_contains "node_modules: broken pointer inside it is not reported" \
+  "$OUT_NM" "does-not-exist-node-modules.sh"
+
+_assert_eq "node_modules: --strict exits 0 (the only dangling pointer is inside it)" \
+  "$EXIT_NM" "0"
+
+# ---------------------------------------------------------------- repo F
+# Performance regression lock: a gitignored directory with several thousand
+# files, each carrying a broken pointer. Before the fix, check-index.sh
+# shelled out to `git check-ignore` once per candidate file; on a real
+# checkout with a stray worktree's node_modules (112k files) that took over
+# two minutes. This directory is NOT node_modules and NOT a nested
+# checkout, so it is not pruned by name or by an embedded .git — it can
+# only be skipped through the batched `git check-ignore --stdin` call, so
+# this is the case that actually exercises the fix rather than the prune.
+#
+# The ceiling is measured, not guessed: on this machine, 3000 files took
+# ~32s with the old one-git-process-per-file approach and ~0.02s batched
+# (see the PR description for the raw numbers). 30s gives wide margin for a
+# slower CI machine while still being far below what the old approach would
+# need for the same file count.
+REPO_PERF="$TMPDIR_ROOT/repo-perf"
+mkdir -p "$REPO_PERF/.claude/rules" "$REPO_PERF/.claude/big-ignored-dir"
+
+git -C "$REPO_PERF" init -q -b test
+git -C "$REPO_PERF" config user.email "test@example.com"
+git -C "$REPO_PERF" config user.name "Test"
+
+cat > "$REPO_PERF/.gitignore" <<'EOF'
+big-ignored-dir/
+EOF
+
+cat > "$REPO_PERF/.claude/rules/tracked-rule.md" <<'EOF'
+---
+paths: "**"
+---
+
+No dangling pointer here.
+EOF
+
+cat > "$REPO_PERF/CLAUDE.md" <<'EOF'
+# Test project
+
+## Rules
+
+- tracked-rule.md - a clean rule, no dangling pointer
+EOF
+
+git -C "$REPO_PERF" add .gitignore CLAUDE.md .claude/rules
+git -C "$REPO_PERF" commit -q -m "fixture"
+
+PERF_FILE_COUNT=3000
+i=1
+while [[ "$i" -le "$PERF_FILE_COUNT" ]]; do
+  echo "See ${DC}/scripts/does-not-exist-perf-$i.sh for details." \
+    > "$REPO_PERF/.claude/big-ignored-dir/file-$i.md"
+  i=$((i + 1))
+done
+
+PERF_CEILING_SECONDS=30
+PERF_START=$(date +%s)
+OUT_PERF="$TMPDIR_ROOT/out-perf.txt"
+(cd "$REPO_PERF" && bash "$SCRIPT" --strict) > "$OUT_PERF" 2>&1
+EXIT_PERF=$?
+PERF_END=$(date +%s)
+PERF_ELAPSED=$((PERF_END - PERF_START))
+
+_assert_not_contains "large gitignored dir: broken pointers are not reported" \
+  "$OUT_PERF" "does-not-exist-perf-1.sh"
+
+_assert_eq "large gitignored dir: --strict exits 0" "$EXIT_PERF" "0"
+
+if [[ "$PERF_ELAPSED" -le "$PERF_CEILING_SECONDS" ]]; then
+  _pass "large gitignored dir ($PERF_FILE_COUNT files) scanned in ${PERF_ELAPSED}s (ceiling ${PERF_CEILING_SECONDS}s)"
+else
+  _fail "large gitignored dir ($PERF_FILE_COUNT files) took ${PERF_ELAPSED}s, over the ${PERF_CEILING_SECONDS}s ceiling"
+fi
+
+# ---------------------------------------------------------------- repo G
+# A symlinked directory whose target lives OUTSIDE the repo — exactly the
+# shape of a project that linked the harness (.claude/agents ->
+# baseline/agents in a different checkout). `git check-ignore` refuses a
+# pathspec that goes "beyond a symbolic link" like that: it prints a fatal
+# for that one line and the whole `--stdin` invocation exits non-zero, even
+# though every other line in the same batch is still evaluated correctly.
+# A genuinely gitignored file elsewhere in the same repo must still be
+# suppressed — proving the fix trusts the batch's stdout, not its exit
+# code, so one unrelated symlink doesn't undo the gitignore filtering for
+# everything else in the run.
+REPO_SYM="$TMPDIR_ROOT/repo-symlink"
+EXT_TARGET="$TMPDIR_ROOT/external-agents-target"
+mkdir -p "$REPO_SYM/.claude/rules" "$EXT_TARGET"
+
+git -C "$REPO_SYM" init -q -b test
+git -C "$REPO_SYM" config user.email "test@example.com"
+git -C "$REPO_SYM" config user.name "Test"
+
+cat > "$EXT_TARGET/some-agent.md" <<'EOF'
+---
+name: some-agent
+description: lives outside the repo, reached only through a symlink
+---
+EOF
+
+ln -s "$EXT_TARGET" "$REPO_SYM/.claude/agents"
+
+cat > "$REPO_SYM/.gitignore" <<'EOF'
+ignored-elsewhere.md
+EOF
+
+cat > "$REPO_SYM/.claude/rules/tracked-rule.md" <<'EOF'
+---
+paths: "**"
+---
+
+No dangling pointer here.
+EOF
+
+cat > "$REPO_SYM/CLAUDE.md" <<'EOF'
+# Test project
+
+## Rules
+
+- tracked-rule.md - a clean rule, no dangling pointer
+
+## Agents
+
+- `some-agent` - lives outside the repo, reached only through a symlink
+EOF
+
+git -C "$REPO_SYM" add .gitignore CLAUDE.md .claude/rules
+git -C "$REPO_SYM" commit -q -m "fixture"
+
+# Gitignored, with a broken pointer, sitting alongside the symlinked dir in
+# the same scan.
+cat > "$REPO_SYM/.claude/ignored-elsewhere.md" <<EOF
+See ${DC}/scripts/does-not-exist-past-symlink.sh for details.
+EOF
+
+OUT_SYM="$TMPDIR_ROOT/out-symlink.txt"
+(cd "$REPO_SYM" && bash "$SCRIPT" --strict) > "$OUT_SYM" 2>&1
+EXIT_SYM=$?
+
+_assert_not_contains "gitignored file is still suppressed alongside a symlink pointing outside the repo" \
+  "$OUT_SYM" "does-not-exist-past-symlink.sh"
+
+_assert_eq "--strict exits 0 despite a symlink pointing outside the repo" \
+  "$EXIT_SYM" "0"
+
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"
 
