@@ -35,6 +35,18 @@
 #     requires a word boundary right after the subcommand
 #     (`git\s+merge(\s|$)`), so a suffixed subcommand like `merge-base` no
 #     longer matches while `git merge <sha>` still does.
+#   - ff-only merge of a protected branch's own upstream, blocked like any
+#     other merge: `git merge --ff-only origin/main` while on `main` is what
+#     `git pull --ff-only` does under the hood — it can only fast-forward or
+#     fail, never create a commit — but the old hook matched `git\s+merge`
+#     unconditionally and blocked it anyway, next to `git pull --ff-only`
+#     itself, which was never in the dangerous-pattern list and always
+#     passed. Fixed: a `git merge` invocation on a protected branch is now
+#     exempted ONLY when it carries `--ff-only` AND its single merge target
+#     is the branch's own upstream (`@{u}`, `@{upstream}`, `origin/<branch>`,
+#     or `<remote>/<branch>` generally). A merge of any other ref, more than
+#     one target, or a merge without `--ff-only`, is still blocked exactly as
+#     before.
 #
 # Accepted gap: when a cd target is not a literal path — built from a
 # variable, command substitution, or a glob, e.g. `W=<path>` then `cd $W` —
@@ -164,6 +176,49 @@ _is_unresolvable_cd_target() {
   esac
 }
 
+# A `git merge` invocation on a protected branch is safe, and exempted from
+# the dangerous-pattern block below, only when it is `--ff-only` AND its one
+# merge target is the branch's own upstream — same shape `git pull --ff-only`
+# already produces. Not a shell parser: flags other than `--ff-only` are
+# skipped rather than understood, so a flag that itself takes a value (e.g.
+# `-m <msg>`) is misread as an extra positional target, which only makes this
+# check MORE conservative (falls through to "not safe", still blocked) — see
+# the defect note at the top of this file.
+_is_safe_ff_only_upstream_merge() {
+  local line="$1"
+  local branch="$2"
+  local -a tokens
+  read -ra tokens <<< "$line"
+
+  local has_ff_only=0
+  local -a targets=()
+  local i tok
+  for ((i = 2; i < ${#tokens[@]}; i++)); do
+    tok="${tokens[$i]}"
+    case "$tok" in
+      --ff-only) has_ff_only=1 ;;
+      -*) : ;;
+      *) targets+=("$tok") ;;
+    esac
+  done
+
+  [[ "$has_ff_only" -eq 1 ]] || return 1
+  [[ "${#targets[@]}" -eq 1 ]] || return 1
+
+  local target="${targets[0]}"
+  case "$target" in
+    '@{u}'|'@{upstream}') return 0 ;;
+    */"$branch")
+      local remote_part="${target%/*}"
+      case "$remote_part" in
+        ''|*/*) return 1 ;;
+        *) return 0 ;;
+      esac
+      ;;
+    *) return 1 ;;
+  esac
+}
+
 # Split into one "atomic" command per line at command-position separators, so
 # 'cd x && git y' and 'cd x\ngit y' are walked the same way. Order matters:
 # && / || must be split before the single & / | they contain, or a stray & or
@@ -263,6 +318,10 @@ while IFS= read -r _line; do
 
     for pattern in "${dangerous_patterns[@]}"; do
       if echo "$git_line_normalized" | grep -qE "$pattern"; then
+        if [[ "$pattern" == 'git\s+merge(\s|$)' ]] \
+           && _is_safe_ff_only_upstream_merge "$git_line_normalized" "$inv_branch"; then
+          continue
+        fi
         blocked=1
         blocked_branch="$inv_branch"
         break
