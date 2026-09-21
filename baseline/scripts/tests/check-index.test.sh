@@ -581,6 +581,69 @@ _assert_not_contains "rules pointer: a resolving .claude/rules/... is not flagge
 _assert_eq "--strict exits 1 with three real dangling pointers present" \
   "$EXIT_RSA" "1"
 
+# ---------------------------------------------------------------- repo I
+# An agent referenced by name, not by file: an agents pointer with no `.md`
+# extension (the file on disk always carries one). Reproduces a real rule in
+# a consumer project (njord-front) that writes such a pointer inside a bold,
+# backtick-quoted span. Written to avoid a literal, contiguous pointer-shaped
+# path in this comment itself, for the same reason explained near the top of
+# this file: check-index.sh's own scan would flag it against THIS repo. A
+# genuinely broken agent pointer (no matching file either with or without
+# `.md`) is the positive control.
+REPO_AGENT="$TMPDIR_ROOT/repo-agent-name-pointer"
+mkdir -p "$REPO_AGENT/.claude/agents" "$REPO_AGENT/.claude/rules"
+
+git -C "$REPO_AGENT" init -q -b test
+git -C "$REPO_AGENT" config user.email "test@example.com"
+git -C "$REPO_AGENT" config user.name "Test"
+
+cat > "$REPO_AGENT/.claude/agents/code-reviewer.md" <<'EOF'
+---
+name: code-reviewer
+description: reviews implementation against spec, plan and conventions
+---
+
+Real agent, referenced elsewhere without its .md extension.
+EOF
+
+cat > "$REPO_AGENT/${DC}/rules/agent-name-pointer.md" <<EOF
+---
+paths: "**"
+---
+
+Referenced by name, no extension: **\`${DC}/agents/code-reviewer\`**.
+
+Broken, no extension and no matching file either way:
+${DC}/agents/does-not-exist-agent-noext for details.
+EOF
+
+cat > "$REPO_AGENT/CLAUDE.md" <<'EOF'
+# Test project
+
+## Agents
+
+- `code-reviewer` - reviews implementation against spec, plan and conventions
+
+## Rules
+
+- agent-name-pointer.md - agent pointer without .md extension
+EOF
+
+git -C "$REPO_AGENT" add CLAUDE.md .claude/agents .claude/rules
+git -C "$REPO_AGENT" commit -q -m "fixture"
+
+OUT_AGENT="$TMPDIR_ROOT/out-agent-name-pointer.txt"
+(cd "$REPO_AGENT" && bash "$SCRIPT" --strict) > "$OUT_AGENT" 2>&1
+EXIT_AGENT=$?
+
+_assert_not_contains "agent pointer without .md extension resolves, not flagged" \
+  "$OUT_AGENT" "— ${DC}/agents/code-reviewer"
+
+_assert_contains "agent pointer with no matching file at all is still reported (positive control)" \
+  "$OUT_AGENT" "does-not-exist-agent-noext"
+
+_assert_eq "--strict exits 1 with the positive control present" "$EXIT_AGENT" "1"
+
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"
 
