@@ -69,10 +69,12 @@
 # and you can try the new model on a real repository without losing the old one.
 #
 # While adopted, git reports the set-aside files as DELETED, because they are
-# tracked and the link now in their place does not expose them. That is expected and harmless as
-# long as you do not COMMIT, MERGE or PULL in that state. --unlink restores them
-# and leaves the working tree exactly as it was; deleting the .pre-harness copies
-# for good is a separate, deliberate commit.
+# tracked and the link now in their place does not expose them. That is expected
+# and harmless — including committing it: the intended flow (ADOPTING.md section
+# 3, step 7) commits exactly that deletion with `git rm`/`git rm --cached`, never
+# `git add -A`, and keeps the .pre-harness copies on disk until that PR merges
+# (step 10). --unlink instead restores everything and leaves the working tree
+# exactly as it was, if you decide not to go through with it.
 #
 # The merge/pull half is the one that bites. Git sees those files as deleted, so
 # any operation that restores the working tree writes them back — over the links.
@@ -756,9 +758,11 @@ case $MODE in
             say ""
             if [[ $SET_ASIDE_TRACKED -eq 1 ]]; then
               say "NOTE: the files you set aside are tracked, so git now reports them as"
-              say "      deleted. Do not commit while adopted — run --unlink to put them"
-              say "      back, or delete the .pre-harness copies deliberately once you are"
-              say "      satisfied and commit that as its own change."
+              say "      deleted. Commit ONLY the removals (ADOPTING.md section 3, step 7:"
+              say "      git rm / git rm --cached, never git add -A) and keep the"
+              say "      .pre-harness copies on disk until that PR merges (step 10)."
+              say "      Do not merge or pull while adopted — run --unlink first, or a"
+              say "      restored working tree writes the old files back over the links."
             else
               say "note: what you set aside was untracked or ignored (e.g. a stray"
               say "      .DS_Store), so git reports nothing as deleted and there is"

@@ -119,7 +119,7 @@ _ok  "clash --adopt: exit 0"                           '[[ $(rc) -eq 0 ]]'
 _ok  "clash --adopt: only the colliding item set aside" '[[ -f $R/.claude/skills.pre-harness/alpha/SKILL.md ]]'
 _ok  "clash --adopt: linked over it"                    '[[ -L $R/.claude/skills/alpha ]]'
 _ok  "clash --adopt: the repo's other skill stays and loads" '[[ -f $R/.claude/skills/repo-skill/SKILL.md && ! -L $R/.claude/skills/repo-skill ]]'
-_has "clash --adopt: warns that git now sees a deletion" "$TMP/out" "Do not commit while adopted"
+_has "clash --adopt: warns that git now sees a deletion" "$TMP/out" "Commit ONLY the removals"
 inst "$R" --unlink
 _ok  "clash --unlink: our links gone"                  '[[ ! -L $R/.claude/skills/beta && ! -L $R/.claude/agents/a1.md ]]'
 _ok  "clash --unlink: set-aside item restored"         '[[ -f $R/.claude/skills/alpha/SKILL.md && ! -L $R/.claude/skills/alpha ]]'
