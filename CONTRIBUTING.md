@@ -104,6 +104,8 @@ echo "Exit: $?"
 
 Both should be deterministic. Random flakiness means users get random behavior.
 
+CI (`.github/workflows/test.yml`) runs every `*.test.sh` fixture suite under `baseline/hooks/tests/` and `baseline/scripts/tests/`, plus `tests/install-harness.test.sh` and `baseline/scripts/check-index.sh --strict`, on both Linux and macOS runners.
+
 ## Questions
 
 Open an issue with the `question` label. For larger discussions, open a discussion.

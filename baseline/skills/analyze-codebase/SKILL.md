@@ -1,6 +1,7 @@
 ---
 name: analyze-codebase
 description: Runs once when adopting the template on an existing project. Detects tech stack, architectural patterns, and conventions, then generates initial documentation (CONSTITUTION.md, architecture overview, conventions, patterns). Also creates a Repomix snapshot for projects with 100+ files. Use when the user says something like "analyze this project", "onboard me", "set up this template on an existing codebase", or when adopting the template for the first time.
+disable-model-invocation: true
 ---
 
 # Analyze codebase
