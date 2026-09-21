@@ -108,7 +108,11 @@ cd ~/Sites/some-project
 not they installed anything. It is copied, and it is different in every repo.
 
 **Method** is how *you* work: the skills, agents and rules. It is symlinked from
-your clone, so `git pull` there updates every project you linked, at once. The
+your clone, so `git pull` there updates every project you linked, at once.
+Skills and agents are linked one item at a time, so a skill or agent a repo
+versions itself keeps loading next to the harness's; the cost is that one the
+harness adds or renames needs the installer re-run, and the session-start check
+names it. The
 links go into `.git/info/exclude`, so a teammate cloning the repo sees nothing
 and CI sees nothing — **opting in is invisible to everyone else, and opting out
 costs nothing.**

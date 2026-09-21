@@ -15,7 +15,7 @@ either loses nothing: the step is a no-op. See
 
 ### Skills available
 
-The skills in `baseline/skills/` are workflows Claude Code auto-invokes based on their descriptions. Linked into a project with `./install-harness.sh` (opt-in, per repo), they land in that project's `.claude/skills/`:
+The skills in `baseline/skills/` are workflows Claude Code auto-invokes based on their descriptions. Linked into a project with `./install-harness.sh` (opt-in, per repo), they land in that project's `.claude/skills/`, one link per skill, next to any skill the project versions itself:
 
 - `analyze-codebase` - one-time setup when adopting the template on an existing project
 - `refresh-snapshot` - manually regenerates the Repomix snapshot

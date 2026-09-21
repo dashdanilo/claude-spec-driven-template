@@ -52,20 +52,33 @@ cd ~/Sites/algum-projeto
 "$HARNESS/install-harness.sh"
 ```
 
-Isso cria cinco symlinks e registra os hooks portáveis:
+Isso cria os symlinks e registra os hooks portáveis:
 
 ```
-.claude/skills          -> $HARNESS/baseline/skills
-.claude/agents          -> $HARNESS/baseline/agents
-.claude/rules/harness   -> $HARNESS/baseline/rules
-.claude/docs/harness    -> $HARNESS/baseline/docs
-.claude/scripts/harness -> $HARNESS/baseline/scripts
+.claude/skills/<nome>     -> $HARNESS/baseline/skills/<nome>      um por skill
+.claude/agents/<nome>.md  -> $HARNESS/baseline/agents/<nome>.md   um por agent
+.claude/rules/harness     -> $HARNESS/baseline/rules
+.claude/docs/harness      -> $HARNESS/baseline/docs
+.claude/scripts/harness   -> $HARNESS/baseline/scripts
 ```
 
-Os dois últimos ficam num subdiretório pelo mesmo motivo que `rules/harness`: não
-substituem a pasta inteira, então `.claude/docs/libs/` (como este projeto usa
-cada lib) e um `.claude/scripts/` próprio do repositório convivem com o que o
+**Skills e agents são linkados um a um**, nunca a pasta inteira. O Claude Code
+só procura skill e agent direto em `.claude/skills/` e `.claude/agents/`, então
+a saída das outras três (uma subpasta `harness/`) não serve para eles; e um link
+da pasta inteira esconderia toda skill ou agent que o próprio repositório versiona
+ali. Um a um, as do repo e as do harness convivem na mesma pasta. O instalador só
+para se o repo tiver um item **com o mesmo nome** de um que o harness entrega
+(ver seção 3).
+
+Rules, docs e scripts ficam num subdiretório pelo mesmo motivo: não substituem a
+pasta inteira, então `.claude/rules/` do repo, `.claude/docs/libs/` (como este
+projeto usa cada lib) e um `.claude/scripts/` próprio convivem com o que o
 harness linkou.
+
+O custo de linkar um a um: o `git pull` atualiza o conteúdo de tudo que já está
+linkado, mas uma skill ou agent que o harness **criar ou renomear** depois só
+aparece rodando o instalador de novo. O `check-baseline.sh` avisa disso no início
+da sessão, com o nome do item que falta.
 
 **Nada é commitado.** Os links vão para o `.git/info/exclude` (por clone, nunca
 sobe) e os hooks para o `.claude/settings.local.json` (já gitignorado). Quem
@@ -81,10 +94,18 @@ Repita em cada projeto que você quiser. Repo onde você nunca rodar fica intact
 ```
 
 Sem `--adopt`, o instalador **para** em vez de sobrescrever qualquer coisa. Com
-ele, o que está no caminho vira `.claude/<nome>.pre-harness` e o link entra por
-cima. Isso inclui arquivos individuais que colidiriam, porque rules e commands
-se **mesclam** em vez de serem substituídos: um repo com `delegation.md` próprio
-carregaria a regra duas vezes. O `--unlink` devolve todos eles.
+ele, o que está no caminho é posto de lado e o link entra por cima:
+
+- uma skill ou agent do repo **com o mesmo nome** de um do harness vai para
+  `.claude/skills.pre-harness/<nome>` (ou `agents.pre-harness/`). Só esse item: o
+  resto do que o repo tem em `.claude/skills/` fica onde está e continua
+  carregando;
+- rules e commands que colidiriam viram `<arquivo>.pre-harness` ao lado, porque
+  se **mesclam** em vez de serem substituídos: um repo com `delegation.md`
+  próprio carregaria a regra duas vezes;
+- rules, docs e scripts têm a subpasta `harness/` e não colidem com nada.
+
+O `--unlink` devolve todos eles.
 
 > Enquanto estiver adotado, o git reporta os arquivos deslocados como
 > **deletados**. Eles são versionados e o symlink não os expõe. **Não commite,
@@ -94,12 +115,12 @@ carregaria a regra duas vezes. O `--unlink` devolve todos eles.
 >
 > O merge é o que morde de verdade: o git acha os arquivos deletados, então
 > qualquer operação que restaure a working tree os escreve **por cima dos links**.
-> Você fica com um `.claude/skills` real ao lado de um `.claude/skills.pre-harness`
-> órfão, e o `--unlink` não conserta porque o destino está ocupado. A saída é
+> Você fica com uma skill real ao lado da mesma skill em `.claude/skills.pre-harness`
+> órfã, e o `--unlink` não conserta porque o destino está ocupado. A saída é
 > `git checkout -- .claude`, que é autoritativo, e remover a sobra à mão.
 > **Desfaça antes de mergear, re-adote depois.**
 
-O `--adopt` resolve o **método**: as pastas de skills, agents e rules que
+O `--adopt` resolve o **método**: as skills, agents, rules e commands que
 colidem. Ele não sabe nada sobre um plugin de stack, nunca toca o
 `settings.json` commitado do repo, e não toca sozinho cópias antigas soltas em
 `.claude/docs`, `.claude/scripts` ou `.claude/hooks`: essas convivem em paz ao
@@ -109,8 +130,8 @@ motivo pra mexer nelas. Se a cópia antiga também tinha specialists de stack
 ordem:
 
 1. **Habilite e atualize o plugin de stack antes de adotar** (seção "Plugins de
-   stack", abaixo). O `--adopt` põe a pasta inteira de skills vendorizadas de
-   lado; as skills de stack só voltam pelo plugin, e uma cópia velha do plugin
+   stack", abaixo). A cópia vendorizada de uma skill de stack sai do repo no
+   passo 7; ela só volta pelo plugin, e uma cópia velha do plugin
    é pior do que nenhuma, porque parece funcionar.
 
    Às vezes o `update` não traz nada mesmo com o marketplace à frente, porque
@@ -377,13 +398,14 @@ ordem:
    repo: se o balde do passo 3 marcou esse hook como `sai`, o arquivo sai
    junto.
 7. **Suba as remoções, nunca com `git add -A`, e escolha `git rm` ou
-   `git rm --cached` conforme o que o `--adopt` fez com aquela pasta.** O
-   `--adopt` só troca por symlink as pastas de `.claude/skills`,
-   `.claude/agents` e as rules individuais que colidiram (postas de lado como
-   `.pre-harness`, ver passo 3): nessas, o caminho original já resolve **pelo
-   clone do harness**, então um `git rm` normal apagaria o arquivo real do seu
-   clone, não uma cópia; use `git rm --cached <caminho>`, que só tira do
-   índice e não toca o working tree. Já `.claude/hooks`, `.claude/docs` e
+   `git rm --cached` conforme o que o `--adopt` fez com aquele caminho.** Nas
+   skills e agents que colidiram e nas rules e commands individuais postos de
+   lado (ver passo 3), o caminho original agora é um link **para dentro do clone
+   do harness**. Ali, `git add` recusa na hora (`fatal: pathspec ... is beyond a
+   symbolic link`) e um `git rm` normal apagaria o arquivo real do seu clone, não
+   uma cópia: use `git rm --cached <caminho>`, que só tira do índice e não toca
+   o working tree. Um arquivo `fica` em `.claude/skills/` (skill do próprio repo)
+   não foi tocado pelo `--adopt` e não entra em nenhum dos dois. Já `.claude/hooks`, `.claude/docs` e
    `.claude/scripts` o `--adopt` não toca: a cópia antiga continua sentada no
    disco como um arquivo comum, e `git rm --cached` ali deixaria essa cópia
    solta e sem rastreamento; use `git rm` normal, que apaga do índice e do
@@ -482,31 +504,33 @@ existindo, porque sobrou dentro dela algo que o git nunca rastreou, por
 exemplo o `.DS_Store` do Finder no macOS: git não apaga diretório com
 conteúdo.
 
-Se depois do `pull` o `install-harness.sh` parar dizendo que `.claude/skills`
-(ou `.claude/agents`) existe e não é link, quase sempre é isso: sobra não
-rastreada, não uma pasta com conteúdo real seu.
+Com o instalador de hoje, que linka skills e agents um a um, essa sobra **não
+atrapalha mais**: uma pasta `.claude/skills` real é o layout esperado, e o
+instalador só para quando um item dela tem o nome de um item do harness. Rodar
+`install-harness.sh` sem `--adopt` resolve.
 
-Confira o que sobrou antes de rodar `--adopt`:
+Se ele parar mesmo assim, é porque você tem uma skill ou agent **com o nome de um
+do harness**, quase sempre uma cópia velha que o `git pull` não apagou por causa
+de uma sobra dentro dela. Confira antes de rodar `--adopt`:
 
 ```bash
-ls -la .claude/skills
-git ls-files .claude/skills
+ls -la .claude/skills/<nome>
+git ls-files .claude/skills/<nome>
 ```
 
-Se `git ls-files` não listar nada, é só sobra. `install-harness.sh --adopt`
-resolve sem apagar nada: põe a pasta de lado como `.claude/skills.pre-harness`
-e liga por cima. O instalador não imprime mais o aviso de "arquivos
-rastreados foram deletados" nesse caso, porque deixou de ser verdade; a pasta
-`.pre-harness` pode ser apagada quando você quiser, não tem nada para
-restaurar.
+Se `git ls-files` não listar nada, é sobra: `--adopt` põe só esse item de lado,
+em `.claude/skills.pre-harness/<nome>`, e o instalador não imprime o aviso de
+"arquivos rastreados foram deletados", porque não seria verdade. Se for conteúdo
+seu com um nome que colide, renomeie antes: com `--adopt` ele sai de cena enquanto
+o harness estiver linkado.
 
-Se você tem uma skill ou agent seu, que nunca chegou a ser commitado no
-repositório remoto que migrou, `git ls-files` não vai listá-lo (não é
-rastreado), mas ele continua sendo conteúdo seu. Olhe o `ls -la` de qualquer
-jeito, mesmo com `git ls-files` vazio: o `--adopt` põe a pasta inteira de
-lado como `.pre-harness` sem diferenciar o que é sobra do que é seu, e ela
-deixa de carregar enquanto estiver lá. Mova o que quiser manter para fora de
-`.claude/skills` antes de rodar `--adopt`.
+**Checkout que já estava no layout antigo** (a pasta inteira como um link só,
+de um instalador anterior): rode o instalador de novo, sem flag. Ele troca o
+link da pasta por links um a um e devolve, da `.claude/skills.pre-harness/` que
+o `--adopt` antigo criou, o que **o git rastreia** e o harness não entrega, ou
+seja, as skills do próprio repo que o link antigo escondia. O que o git não
+rastreia (uma cópia vendorizada que já saiu do repo) continua lá, para você
+apagar quando quiser.
 
 ### Windows
 
@@ -531,8 +555,15 @@ de symlink e o `git pull` volta a bastar.
 git -C "$HARNESS" pull
 ```
 
-Esse é o mecanismo de atualização inteiro — **desde que os seus sejam symlinks**. Se o `--status` disser `COPIED`, rode o instalador de novo depois do pull. Todo projeto que você linkou recebe na
-hora, porque todos leem os mesmos arquivos.
+Isso atualiza na hora, em todo projeto que você linkou, o conteúdo de tudo que
+já está linkado, porque todos leem os mesmos arquivos. Duas exceções pedem rodar
+o instalador de novo em cada projeto depois do pull:
+
+- uma skill ou agent que o harness **criou ou renomeou** (o link é um por item, e
+  o item novo ainda não tem o dele);
+- o `--status` diz `COPIED` (cópia não acompanha o checkout).
+
+O `check-baseline.sh` avisa as duas no início da sessão, com o nome do item.
 
 ### Remover
 
