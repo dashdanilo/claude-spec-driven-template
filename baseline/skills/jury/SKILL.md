@@ -106,7 +106,7 @@ Next        <one action that can start in minutes>
 ## In our flow
 
 - A verdict that changes how the system is built is an **ADR** in
-  `docs/decisions/` — `.claude/rules/adr.md` applies, so it is append-only and a
+  `docs/decisions/` — `.claude/rules/harness/adr.md` applies, so it is append-only and a
   later reversal supersedes rather than rewrites. Carry **Dissent** and
   **Riskiest** into it: an ADR that records only the winning argument is the one
   nobody can re-evaluate later.

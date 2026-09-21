@@ -29,7 +29,7 @@ See [`docs/principles.md`](docs/principles.md) — delivered to a linked project
 
 ## Delegation and dispatch
 
-Who writes the code is a rule, not a preference: `.claude/rules/delegation.md` (always loaded — the main thread coordinates, specialists implement). *How* to dispatch — parallel means several agent calls in **one** message, background only for long work you collect this turn, never background a gate — is `.claude/docs/harness/dispatching.md`. What to send and take back is `.claude/docs/harness/context-engineering.md`.
+Who writes the code is a rule, not a preference: `.claude/rules/harness/delegation.md` (always loaded — the main thread coordinates, specialists implement). *How* to dispatch — parallel means several agent calls in **one** message, background only for long work you collect this turn, never background a gate — is `.claude/docs/harness/dispatching.md`. What to send and take back is `.claude/docs/harness/context-engineering.md`.
 
 ## Where things point
 

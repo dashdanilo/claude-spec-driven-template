@@ -11,7 +11,7 @@ Write a handover for whoever picks this up next (human or a fresh agent). Follow
 
 This is not style. An instruction written now ages worse than a fact: *"implement logout next"* becomes wrong the moment priorities change or someone else does it, while *"logout is not started"* stays true until someone touches it. And the fresh agent has context you do not — it should decide the action from ground truth.
 
-The same principle runs through `.claude/rules/specs.md` (claims verified, not copied), Step 0 below, and `deviations.md` (what happened, not what to do about it). The single exception is the one resume line in the cut at the end.
+The same principle runs through `.claude/rules/harness/specs.md` (claims verified, not copied), Step 0 below, and `deviations.md` (what happened, not what to do about it). The single exception is the one resume line in the cut at the end.
 
 ## Step 0 — Reconcile the state before writing about it ⚠️
 
@@ -47,7 +47,7 @@ This is stronger than "don't paste diffs": it also rules out summarizing an ADR'
 
 ## Frame claims as claims
 
-Everything in a handover is prose about state, and prose ages — including this document, from the moment it is written. Say so in it, and mark anything that was **not** verified in this session as unverified rather than presenting it as confirmed. `.claude/rules/specs.md` applies to a handover as much as to a spec: the confident, well-written paragraph is the dangerous one, because it reads as settled.
+Everything in a handover is prose about state, and prose ages — including this document, from the moment it is written. Say so in it, and mark anything that was **not** verified in this session as unverified rather than presenting it as confirmed. `.claude/rules/harness/specs.md` applies to a handover as much as to a spec: the confident, well-written paragraph is the dangerous one, because it reads as settled.
 
 ## Where to put it — always a file ⚠️
 

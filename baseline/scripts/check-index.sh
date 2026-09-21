@@ -6,9 +6,9 @@
 #   1. on disk, not in the index   — you added a skill/agent and forgot to list it
 #   2. in the index, not on disk   — you renamed or deleted one and the index still advertises it
 #   3. malformed on disk           — missing frontmatter, name/filename mismatch, non-executable hook
-#   4. dangling doc/script pointer — a `.claude/docs/...` or `.claude/scripts/...`
-#      mention in a rule, skill, agent or script that does not resolve as a file
-#      from the repo root
+#   4. dangling pointer            — a `.claude/docs/...`, `.claude/scripts/...`,
+#      `.claude/rules/...`, `.claude/skills/...` or `.claude/agents/...` mention
+#      in a rule, skill, agent or script that does not resolve from the repo root
 #
 # (2), (3) and (4) are the silent ones. A stale index entry sends an agent looking
 # for something that is not there; a hook without +x never runs and never says so;
@@ -178,13 +178,16 @@ for root in ${EXTRA[@]+"${EXTRA[@]}"}; do
   for f in "$root"/commands/*.md; do [[ -e "$f" ]] || continue; know "$(basename "$f" .md)"; done
 done
 
-# ----------------------------------------------- dangling doc/script pointers
-# A fourth class, orthogonal to the other three: `.claude/docs/...` and
-# `.claude/scripts/...` are the two namespaced links a repo gets when it links
-# the harness (install-harness.sh). A stale one survives every check above,
-# because nothing dereferences prose — until an agent tries to read it and
-# finds nothing. Resolved from the repo root, the same way every pointer in
-# this codebase is written.
+# ----------------------------------------------- dangling pointers
+# A fourth class, orthogonal to the other three: `.claude/docs/...`,
+# `.claude/scripts/...`, `.claude/rules/...`, `.claude/skills/...` and
+# `.claude/agents/...` are the paths a repo gets when it links the harness
+# (install-harness.sh) — docs/scripts/rules namespaced under a `harness/`
+# subdirectory, skills/agents linked one item at a time straight into
+# `.claude/skills/<name>` and `.claude/agents/<name>.md`. A stale one survives
+# every check above, because nothing dereferences prose — until an agent tries
+# to read it and finds nothing. Resolved from the repo root, the same way
+# every pointer in this codebase is written.
 #
 # Two things must stay out of the file list this scans, or it reports drift
 # that isn't real:
@@ -311,7 +314,7 @@ for f in ${ptr_files[@]+"${ptr_files[@]}"}; do
     [[ -e "$pointer" ]] && continue
     is_exempt_pointer "$pointer" && continue
     add dangling "$f:$lineno — $pointer"
-  done < <(grep -noE '\.claude/(docs|scripts)/[A-Za-z0-9_./-]+' "$f" 2>/dev/null)
+  done < <(grep -noE '\.claude/(docs|scripts|rules|skills|agents)/[A-Za-z0-9_./-]+' "$f" 2>/dev/null)
 done
 
 # ---------------------------------------------------------------- reverse
@@ -334,7 +337,7 @@ emit() {
 emit "⚠  On disk but not listed in CLAUDE.md:" "$unlisted"
 emit "⚠  Listed in CLAUDE.md but not on disk (renamed or deleted?):" "$stale"
 emit "⚠  Malformed — these do not work as intended:" "$broken"
-emit "⚠  .claude/docs or .claude/scripts pointer that does not resolve:" "$dangling"
+emit "⚠  .claude/(docs|scripts|rules|skills|agents) pointer that does not resolve:" "$dangling"
 
 if [[ $found -eq 1 ]]; then
   {

@@ -10,7 +10,7 @@ You coordinate; specialist subagents implement. **Never write feature code yours
 
 ## Step 0 — Reconcile before you plan ⏸
 
-`tasks.md` is prose, and prose drifts. A box is a **claim**, not evidence — plan from the code, never from the checkboxes (`.claude/rules/specs.md`).
+`tasks.md` is prose, and prose drifts. A box is a **claim**, not evidence — plan from the code, never from the checkboxes (`.claude/rules/harness/specs.md`).
 
 1. Read `$ARGUMENTS/spec.md`, `plan.md`, and `tasks.md`. If `tasks.md` is missing or has no unchecked tasks, stop and say so.
 2. Confirm the current branch is a **feature branch/worktree**, not a protected branch (`main` / `master` / `develop`). If on a protected branch, stop and ask the user to create one (`spec-worktree`).
@@ -108,13 +108,13 @@ For each wave, in the approved order:
 
 If a task's work turned out to be bigger than its class assumed — a "config / chore" that ended up touching a service — **re-classify it and run the stricter gates** before checking its box. The class is a plan, and the diff outranks the plan.
 
-**Document ownership** (so parallel specialists don't clobber): **clusters** in the same wave must touch **disjoint files** — that is what makes one-message dispatch safe. Inside a cluster the tasks may share files freely, because one specialist runs them in order. A specialist edits only its own task's files; `tasks.md` is **yours** to check off, not theirs; ADRs are append-only (`.claude/rules/adr.md`). See the three principles in `.claude/docs/harness/principles.md`.
+**Document ownership** (so parallel specialists don't clobber): **clusters** in the same wave must touch **disjoint files** — that is what makes one-message dispatch safe. Inside a cluster the tasks may share files freely, because one specialist runs them in order. A specialist edits only its own task's files; `tasks.md` is **yours** to check off, not theirs; ADRs are append-only (`.claude/rules/harness/adr.md`). See the three principles in `.claude/docs/harness/principles.md`.
 
 ## Step 4 — Finish
 
 When every box is checked: dispatch `reviewer` to review the whole branch — it runs its environment-variation checklist (timezones, locales, serial mode, random order; see `.claude/agents/reviewer.md`) rather than trusting the author's green — run the gate once more, and open a **PR to the repo's integration branch** (`main` / `develop`). **Never merge** (`protect-main` blocks it).
 
-If `deviations.md` has any open `finding` (a production defect a test revealed, out of scope for this spec — `.claude/rules/specs.md`), add a **"Findings outside scope"** section to the PR body listing each one in one line, so it does not stay invisible in a file nobody but this run reads. `finding` never blocks the PR; only `needs decision` does.
+If `deviations.md` has any open `finding` (a production defect a test revealed, out of scope for this spec — `.claude/rules/harness/specs.md`), add a **"Findings outside scope"** section to the PR body listing each one in one line, so it does not stay invisible in a file nobody but this run reads. `finding` never blocks the PR; only `needs decision` does.
 
 Report the PR link.
 
@@ -122,7 +122,7 @@ Report the PR link.
 
 Maintain `$ARGUMENTS/lessons.md`: after any failure+fix, append a one-line lesson (what broke → the fix). If the **same class of mistake** happens 3+ times, propose promoting it to a `.claude/rules/` rule or a skill rule, and tell the user.
 
-Maintain `$ARGUMENTS/deviations.md` **as you go, not at the end**: every time the run leaves the agreed plan — an assumption taken, a blocker worked around, scope changed mid-flight, a phase executed straight from `plan.md` instead of as tasks — append an entry in the format in `.claude/rules/specs.md`. This is the log the human reads to find what they never approved.
+Maintain `$ARGUMENTS/deviations.md` **as you go, not at the end**: every time the run leaves the agreed plan — an assumption taken, a blocker worked around, scope changed mid-flight, a phase executed straight from `plan.md` instead of as tasks — append an entry in the format in `.claude/rules/harness/specs.md`. This is the log the human reads to find what they never approved.
 
 Both files are yours, not the specialists'. A specialist reports what it did; you decide whether that was a deviation.
 
