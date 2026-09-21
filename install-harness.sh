@@ -668,6 +668,18 @@ if not changed:
 elif mode == "dryrun":
     for c in changed:
         print("would      " + c)
+elif mode == "unlink" and not d and os.path.exists(settings):
+    # Unlinking removed the last thing WE ever put in this file. Writing an
+    # empty `{}` back would leave a file with no exclude entry to cover it
+    # (strip_block just dropped the whole harness block, settings.local.json
+    # included) -- an orphan `git status` would report as untracked forever.
+    # Delete it instead: --unlink promises "the repo keeps whatever lives in
+    # its own .claude/", and a file that held nothing but our own hooks was
+    # never the repo's to keep.
+    os.remove(settings)
+    for c in changed:
+        print(c)
+    print("removed    " + os.path.basename(settings) + " (nothing else left in it)")
 else:
     os.makedirs(os.path.dirname(settings), exist_ok=True)
     with open(settings, "w") as f:
