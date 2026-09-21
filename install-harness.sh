@@ -408,7 +408,7 @@ per_item_unlink() {
 }
 
 per_item_install() {
-  local cat="$1" d="$DEST/$1" aside="$DEST/$1.pre-harness" items copies name t src e tgt n_ok=0
+  local cat="$1" d="$DEST/$1" aside="$DEST/$1.pre-harness" items copies name t src e tgt n_ok=0 fresh=0
   items=$(items_of "$cat")
 
   # Old layout: the whole folder was one link (or one fallback copy). Replace
@@ -426,6 +426,10 @@ per_item_install() {
       [[ $MODE == dryrun ]] || rm -rf "$d"
     fi
     [[ $MODE == dryrun ]] || mkdir -p "$d"
+    # A dry run leaves the old link in place, so every harness item would still
+    # resolve through it and read as something to set aside. The real run starts
+    # from an empty folder: report exactly that.
+    [[ $MODE == dryrun ]] && fresh=1
     if [[ -d "$aside" ]]; then
       for e in "$aside"/*; do
         [[ -e "$e" || -L "$e" ]] || continue
@@ -446,6 +450,7 @@ per_item_install() {
   while IFS= read -r name; do
     [[ -n "$name" ]] || continue
     src="$BASE/$cat/$name"; t="$d/$name"
+    if [[ $fresh -eq 1 ]]; then say "link       .claude/$cat/$name"; continue; fi
     if [[ -L "$t" && "$(readlink "$t")" == "$src" ]]; then
       n_ok=$((n_ok + 1)); continue
     fi
@@ -471,6 +476,7 @@ per_item_install() {
 
   # Whatever the harness stopped shipping (a rename, a removal): drop our link,
   # or a dangling one left by a checkout that moved. Never touch anything else.
+  [[ $fresh -eq 1 ]] && return 0
   for e in "$d"/*; do
     [[ -L "$e" ]] || continue
     name=$(basename "$e")
