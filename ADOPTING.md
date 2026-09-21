@@ -149,8 +149,8 @@ ordem:
    diferente, e isso é a guarda funcionando, não um bug.
 3. **Classifique os arquivos versionados antes de rodar `--adopt`, com duas
    perguntas independentes.** Conteúdo em `.claude/skills`, `.claude/agents`,
-   `.claude/rules`, `.claude/docs`, `.claude/scripts` ou `.claude/hooks` deste
-   repo não é necessariamente vendorizado do harness: parte pode ter vindo do
+   `.claude/rules`, `.claude/docs`, `.claude/scripts`, `.claude/hooks` ou
+   `.claude/commands` deste repo não é necessariamente vendorizado do harness: parte pode ter vindo do
    plugin de stack, e parte pode ser edição do próprio repo num caminho que
    uma fonte também usa. O `--adopt` só sabe procurar na primeira hipótese.
 
@@ -194,6 +194,22 @@ ordem:
    `fica` por definição; senão, existir em `baseline/scripts/<caminho>` conta
    como harness; scripts nunca vêm de plugin.
 
+   **Commands também entram, mesmo sem nenhuma fonte entregar
+   `.claude/commands/`.** O harness autora os drivers (`orchestrate`, `wave`,
+   `handover`, `checkpoint`, `status`) como skills, e o `--adopt` põe de lado
+   todo `commands/<nome>.md` para o qual exista `baseline/skills/<nome>/`, porque
+   os dois produzem o mesmo `/nome`. Então a pergunta 1 para um command é esse
+   mesmo critério de colisão: existe `baseline/skills/<nome>/`? Uma cópia antiga
+   do harness costuma ter os cinco versionados; sem classificá-los, eles viram
+   "deletados" no `git status` sem nunca passarem pelas duas perguntas.
+
+   **Plugin conta só se estiver habilitado neste repo.** O que entrega é o
+   plugin ligado em `enabledPlugins` no `.claude/settings.json` commitado, não
+   todo plugin que por acaso esteja no cache da máquina. Um plugin desligado não
+   entrega nada nesta sessão, e contar com ele autorizaria remover um arquivo
+   que nenhuma fonte entrega (no website, que só liga o `frontend-next`, o cache
+   inteiro trazia o `protect-prisma.sh` do `backend-nest`).
+
    Essa pergunta 1 sozinha só decide se o arquivo **pode** sair; não decide
    se pode sair **sem ler**.
 
@@ -220,6 +236,24 @@ ordem:
      já teve e removeu (inclusive um plugin ainda não atualizado, caso do
      passo 1). Continua no repo.
 
+   Um quarto rótulo sai do mesmo cruzamento e não é balde próprio, é um aviso
+   sobre o `fica`:
+   - **`ORFAO`**: nenhuma fonte entrega esse caminho hoje, **mas** o conteúdo
+     esteve numa delas. A pergunta 1 é por caminho, então um arquivo que a fonte
+     **renomeou** cai aqui em vez de `sai`. No website, `skills/the-fool/SKILL.md`
+     é o `devils-advocate` de antes do rename (difere em 3 linhas, então nenhum
+     hash contra o caminho novo pega): tratado como `fica`, ficaria no repo para
+     sempre, uma cópia congelada carregando ao lado da skill viva com outro nome.
+     Descubra o que houve com o commit que tirou o caminho da fonte, que o
+     próprio `rev-list` já localiza:
+     ```bash
+     git -C "$HARNESS" rev-list --all --objects | grep "^$(git hash-object <arquivo>)"   # caminho antigo na fonte
+     git -C "$HARNESS" log --all -1 --format='%h %s' -- <caminho antigo>               # quem o tirou, e por quê
+     ```
+     Renomeado ou substituído: é `sai`. Plugin instalado mais velho que o
+     marketplace (passo 1): é `fica`. Removido de propósito na fonte: leia e
+     decida como um `LOCAL`.
+
    Leia os conjuntos direto dos instaladores em vez de copiá-los à mão: se um
    deles mudar, o snippet muda sozinho, e o guia não fica desatualizado em
    silêncio.
@@ -230,7 +264,10 @@ ordem:
    PORTABLE_HOOKS=$(grep -oE 'hooks_dir \+ "/[^"]+"' "$HARNESS/install-harness.sh" | sed -E 's#.*/([^"]+)"#\1#' | sort -u)
    eval "$(grep -oE 'REPO_HOOKS=\([^)]*\)' "$HARNESS/install.sh")"
    eval "$(grep -oE 'REPO_SCRIPTS=\([^)]*\)' "$HARNESS/install.sh")"
-   PLUGIN_HOOK_NAMES=$(for d in ~/.claude/plugins/cache/"$MARKETPLACE"/*/*/; do
+   # Só os plugins deste marketplace que ESTE repo liga: desligado não entrega nada.
+   ENABLED_PLUGINS=$(python3 -c 'import json,sys; m=sys.argv[1]; d=json.load(open(".claude/settings.json")).get("enabledPlugins",{}); print("\n".join(k.rsplit("@",1)[0] for k,v in d.items() if v and k.endswith("@"+m)))' "$MARKETPLACE" 2>/dev/null)
+   plugin_dirs() { local p d; for p in $ENABLED_PLUGINS; do for d in ~/.claude/plugins/cache/"$MARKETPLACE"/"$p"/*/; do [[ -d "$d" ]] && echo "$d"; done; done; }
+   PLUGIN_HOOK_NAMES=$(plugin_dirs | while read -r d; do
      [[ -f "${d}hooks/hooks.json" ]] || continue
      grep -oE '"command":[[:space:]]*"[^"]+"' "${d}hooks/hooks.json" | sed -E 's#.*/([^"/]+)"$#\1#'
    done | sort -u)
@@ -239,17 +276,18 @@ ordem:
    harness_has() { [[ -e "$HARNESS/baseline/$1" ]]; }
    plugin_has_path() {
      local rel=$1 d
-     for d in ~/.claude/plugins/cache/"$MARKETPLACE"/*/*/; do
+     while read -r d; do
        [[ -e "${d}${rel}" ]] && return 0
-     done
+     done < <(plugin_dirs)
      return 1
    }
 
    HARNESS_HASHES=$(git -C "$HARNESS" rev-list --all --objects | awk '{print $1}')
    MKT_HASHES=$(git -C ~/.claude/plugins/marketplaces/"$MARKETPLACE" rev-list --all --objects | awk '{print $1}')
    from_source() { local h="${2:-$h}"; [[ "$1" == harness ]] && printf '%s\n' "$HARNESS_HASHES" | grep -qxF "$h" || printf '%s\n' "$MKT_HASHES" | grep -qxF "$h"; }
+   from_any() { printf '%s\n' "$HARNESS_HASHES" "$MKT_HASHES" | grep -qxF "$1"; }
 
-   git ls-files .claude/skills .claude/agents .claude/rules .claude/docs .claude/scripts .claude/hooks | while read -r f; do
+   git ls-files .claude/skills .claude/agents .claude/rules .claude/docs .claude/scripts .claude/hooks .claude/commands | while read -r f; do
      cat=${f#.claude/}; cat=${cat%%/*}
      rel=${f#.claude/$cat/}
      base=$(basename "$rel")
@@ -263,13 +301,15 @@ ordem:
        src=harness
      elif [[ "$cat" == hooks ]] && printf '%s\n' "$PLUGIN_HOOK_NAMES" | grep -qxF "$base"; then
        src=plugin
-     elif [[ "$cat" != hooks ]] && harness_has "$cat/$rel"; then
+     elif [[ "$cat" == commands ]] && [[ -d "$HARNESS/baseline/skills/${base%.md}" ]]; then
+       src=harness
+     elif [[ "$cat" != hooks && "$cat" != commands ]] && harness_has "$cat/$rel"; then
        src=harness
      elif [[ "$cat" == skills || "$cat" == agents ]] && plugin_has_path "$cat/$rel"; then
        src=plugin
      fi
      if [[ -z "$src" ]]; then
-       echo "fica     $f"
+       from_any "$h" && echo "ORFAO    $f  (conteudo veio de uma fonte que nao entrega mais esse caminho: leia)" || echo "fica     $f"
      elif from_source "$src" "$h"; then
        echo "sai      $f"
      else
@@ -316,6 +356,13 @@ ordem:
    continua mandando manter as duas guardas registradas até provar, com
    payload, que a cópia do plugin bloqueia de verdade.
 
+   Rodado contra o website em `35dabd4` (58 arquivos rastreados em `.claude/`,
+   54 nos sete diretórios): 50 em `sai` (os 5 commands incluídos), 0 em
+   `LOCAL`, 3 em `fica` (`protect-critical.sh`, `check-snapshot-on-session.sh`,
+   `check-snapshot.sh`) e 1 `ORFAO` (`skills/the-fool/SKILL.md`, rename). Antes
+   deste snippet olhar `commands/` e o cache só dos plugins ligados, o mesmo
+   repo dava 45/0/4 com os commands invisíveis e o `the-fool` como `fica`.
+
    "Entregue hoje" sozinho **não autoriza remover**: só o balde `sai`
    autoriza, porque soma as duas perguntas. Um caminho entregue hoje com
    conteúdo que nunca esteve na fonte é `LOCAL`, e pede leitura antes de
@@ -360,6 +407,16 @@ ordem:
      própria sessão: um exemplo que cite `.env` ou monte um commit de
      verdade aciona o `block-secrets.sh` ou o `protect-main.sh` da sua sessão
      atual antes mesmo de chegar no hook que você queria testar.
+
+     No macOS o defeito comum nem chega ao `exit 1`. Cópias antigas extraem o
+     payload com `grep -oP`, e o `/usr/bin/grep` do BSD recusa `-P`: a variável
+     sai vazia e a guarda termina `exit 0` sem avaliar padrão nenhum, com
+     `grep: invalid option -- P` no stderr e **sem** imprimir "BLOCKED". Um
+     `grep -oP` numa guarda vendorizada é, sozinho, esse defeito (foi o caso das
+     três guardas de `Bash`/`Edit` do website e do njord-front). Rode o hook
+     sempre como `bash <hook> < payload.json`, nunca testando a extração na
+     shell da sessão: ali o `grep` do Claude Code é uma função que chama um
+     `ugrep` embutido, que **aceita** `-P`, e o teste mente a favor da guarda.
    - **Ao atualizar uma guarda do repo a partir do `baseline/hooks/`, leve
      junto os padrões que só o repo tinha.** Uma guarda de arquivos críticos
      pode proteger caminhos que o baseline não conhece (uma pasta de
@@ -391,6 +448,10 @@ ordem:
    `protect-harness.sh` e qualquer guarda de edição do repo que continuar
    registrada no mesmo matcher amplo, `Edit|Write|MultiEdit|NotebookEdit`
    (`protect-harness.sh` fica nos dois lugares de propósito, não é removido).
+   Uma cópia anterior a essa guarda não tem o arquivo, e o passo 3 não o
+   aponta (ele só classifica o que está versionado): se
+   `.claude/hooks/protect-harness.sh` não existe, copie-o de `baseline/hooks/`
+   (é `REPO_HOOKS`, o mesmo que o `install.sh` faria) antes de registrar.
    Um repo antigo costuma ter essas guardas só em `Edit|Write`, deixando
    `MultiEdit` e `NotebookEdit` passarem por fora; alinhe o matcher ao mesmo
    tempo em que edita a entrada, não depois.
@@ -410,6 +471,13 @@ ordem:
    disco como um arquivo comum, e `git rm --cached` ali deixaria essa cópia
    solta e sem rastreamento; use `git rm` normal, que apaga do índice e do
    disco de uma vez, sem sobra.
+
+   Se o arquivo `sai` é o último de uma pasta que o repo anuncia como sua, a
+   pasta some junto. No website, `docs/libs/example-lib.md` era `sai` (o harness
+   entrega esse caminho) e era o único arquivo de `.claude/docs/libs/`, a pasta
+   que `AGENTS.md` e `CLAUDE.md` apontam para "como este projeto usa cada lib".
+   A remoção está certa; o passo 8 é que precisa reapontar quem a cita (o
+   modelo passa a ser `.claude/docs/harness/libs/example-lib.md`).
 
    Com o critério do passo 3, `check-snapshot-on-session.sh`,
    `scripts/check-snapshot.sh` e `protect-critical.sh` já ficam no balde
@@ -444,8 +512,23 @@ ordem:
    harness ou do plugin** (por exemplo, um script que estava em
    `.claude/scripts/spec-worktree.sh` passa a ser
    `.claude/scripts/harness/spec-worktree.sh`; uma skill que passou a vir do
-   plugin de stack não tem mais caminho dentro do repo). Revise também os
-   arquivos que ficam fora dos seis diretórios classificados no passo 3:
+   plugin de stack não tem mais caminho dentro do repo). Comece fora de
+   `.claude/`: no website, a maior parte dos ponteiros quebrados estava em
+   `AGENTS.md`, `CLAUDE.md` e `docs/` (um guia de setup mandava renomear
+   arquivos que agora são link para o clone do harness). O `check-index.sh` só
+   olha o índice do `CLAUDE.md` e ponteiros dentro de rules, skills, agents e
+   scripts: `AGENTS.md` e `docs/` apodrecem em silêncio mesmo com `--strict`
+   verde, então procure os caminhos que saíram:
+   ```bash
+   git grep -nE '\.claude/(commands|skills|agents|rules|docs|scripts|hooks)/' -- ':!.claude'
+   ```
+   Confira também o `.gitignore`: o `--adopt` registra o `log-edit.sh` e o
+   `log-agent.sh`, que escrevem `.claude/tool-log.txt`, `.claude/agent-log.txt`
+   e `.claude/.agent-log-consumed` na primeira chamada. Um repo cujo
+   `.gitignore` é anterior a esses hooks fica com um arquivo novo não
+   rastreado logo depois de adotar, no diretório que o passo 7 manda revisar.
+   Revise também os arquivos que ficam fora dos sete diretórios classificados
+   no passo 3:
    `.claude/*.md` soltos (um `.claude/README.md` de época costuma descrever a
    cópia vendorizada que acabou de sair) e `.claude/settings.json.example`,
    que costuma registrar os mesmos hooks antigos que o passo 6 acabou de

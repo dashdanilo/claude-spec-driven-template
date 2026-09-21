@@ -75,7 +75,14 @@ CLAUDE.local.md
 # Claude Code session state
 .claude/projects/
 .claude/shell-snapshots/
-.claude/backups/'
+.claude/backups/
+
+# Harness observability logs (written by log-edit.sh and log-agent.sh, which
+# install-harness.sh registers; without these a repo gets an untracked file on
+# the first tool call after linking)
+.claude/tool-log.txt
+.claude/agent-log.txt
+.claude/.agent-log-consumed'
 
 log()  { echo "$@" >&2; }
 die()  { echo "error: $*" >&2; exit "${2:-2}"; }
