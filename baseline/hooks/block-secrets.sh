@@ -41,7 +41,11 @@ forbidden_patterns=(
   "${CMD}(printenv|env)[[:space:]]*$"
   "${CMD}(curl|wget)[^|;&]*\.env"
   "${CMD}"'echo[[:space:]]+\$[A-Z_]*(TOKEN|KEY|SECRET|PASSWORD)'
-  '\\$\\([[:space:]]*cat[[:space:]]+[^)]*\\.env'
+  # Command substitution: `$(` opens a new command position of its own, so it
+  # is the anchor here. Single-quoted, so each backslash reaches grep once;
+  # doubling them (`\\$\\(`) is an unbalanced group to BSD grep, which errors
+  # on every call and never matches.
+  '\$\([[:space:]]*(cat|less|more|head|tail|bat|strings)[[:space:]]+[^)|;&]*\.env'
 )
 
 for pattern in "${forbidden_patterns[@]}"; do
