@@ -1,6 +1,7 @@
 ---
 name: spec-worktree
 description: Creates and manages one git worktree per feature so a feature branch is worked on in isolation, in its own sibling directory, without switching branches in the main checkout. Use when starting to implement a feature (moving from spec/plan into execution), when the user wants to work on multiple features in parallel, or says "work on this in a worktree", "create a worktree", "spin up a worktree for X". Also handles listing and cleaning up worktrees. Delegates the mechanics to `.claude/scripts/harness/spec-worktree.sh`.
+disable-model-invocation: true
 ---
 
 # Spec worktree
