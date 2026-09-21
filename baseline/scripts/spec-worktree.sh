@@ -115,14 +115,30 @@ provision_locals() {
   # that opted in would otherwise start WITHOUT the harness, silently, which is
   # the same quiet failure a moved checkout produces. Point at the same target
   # the main checkout uses rather than re-deriving it.
+  local target
   for f in ".claude/skills" ".claude/agents" ".claude/rules/harness" ".claude/docs/harness" ".claude/scripts/harness"; do
     if [[ -L "$MAIN_ROOT/$f" && ! -e "$wt/$f" ]]; then
-      local target
       target=$(readlink "$MAIN_ROOT/$f")
       mkdir -p "$(dirname "$wt/$f")"
       ln -s "$target" "$wt/$f"
       log "  linked  $f (harness)"
     fi
+  done
+  # Skills and agents are linked one item at a time (install-harness.sh), next
+  # to whatever the repo versions there itself. The repo's own items arrive with
+  # the checkout; carry over the links, which are gitignored and would not.
+  local d item n
+  for d in ".claude/skills" ".claude/agents"; do
+    [[ -d "$MAIN_ROOT/$d" && ! -L "$MAIN_ROOT/$d" ]] || continue
+    n=0
+    for item in "$MAIN_ROOT/$d"/*; do
+      [[ -L "$item" ]] || continue
+      [[ -e "$wt/$d/$(basename "$item")" || -L "$wt/$d/$(basename "$item")" ]] && continue
+      mkdir -p "$wt/$d"
+      ln -s "$(readlink "$item")" "$wt/$d/$(basename "$item")"
+      n=$((n + 1))
+    done
+    [[ $n -gt 0 ]] && log "  linked  $d/* ($n items, harness)"
   done
 
   # Copy-seed the regenerable snapshot cache (do NOT symlink: it is per-branch
