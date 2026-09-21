@@ -186,6 +186,41 @@ _ok  "worktree: harness agent link carried over"        '[[ -L $WT/.claude/agent
 _ok  "worktree: repo skill arrives from the checkout"   '[[ -f $WT/.claude/skills/repo-skill/SKILL.md && ! -L $WT/.claude/skills/repo-skill ]]'
 _ok  "worktree: git status clean"                       '[[ -z $(git -C $WT status --porcelain) ]]'
 
+# ---------------------------------------------------------------- 9. spec-worktree warns on a stale origin/HEAD
+# A clone made while the remote's default was 'main', with the remote's
+# default moved to 'develop' AFTER that clone: the local origin/HEAD keeps
+# pointing at 'main' until someone runs `git remote set-head origin --auto`.
+REMOTE="$TMP/remote.git"; git init -q --bare -b main "$REMOTE"
+SRC="$TMP/remote-src"; mkdir -p "$SRC"
+( cd "$SRC" && git init -q -b main . \
+  && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init \
+  && git remote add origin "$REMOTE" && git push -q origin main \
+  && git checkout -q -b develop \
+  && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m develop \
+  && git push -q origin develop )
+git clone -q "$REMOTE" "$TMP/staleheadrepo"
+_ok  "stale-head fixture: local origin/HEAD is main right after clone" \
+     '[[ $(git -C $TMP/staleheadrepo symbolic-ref refs/remotes/origin/HEAD) == refs/remotes/origin/main ]]'
+git -C "$REMOTE" symbolic-ref HEAD refs/heads/develop   # remote default moves, after the clone
+( cd "$TMP/staleheadrepo" && bash "$H/baseline/scripts/spec-worktree.sh" probe2 ) > "$TMP/wt2" 2>&1
+_has "stale origin/HEAD: warns, naming the stale local pointer" \
+     "$TMP/wt2" "local origin/HEAD points at origin/main"
+_has "stale origin/HEAD: names the remote's real default" \
+     "$TMP/wt2" "default branch is origin/develop"
+_has "stale origin/HEAD: tells you how to fix it" \
+     "$TMP/wt2" "git remote set-head origin --auto"
+_ok  "stale origin/HEAD: worktree is still created (warns, never fails)" \
+     '[[ -d $TMP/staleheadrepo.probe2 && -f $TMP/staleheadrepo.probe2/.git ]]'
+
+# ---------------------------------------------------------------- 10. spec-worktree stays quiet with no origin at all
+# No remote configured: `git ls-remote --symref origin HEAD` has nothing to
+# ask, and the warning must skip silently rather than error out the create.
+R="$TMP/noorigin"; mkdir -p "$R"
+( cd "$R" && git init -q -b main . && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init )
+( cd "$R" && bash "$H/baseline/scripts/spec-worktree.sh" probe3 ) > "$TMP/wt3" 2>&1
+_hasnt "no origin: no stale-origin warning text at all" "$TMP/wt3" "origin/HEAD points at"
+_ok    "no origin: worktree still created" '[[ -d $TMP/noorigin.probe3 && -f $TMP/noorigin.probe3/.git ]]'
+
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed"
 [[ $FAIL_COUNT -eq 0 ]]

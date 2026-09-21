@@ -46,7 +46,7 @@ set -euo pipefail
 
 DEFAULT_TYPE="feat"
 # Types accepted for the branch prefix. Mirrors the Conventional Commits /
-# commitlint types documented in .claude/rules/git-workflow.md.
+# commitlint types documented in .claude/rules/harness/git-workflow.md.
 VALID_TYPES="feat fix hotfix refactor docs chore test"
 
 log()  { echo "$@" >&2; }
@@ -71,9 +71,29 @@ MAIN_ROOT=$(dirname "$common_dir")
 REPO_NAME=$(basename "$MAIN_ROOT")
 PARENT_DIR=$(dirname "$MAIN_ROOT")
 
+# Warn (never fail) when the local origin/HEAD pointer has gone stale — it
+# still says 'main' after the remote's actual default branch moved to
+# 'develop', say. `git ls-remote --symref` asks the remote directly, cheap
+# and with no `gh` dependency; a repo with no network right now (or no
+# `origin` at all) gets no answer and this stays silent rather than blocking
+# worktree creation on it.
+warn_stale_origin_head() {
+  local local_def remote_ref remote_def
+  local_def=$(git symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null | sed 's#^refs/remotes/##')
+  remote_ref=$(git ls-remote --symref origin HEAD 2>/dev/null | awk '$1 == "ref:" {print $2}')
+  [[ -n "$remote_ref" ]] || return 0
+  remote_def="origin/${remote_ref#refs/heads/}"
+  if [[ -n "$local_def" && "$local_def" != "$remote_def" ]]; then
+    log "warning: local origin/HEAD points at $local_def, but the remote's"
+    log "         default branch is $remote_def right now. Run"
+    log "         'git remote set-head origin --auto' before trusting this base."
+  fi
+}
+
 # --- Pick the base branch (repo default integration branch) ---
 base_ref() {
   git fetch origin --quiet 2>/dev/null || true
+  warn_stale_origin_head
   # Prefer the remote's default branch (origin/HEAD), so repos whose integration
   # branch is 'develop' (or anything else) get the correct base, not a stale main.
   local def
