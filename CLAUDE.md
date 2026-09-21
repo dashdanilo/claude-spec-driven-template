@@ -75,7 +75,7 @@ For this repo, in `.claude/settings.json`. For a project that linked the harness
 
 ### Rules with path scope
 
-The files in `baseline/rules/` auto-load based on their `paths:` glob, and land in `.claude/rules/harness/` when linked into a project — rules are discovered recursively, so the repo's own rules coexist. **Project rules win over personal ones**, so a repo can always override. Five ship with the template:
+The files in `baseline/rules/` auto-load based on their `paths:` glob, and land in `.claude/rules/harness/` when linked into a project — rules are discovered recursively, so the repo's own rules coexist alongside them. A same-named rule the repo keeps directly in `.claude/rules/` does not override the linked one: both load, until `install-harness.sh --adopt` deduplicates by moving the repo's copy aside (see ADOPTING.md, section 3, step 5). Five ship with the template:
 
 - `delegation.md` (matches `**`, always loaded) - the main thread coordinates, specialists implement; never write feature code from the main thread
 - `specs.md` (matches `specs/**`) - claims are verified against code/git when written, never copied from existing prose; a hand-written spec still goes through `spec-reviewer`
