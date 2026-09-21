@@ -26,7 +26,7 @@ Do NOT create a worktree per `plan.md`. If a feature has multiple plans, they al
 ```
 
 - `<slug>` is the feature slug in kebab-case (same slug family as the spec folder, without the date prefix).
-- `--type` defaults to `feat`. Valid: `feat fix hotfix refactor docs chore test` (the Conventional Commits / commitlint types; see `.claude/rules/git-workflow.md`).
+- `--type` defaults to `feat`. Valid: `feat fix hotfix refactor docs chore test` (the Conventional Commits / commitlint types; see `.claude/rules/harness/git-workflow.md`).
 - The branch is always created **from the latest remote default branch** — `origin/HEAD` (`origin/main` on most repos, but whatever the remote actually points at, e.g. `origin/develop`), falling back to `origin/main` then local `main` (the script fetches first).
 - The script provisions gitignored local files into the new worktree: it **symlinks** `CLAUDE.local.md`, `.claude/settings.local.json`, `.claude/context/config.json` (single source of truth), and **copy-seeds** `.claude/context/repomix-snapshot.md` (regenerable per-branch cache).
 - If the repo has an executable `script/setup` at its root (the Scripts to Rule Them All convention — see `docs/guides/script-setup-and-test.md`), it runs it inside the new worktree right after provisioning, taking the worktree from "created" to "ready to work in" (deps installed, env file provisioned, codegen run). Pass `--no-setup` to skip it. A repo without `script/setup` is unaffected — this step is a no-op, not a warning.

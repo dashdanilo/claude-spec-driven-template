@@ -6,7 +6,7 @@ argument-hint: <what to do — free-form, or a spec folder to take the next unch
 
 Dispatch **one wave** and stop. No spec required, no PR at the end. Use this when `/orchestrate` is more ceremony than the work deserves — which is most of the time.
 
-Follow `.claude/rules/delegation.md` (you coordinate, specialists implement) and `.claude/docs/harness/dispatching.md` (how to fan out).
+Follow `.claude/rules/harness/delegation.md` (you coordinate, specialists implement) and `.claude/docs/harness/dispatching.md` (how to fan out).
 
 ## 1 — Build the batch
 
@@ -41,7 +41,7 @@ Wait for all of them. Then run `verify-before-done` **once, in the foreground** 
 
 One short card: what each specialist changed, gate result, what is left. Then **stop** — do not roll into the next wave on your own. The human decides whether to run `/wave` again.
 
-If a spec is active and this wave left the agreed plan — an assumption taken, a blocker worked around, a task done differently than written — append it to `specs/<slug>/deviations.md` (format in `.claude/rules/specs.md`) before reporting. A free-form `/wave` with no spec has nowhere durable to put this, so say it in the card instead.
+If a spec is active and this wave left the agreed plan — an assumption taken, a blocker worked around, a task done differently than written — append it to `specs/<slug>/deviations.md` (format in `.claude/rules/harness/specs.md`) before reporting. A free-form `/wave` with no spec has nowhere durable to put this, so say it in the card instead.
 
 ## STOP and ask when
 

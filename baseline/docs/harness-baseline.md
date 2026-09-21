@@ -266,5 +266,5 @@ session, not a hook-log after the fact.
 
 When a measurement is taken that is broad enough to replace the baseline, add a
 new dated section rather than editing the table above. The trail of what the
-harness used to do is the point — the same reason `.claude/rules/adr.md` makes
-decisions append-only.
+harness used to do is the point — the same reason `.claude/rules/harness/adr.md`
+makes decisions append-only.

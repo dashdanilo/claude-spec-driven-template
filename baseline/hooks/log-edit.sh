@@ -7,7 +7,7 @@
 # Wire on PreToolUse for Edit|Write|MultiEdit|NotebookEdit AND for Bash. Never
 # blocks (always exit 0, no decision output). The log is gitignored.
 #
-# Why this exists: `.claude/rules/delegation.md` says the main thread
+# Why this exists: `.claude/rules/harness/delegation.md` says the main thread
 # coordinates and specialists implement. On a real project that rule was
 # already written and 71% of Edit calls still happened in the main thread. A
 # rule you cannot see being broken is a rule that decays. This makes it

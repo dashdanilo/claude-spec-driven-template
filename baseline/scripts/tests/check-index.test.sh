@@ -86,7 +86,7 @@ ignored-notes.md
 EOF
 
 # Positive control: tracked rule, broken pointer. Must be reported.
-cat > "$REPO/.claude/rules/tracked-rule.md" <<EOF
+cat > "$REPO/${DC}/rules/tracked-rule.md" <<EOF
 ---
 paths: "**"
 ---
@@ -172,7 +172,7 @@ cat > "$REPO_CLEAN/.gitignore" <<'EOF'
 ignored-notes.md
 EOF
 
-cat > "$REPO_CLEAN/.claude/rules/tracked-rule.md" <<'EOF'
+cat > "$REPO_CLEAN/${DC}/rules/tracked-rule.md" <<'EOF'
 ---
 paths: "**"
 ---
@@ -232,7 +232,7 @@ _assert_not_contains "clean repo: gitignored-file broken pointer still not repor
 REPO_NO_GIT="$TMPDIR_ROOT/repo-no-git"
 mkdir -p "$REPO_NO_GIT/.claude/rules" "$REPO_NO_GIT/.claude/skills.pre-harness"
 
-cat > "$REPO_NO_GIT/.claude/rules/tracked-rule.md" <<'EOF'
+cat > "$REPO_NO_GIT/${DC}/rules/tracked-rule.md" <<'EOF'
 ---
 paths: "**"
 ---
@@ -289,7 +289,7 @@ git -C "$REPO_NESTED" init -q -b test
 git -C "$REPO_NESTED" config user.email "test@example.com"
 git -C "$REPO_NESTED" config user.name "Test"
 
-cat > "$REPO_NESTED/.claude/rules/tracked-rule.md" <<'EOF'
+cat > "$REPO_NESTED/${DC}/rules/tracked-rule.md" <<'EOF'
 ---
 paths: "**"
 ---
@@ -339,7 +339,7 @@ git -C "$REPO_NM" init -q -b test
 git -C "$REPO_NM" config user.email "test@example.com"
 git -C "$REPO_NM" config user.name "Test"
 
-cat > "$REPO_NM/.claude/rules/tracked-rule.md" <<'EOF'
+cat > "$REPO_NM/${DC}/rules/tracked-rule.md" <<'EOF'
 ---
 paths: "**"
 ---
@@ -398,7 +398,7 @@ cat > "$REPO_PERF/.gitignore" <<'EOF'
 big-ignored-dir/
 EOF
 
-cat > "$REPO_PERF/.claude/rules/tracked-rule.md" <<'EOF'
+cat > "$REPO_PERF/${DC}/rules/tracked-rule.md" <<'EOF'
 ---
 paths: "**"
 ---
@@ -476,7 +476,7 @@ cat > "$REPO_SYM/.gitignore" <<'EOF'
 ignored-elsewhere.md
 EOF
 
-cat > "$REPO_SYM/.claude/rules/tracked-rule.md" <<'EOF'
+cat > "$REPO_SYM/${DC}/rules/tracked-rule.md" <<'EOF'
 ---
 paths: "**"
 ---
@@ -514,6 +514,72 @@ _assert_not_contains "gitignored file is still suppressed alongside a symlink po
 
 _assert_eq "--strict exits 0 despite a symlink pointing outside the repo" \
   "$EXIT_SYM" "0"
+
+# ---------------------------------------------------------------- repo H
+# A fourth pointer category beyond docs/scripts: rules, skills and agents are
+# the other three paths a consumer gets from linking the harness (rules
+# namespaced under harness/, skills/agents linked one item at a time). A
+# dangling pointer to any of the three used to survive --strict silently
+# because the old regex only looked at the docs and scripts categories. One
+# rule file carries a broken pointer into each of the three, plus a
+# resolving one, to prove real hits still pass through.
+REPO_RSA="$TMPDIR_ROOT/repo-rules-skills-agents"
+mkdir -p "$REPO_RSA/.claude/rules"
+
+git -C "$REPO_RSA" init -q -b test
+git -C "$REPO_RSA" config user.email "test@example.com"
+git -C "$REPO_RSA" config user.name "Test"
+
+cat > "$REPO_RSA/${DC}/rules/other-real-rule.md" <<'EOF'
+---
+paths: "**"
+---
+
+A second real rule, referenced from pointer-check.md below to prove a
+resolving .claude/rules/... pointer is not flagged.
+EOF
+
+cat > "$REPO_RSA/${DC}/rules/pointer-check.md" <<EOF
+---
+paths: "**"
+---
+
+Broken: see ${DC}/rules/does-not-exist-rule.md, ${DC}/skills/does-not-exist-skill
+and ${DC}/agents/does-not-exist-agent.md for details.
+
+Resolves fine: see ${DC}/rules/other-real-rule.md (a real file, above).
+EOF
+
+cat > "$REPO_RSA/CLAUDE.md" <<'EOF'
+# Test project
+
+## Rules
+
+- pointer-check.md - a rule whose pointers are checked, some broken, some not
+- other-real-rule.md - the rule pointer-check.md points at, which resolves
+EOF
+
+git -C "$REPO_RSA" add CLAUDE.md .claude/rules
+git -C "$REPO_RSA" commit -q -m "fixture"
+
+OUT_RSA="$TMPDIR_ROOT/out-rules-skills-agents.txt"
+(cd "$REPO_RSA" && bash "$SCRIPT" --strict) > "$OUT_RSA" 2>&1
+EXIT_RSA=$?
+
+_assert_contains "rules pointer: broken .claude/rules/... is reported" \
+  "$OUT_RSA" "does-not-exist-rule.md"
+
+_assert_contains "skills pointer: broken .claude/skills/... is reported" \
+  "$OUT_RSA" "does-not-exist-skill"
+
+_assert_contains "agents pointer: broken .claude/agents/... is reported" \
+  "$OUT_RSA" "does-not-exist-agent.md"
+
+_assert_not_contains "rules pointer: a resolving .claude/rules/... is not flagged" \
+  "$OUT_RSA" "— ${DC}/rules/other-real-rule.md"
+
+_assert_eq "--strict exits 1 with three real dangling pointers present" \
+  "$EXIT_RSA" "1"
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"
