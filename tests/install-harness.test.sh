@@ -139,6 +139,7 @@ _has "old: status names the old layout"                "$TMP/st" "whole-folder l
 inst "$R" --dry-run
 _ok  "old --dry-run: changes nothing"                   '[[ -L $R/.claude/skills ]]'
 _has "old --dry-run: announces the conversion"          "$TMP/out" "convert    .claude/skills"
+_hasnt "old --dry-run: no phantom set-aside through the old link" "$TMP/out" "set aside  .claude/skills/"
 inst "$R"
 _ok  "old: converted to a real folder"                  '[[ -d $R/.claude/skills && ! -L $R/.claude/skills ]]'
 _ok  "old: tracked repo skill restored from .pre-harness" '[[ -f $R/.claude/skills/repo-skill/SKILL.md && ! -L $R/.claude/skills/repo-skill ]]'
