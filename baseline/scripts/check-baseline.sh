@@ -35,7 +35,8 @@ set -uo pipefail
 VERBOSE=0
 [[ "${1:-}" == "--verbose" ]] && VERBOSE=1
 
-# Where is the harness? Either we are inside it, or ~/.claude/skills points at it.
+# Where is the harness? Either we are inside it, or ~/.claude/skills points at it:
+# as one folder link (the old layout) or through any of its per-item links.
 resolve_checkout() {
   local here
   here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)
@@ -48,6 +49,12 @@ resolve_checkout() {
     target=$(cd -- "$(readlink "$link")/../.." 2>/dev/null && pwd)
     [[ -n "$target" && -e "$target/.git" ]] && { printf '%s' "$target"; return 0; }
   fi
+  local item
+  for item in "$link"/*; do
+    [[ -L "$item" && "$(readlink "$item")" == */baseline/skills/* ]] || continue
+    target=$(cd -- "$(dirname "$(readlink "$item")")/../.." 2>/dev/null && pwd)
+    [[ -n "$target" && -e "$target/.git" ]] && { printf '%s' "$target"; return 0; }
+  done
   return 1
 }
 
@@ -60,6 +67,16 @@ for n in skills agents rules/harness docs/harness scripts/harness; do
   [[ -e "$l" ]] && continue          # resolves — fine
   broken="${broken}
      .claude/$n -> $(readlink "$l")"
+done
+# Skills and agents are linked one item at a time, so a single dangling item is
+# as silent as a dangling folder: that one skill is simply not there.
+for n in skills agents; do
+  [[ -d ".claude/$n" && ! -L ".claude/$n" ]] || continue
+  for l in ".claude/$n"/*; do
+    [[ -L "$l" && ! -e "$l" ]] || continue
+    broken="${broken}
+     $l -> $(readlink "$l")"
+  done
 done
 
 if [[ -n "$broken" ]]; then
@@ -107,6 +124,70 @@ if [[ -n "$stale_copies" ]]; then
 fi
 
 CO=$(resolve_checkout) || exit 0
+
+# ------------------------------------------- skills/agents out of step with it
+# Per-item links follow every edit to a linked item, but not an item the
+# harness ADDED after the install: that one has no link until the installer runs
+# again. Only reported where this repo actually uses per-item links into THIS
+# checkout, so a repo that never linked the harness hears nothing.
+items_in() {
+  local p
+  case $1 in
+    skills) for p in "$CO/baseline/skills"/*/; do [[ -f "${p}SKILL.md" ]] && basename "$p"; done ;;
+    agents) for p in "$CO/baseline/agents"/*.md; do [[ -f "$p" ]] && basename "$p"; done ;;
+  esac
+  return 0
+}
+missing=""; old_layout=""; stale_items=""
+for n in skills agents; do
+  d=".claude/$n"
+  if [[ -L "$d" && "$(readlink "$d")" == "$CO/baseline/$n" ]]; then
+    old_layout="${old_layout} .claude/$n"; continue
+  fi
+  [[ -d "$d" ]] || continue
+  uses=0
+  for l in "$d"/*; do
+    [[ -L "$l" && "$(readlink "$l")" == "$CO/baseline/$n/"* ]] && { uses=1; break; }
+  done
+  [[ -f "$d/.harness-copies" ]] && uses=1
+  [[ $uses -eq 1 ]] || continue
+  while IFS= read -r item; do
+    [[ -n "$item" ]] || continue
+    [[ -e "$d/$item" || -L "$d/$item" ]] || missing="${missing}
+     $d/$item"
+  done <<< "$(items_in "$n")"
+  if [[ -f "$d/.harness-copies" ]]; then
+    while IFS= read -r item; do
+      [[ -n "$item" && -e "$CO/baseline/$n/$item" ]] || continue
+      diff -rq "$CO/baseline/$n/$item" "$d/$item" >/dev/null 2>&1 || stale_items="${stale_items}
+     $d/$item"
+    done < "$d/.harness-copies"
+  fi
+done
+
+if [[ -n "$missing" || -n "$stale_items" ]]; then
+  {
+    echo ""
+    [[ -n "$missing" ]] && { echo "⚠  the harness ships these, and this repo has no link for them yet:"; echo "$missing"; }
+    [[ -n "$stale_items" ]] && { echo "⚠  these are COPIES of harness items, and they no longer match it:"; echo "$stale_items"; }
+    echo ""
+    echo "   git pull updates what is already linked, not what the harness added"
+    echo "   since (or what was copied). Re-run the installer:"
+    echo "     $CO/install-harness.sh"
+    echo ""
+  } >&2
+fi
+if [[ -n "$old_layout" ]]; then
+  {
+    echo ""
+    echo "⚠  old layout:$old_layout linked as one whole folder."
+    echo "   It works, but it hides every skill or agent this repo versions itself."
+    echo "   Re-run the installer to link one item at a time:"
+    echo "     $CO/install-harness.sh"
+    echo ""
+  } >&2
+fi
+
 git -C "$CO" rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
 BRANCH=$(git -C "$CO" rev-parse --abbrev-ref HEAD 2>/dev/null)
