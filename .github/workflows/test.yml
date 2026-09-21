@@ -1,0 +1,43 @@
+name: test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity for fixture commits
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@example.com"
+
+      - name: Run hook and script test suites
+        run: |
+          set -u
+          fail=0
+          for f in baseline/hooks/tests/*.test.sh baseline/scripts/tests/*.test.sh; do
+            echo "=== $f ==="
+            if ! bash "$f"; then
+              echo "--- FAILED: $f ---"
+              fail=1
+            fi
+            echo
+          done
+          exit "$fail"
+
+      - name: Run install-harness test suite
+        run: bash tests/install-harness.test.sh
+
+      - name: Check index (strict)
+        run: bash baseline/scripts/check-index.sh --strict

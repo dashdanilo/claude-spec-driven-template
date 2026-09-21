@@ -276,19 +276,48 @@ for root in ${OWNED[@]+"${OWNED[@]}"}; do
     -o -type f \( -name '*.md' -o -name '*.sh' \) -print 2>/dev/null)
 done
 
+# A candidate reached through a symlinked DIRECTORY — a whole-folder link
+# (old-style `.claude/skills -> .../baseline/skills`) or a per-item one
+# (`.claude/skills/write-spec -> .../baseline/skills/write-spec`) — makes
+# `git check-ignore` fatal with "pathspec '...' is beyond a symbolic link"
+# for THAT line, regardless of whether the symlink points inside or
+# outside the repo. `check-ignore --stdin` reads its input sequentially and
+# ABORTS THE WHOLE BATCH at the first such line: every candidate listed
+# after it in the same invocation never gets evaluated at all, not just
+# skipped. `find -L`'s traversal order isn't guaranteed, so whether the
+# offending line lands before or after everything else is filesystem-
+# dependent — this passed for years on one OS and failed the moment CI ran
+# it on another. Pull anything under a symlinked directory out of the
+# batch before it can poison the rest of it; git can never classify these
+# anyway, so they are simply never counted as ignored (a leaf file that is
+# itself a symlink, like a per-item agent link, does not trigger this and
+# stays in the batch — only a symlinked directory COMPONENT does).
+symlinked_dirs=()
+for root in ${OWNED[@]+"${OWNED[@]}"}; do
+  while IFS= read -r d; do
+    symlinked_dirs+=("$d")
+  done < <(find "$root" -type l -xtype d 2>/dev/null)
+done
+
+check_candidates=()
+if [[ ${#symlinked_dirs[@]} -gt 0 ]]; then
+  for f in ${candidates[@]+"${candidates[@]}"}; do
+    skip=0
+    for d in "${symlinked_dirs[@]}"; do
+      case "$f" in "$d"/*) skip=1; break ;; esac
+    done
+    [[ $skip -eq 0 ]] && check_candidates+=("$f")
+  done
+else
+  check_candidates=(${candidates[@]+"${candidates[@]}"})
+fi
+
 ignored=""
-if [[ $GIT_AVAILABLE -eq 1 && ${#candidates[@]} -gt 0 ]]; then
-  # Trust stdout, not the exit code. A candidate whose ancestor is a
-  # symlink pointing outside the work tree — exactly what a repo that
-  # linked the harness has at .claude/agents, .claude/skills, etc. — makes
-  # git print "fatal: pathspec '...' is beyond a symbolic link" for THAT
-  # line and the whole invocation exits non-zero, but git still evaluates
-  # every other line correctly and still prints its own ignored paths to
-  # stdout. Discarding the batch on a non-zero exit would throw away
-  # correct results for every other candidate because of one unrelated
-  # line. Exit 1 alone ("nothing in the batch is ignored") is not an error
-  # either; $ignored is already empty in that case.
-  ignored="$(printf '%s\n' "${candidates[@]}" | git check-ignore --stdin 2>/dev/null)"
+if [[ $GIT_AVAILABLE -eq 1 && ${#check_candidates[@]} -gt 0 ]]; then
+  # Trust stdout, not the exit code: an unrelated `check-ignore` failure
+  # (exit 1 alone means "nothing in the batch is ignored", not an error)
+  # should not discard results that were already printed correctly.
+  ignored="$(printf '%s\n' "${check_candidates[@]}" | git check-ignore --stdin 2>/dev/null)"
 fi
 
 if [[ -n "$ignored" ]]; then
