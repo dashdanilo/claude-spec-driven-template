@@ -199,6 +199,57 @@ _run_case "19: [per-invocation cd] main status then feature commit" \
 _run_case "20: [defect 2, order A, explicit -C shape, not a reproduction] rev-parse on main then -C push on feature" \
   "$NEUTRAL_CWD" "git -C $MAIN_REPO rev-parse HEAD"$'\n'"git -C $FEATURE_REPO push" 0
 
+# 21-29: defect 3, ff-only merge of a protected branch's own upstream. The
+# hook never runs `git merge`, only inspects the command text, so none of
+# these need a real `origin` remote configured on the fixture repos.
+
+# 21. the reported bug: --ff-only update from the branch's own upstream is
+# exactly what `git pull --ff-only` does and cannot create a commit. Now
+# exempted.
+_run_case "21: [defect 3] git merge --ff-only origin/main, cwd on main" \
+  "$MAIN_REPO" "git merge --ff-only origin/main" 0
+
+# 22. control: same target, no --ff-only. Still blocked — --ff-only is the
+# part of the exemption that guarantees no commit can be created.
+_run_case "22: [defect 3 control] git merge origin/main (no --ff-only), cwd on main" \
+  "$MAIN_REPO" "git merge origin/main" 2
+
+# 23. control: --ff-only, but the target is NOT the branch's own upstream.
+# Still blocked — the exemption is upstream-only, not any ff-only merge.
+_run_case "23: [defect 3 control] git merge --ff-only feature/x, cwd on main" \
+  "$MAIN_REPO" "git merge --ff-only feature/x" 2
+
+# 24. @{u} shorthand for the current branch's upstream.
+_run_case "24: [defect 3] git merge --ff-only @{u}, cwd on main" \
+  "$MAIN_REPO" 'git merge --ff-only @{u}' 0
+
+# 25. @{upstream}, the long form of the same shorthand.
+_run_case "25: [defect 3] git merge --ff-only @{upstream}, cwd on main" \
+  "$MAIN_REPO" 'git merge --ff-only @{upstream}' 0
+
+# 26. octopus shape: two targets. Still blocked — "the single merge target"
+# is part of the exemption, not any --ff-only merge that happens to include
+# the upstream among several refs.
+_run_case "26: [defect 3 control] git merge --ff-only origin/main origin/other, cwd on main" \
+  "$MAIN_REPO" "git merge --ff-only origin/main origin/other" 2
+
+# 27. explicit -C shape: the exemption applies after -C is stripped, same as
+# every other pattern.
+_run_case "27: [defect 3] git -C main-repo merge --ff-only origin/main" \
+  "$NEUTRAL_CWD" "git -C $MAIN_REPO merge --ff-only origin/main" 0
+
+# 28. compound command: the exempted merge does not clear a later, real
+# merge in the same command — each invocation is still checked on its own.
+_run_case "28: [defect 3] compound: ff-only upstream merge, then a real merge" \
+  "$MAIN_REPO" 'git merge --ff-only origin/main && git merge feature/x' 2
+
+# 29. git pull --ff-only itself was never in the dangerous-pattern list and
+# always passed; asserted here next to 21 so the contrast the bug report
+# drew (pull allowed, equivalent merge blocked) is pinned as a regression
+# test, not just prose.
+_run_case "29: [defect 3, contrast] git pull --ff-only, cwd on main" \
+  "$MAIN_REPO" "git pull --ff-only" 0
+
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"
 
