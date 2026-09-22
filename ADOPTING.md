@@ -628,6 +628,15 @@ if chosen and chosen.get("installPath"):
    e `.claude/.agent-log-consumed` na primeira chamada. Um repo cujo
    `.gitignore` é anterior a esses hooks fica com um arquivo novo não
    rastreado logo depois de adotar, no diretório que o passo 7 manda revisar.
+
+   Um repo que adotou com uma versão antiga do `install.sh` provavelmente tem
+   `.claude/agent-memory/` no `.gitignore`: remova essa linha. A memória de um
+   subagent com `memory: project` é versionada de propósito (vai no diff da
+   feature branch e é revisada com o PR, igual a qualquer outro arquivo); só
+   `memory: local` fica em `.claude/agent-memory-local/`, que continua fora do
+   git. Se um agent de plugin rodou por engano no repo errado e deixou memória
+   que não faz sentido aqui, apague o arquivo, não commite.
+
    Revise também os arquivos que ficam fora dos sete diretórios classificados
    no passo 3:
    `.claude/*.md` soltos (um `.claude/README.md` de época costuma descrever a

@@ -62,10 +62,14 @@ ITEMS=(
   ".github"
 )
 
+# .claude/agent-memory/ (memory: project subagents) is deliberately NOT in
+# this block: it is versioned, lands in the feature branch's diff, and is
+# reviewed with the PR like any other file. Only memory: local subagents
+# write to .claude/agent-memory-local/, which stays personal.
 GITIGNORE_BLOCK='# Personal Claude Code files (do not share)
 CLAUDE.local.md
 .claude/settings.local.json
-.claude/agent-memory/
+.claude/agent-memory-local/
 
 # Generated context (Repomix snapshot, etc)
 .claude/context/repomix-snapshot.md

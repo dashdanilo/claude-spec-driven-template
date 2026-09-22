@@ -9,6 +9,9 @@
 #   4. dangling pointer            — a `.claude/docs/...`, `.claude/scripts/...`,
 #      `.claude/rules/...`, `.claude/skills/...` or `.claude/agents/...` mention
 #      in a rule, skill, agent or script that does not resolve from the repo root
+#      (a `.claude/agents/<name>` pointer without the `.md` extension, the way
+#      an agent is usually referenced by name, also resolves when `<name>.md`
+#      exists on disk)
 #
 # (2), (3) and (4) are the silent ones. A stale index entry sends an agent looking
 # for something that is not there; a hook without +x never runs and never says so;
@@ -260,6 +263,20 @@ is_exempt_pointer() {
   return 1
 }
 
+# A `.claude/agents/<name>` pointer is often written without the `.md`
+# extension, the same way the agent is dispatched by name (backtick-quoted
+# in prose, e.g. `.claude/agents/code-reviewer`) rather than referenced as a
+# literal file path. The file on disk is always `<name>.md`, so a pointer
+# missing the extension still resolves as long as that file exists.
+pointer_resolves() {
+  local pointer="$1"
+  [[ -e "$pointer" ]] && return 0
+  case "$pointer" in
+    .claude/agents/*) [[ -e "$pointer.md" ]] && return 0 ;;
+  esac
+  return 1
+}
+
 dangling=""
 seen_ptr_files=""
 ptr_files=()
@@ -340,7 +357,7 @@ for f in ${ptr_files[@]+"${ptr_files[@]}"}; do
     # A pointer at the end of a sentence ("...harness-baseline.md.") picks up
     # the full stop; it is punctuation, not part of the path.
     pointer="${pointer%.}"
-    [[ -e "$pointer" ]] && continue
+    pointer_resolves "$pointer" && continue
     is_exempt_pointer "$pointer" && continue
     add dangling "$f:$lineno — $pointer"
   done < <(grep -noE '\.claude/(docs|scripts|rules|skills|agents)/[A-Za-z0-9_./-]+' "$f" 2>/dev/null)

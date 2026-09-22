@@ -46,8 +46,8 @@ Check what already exists:
 
 - `.env*` and any file matching `**/secrets/**`
 - `node_modules/`, `.next/`, `dist/`, `build/`
-- `CLAUDE.local.md` and any `*.local.*` files (personal)
-- `.claude/agent-memory/` and `.claude/context/` (generated, gitignored)
+- `CLAUDE.local.md`, any `*.local.*` files, and `.claude/agent-memory-local/` (personal, gitignored)
+- `.claude/context/` (generated, gitignored)
 
 ## Personal Copilot preferences
 

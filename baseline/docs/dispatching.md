@@ -179,7 +179,7 @@ A cheap narrow specialist often beats an expensive broad one: a focused security
 
 ## Agent memory
 
-An agent whose frontmatter declares `memory:` has a durable notebook across runs (`.claude/agent-memory/<agent>/`, gitignored). Declaring it is not using it — the agent has to choose to write.
+An agent whose frontmatter declares `memory:` has a durable notebook across runs. The scope decides where it lands: `memory: project` writes to `.claude/agent-memory/<agent>/`, versioned and reviewed with the PR like any other file; `memory: user` writes to `~/.claude/agent-memory/<agent>/`, personal and shared across every project on the machine; `memory: local` writes to `.claude/agent-memory-local/<agent>/`, project-specific but gitignored. Declaring it is not using it — the agent has to choose to write.
 
 Worth persisting: conventions the agent re-derives every run, gotchas that already bit once, the shape of the area it owns. **Not** worth persisting: anything re-readable from the repo in one grep (see "re-fetchable beats stored" in the context doc).
 

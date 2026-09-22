@@ -200,15 +200,17 @@ Introduced in Claude Code v2.1.33, the `memory:` frontmatter field gives a subag
 
 ```markdown
 ---
-memory: user        # ~/.claude/agent-memory/<name>/
+memory: user        # ~/.claude/agent-memory/<name>/ (personal, shared across every project)
 # OR
-memory: project     # .claude/agent-memory/<name>/ (gitignored)
+memory: project     # .claude/agent-memory/<name>/ (versioned, shareable via version control)
 # OR
-memory: local       # session-only
+memory: local       # .claude/agent-memory-local/<name>/ (project-specific, gitignored)
 ---
 ```
 
 The first 200 lines of `MEMORY.md` in that directory are auto-injected into the subagent's system prompt every invocation. The subagent has Read, Write, and Edit tools enabled to manage its own notes.
+
+`memory: project` is the scope every baseline agent uses: the notebook lands in the feature branch's diff and is reviewed with the PR like any other file, so a teammate who never ran the agent still sees what it learned. Only `memory: local` is gitignored; reach for it when the notes are genuinely tied to one machine and would mislead a teammate.
 
 This is real persistence. A `researcher` subagent that investigated five libraries last week will remember the gotchas this week.
 
