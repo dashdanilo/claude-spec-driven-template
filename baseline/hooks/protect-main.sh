@@ -47,6 +47,21 @@
 #     or `<remote>/<branch>` generally). A merge of any other ref, more than
 #     one target, or a merge without `--ff-only`, is still blocked exactly as
 #     before.
+#   - deleting a non-protected remote branch, blocked like any other push:
+#     `git push origin --delete fix/x` while the CURRENT branch is `main`
+#     never pushes `main` — it only removes a remote ref for a feature branch
+#     that already merged — but the old hook matched `git\s+push`
+#     unconditionally and blocked every push regardless of what it actually
+#     names. Fixed: a `git push` invocation on a protected branch is now
+#     exempted ONLY when EVERY ref it names is a deletion (`--delete`/`-d`
+#     followed by branch names, or a `:<branch>` refspec) of a branch that is
+#     itself NOT in the protected list. A push that also names a real ref
+#     (`git push origin :fix/x main`), deletes a protected branch itself
+#     (`git push origin --delete main`), carries no ref at all (plain
+#     `git push`/`git push origin`), or carries `--force`/`-f` or any other
+#     flag this check doesn't recognize as harmless, is still blocked exactly
+#     as before — the parser is conservative on purpose: an unrecognized flag
+#     is treated as unsafe rather than assumed harmless.
 #
 # Accepted gap: when a cd target is not a literal path — built from a
 # variable, command substitution, or a glob, e.g. `W=<path>` then `cd $W` —
@@ -219,6 +234,72 @@ _is_safe_ff_only_upstream_merge() {
   esac
 }
 
+# A `git push` invocation on a protected branch is safe, and exempted from
+# the dangerous-pattern block below, only when EVERY ref it names is a
+# deletion of a branch that is NOT itself in the protected list: `--delete`/
+# `-d` followed by one or more branch names, or a `:<branch>` refspec.
+# Deleting an already-merged remote feature branch never pushes the current
+# (protected) branch. Not a shell parser: the first positional token is
+# always treated as the remote name (as `git push` requires), and any flag
+# other than `--delete`/`-d`/`-q`/`--quiet`/`-v`/`--verbose` is treated as
+# unsafe rather than assumed harmless — most importantly `--force`/`-f`,
+# `--mirror`, `--all`, `--tags`, `--prune`, which change what the invocation
+# actually does and must stay blocked even alongside a `--delete`.
+_is_safe_delete_only_push() {
+  local line="$1"
+  local -a tokens
+  read -ra tokens <<< "$line"
+
+  local has_delete_flag=0
+  local remote_seen=0
+  local -a ref_names=()
+  local -a ref_is_delete=()
+  local i tok
+
+  for ((i = 2; i < ${#tokens[@]}; i++)); do
+    tok="${tokens[$i]}"
+    case "$tok" in
+      --delete|-d) has_delete_flag=1 ;;
+      -q|--quiet|-v|--verbose) : ;;
+      -*) return 1 ;;
+      *)
+        if [[ "$remote_seen" -eq 0 ]]; then
+          remote_seen=1
+          continue
+        fi
+        if [[ "$tok" == :* ]]; then
+          ref_names+=("${tok#:}")
+          ref_is_delete+=(1)
+        elif [[ "$has_delete_flag" -eq 1 ]]; then
+          ref_names+=("$tok")
+          ref_is_delete+=(1)
+        else
+          ref_names+=("$tok")
+          ref_is_delete+=(0)
+        fi
+        ;;
+    esac
+  done
+
+  [[ "${#ref_names[@]}" -eq 0 ]] && return 1
+
+  local j name is_del
+  for ((j = 0; j < ${#ref_names[@]}; j++)); do
+    is_del="${ref_is_delete[$j]}"
+    [[ "$is_del" -eq 1 ]] || return 1
+
+    name="${ref_names[$j]}"
+    name="${name#refs/heads/}"
+    [[ -z "$name" ]] && return 1
+
+    for b in $protected_branches; do
+      [[ "$name" == "$b" ]] && return 1
+    done
+  done
+
+  return 0
+}
+
 # Split into one "atomic" command per line at command-position separators, so
 # 'cd x && git y' and 'cd x\ngit y' are walked the same way. Order matters:
 # && / || must be split before the single & / | they contain, or a stray & or
@@ -320,6 +401,10 @@ while IFS= read -r _line; do
       if echo "$git_line_normalized" | grep -qE "$pattern"; then
         if [[ "$pattern" == 'git\s+merge(\s|$)' ]] \
            && _is_safe_ff_only_upstream_merge "$git_line_normalized" "$inv_branch"; then
+          continue
+        fi
+        if [[ "$pattern" == 'git\s+push(\s|$)' ]] \
+           && _is_safe_delete_only_push "$git_line_normalized"; then
           continue
         fi
         blocked=1

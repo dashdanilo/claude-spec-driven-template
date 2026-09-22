@@ -5,7 +5,7 @@
 # with two commits so `git merge-base --is-ancestor` has real revisions),
 # feeds the hook the same JSON-on-stdin shape Claude Code sends
 # (`{"tool_name":"Bash","tool_input":{"command":"..."}}`, per CONTRIBUTING.md),
-# and asserts the exit code (2 = blocked, 0 = passes). 20 cases. Self-contained:
+# and asserts the exit code (2 = blocked, 0 = passes). 41 cases. Self-contained:
 # no dependency on the developer's cwd, fixtures live under a mktemp dir
 # removed on exit via trap.
 #
@@ -249,6 +249,67 @@ _run_case "28: [defect 3] compound: ff-only upstream merge, then a real merge" \
 # test, not just prose.
 _run_case "29: [defect 3, contrast] git pull --ff-only, cwd on main" \
   "$MAIN_REPO" "git pull --ff-only" 0
+
+# 30-40: defect 4, deleting a non-protected remote branch after its PR
+# merged. The hook never runs the push, only inspects the command text, so
+# none of these need a real `origin` remote configured on the fixture repos,
+# and "feature/x" is used as the branch name being deleted purely as text —
+# it does not need to exist as a real ref on any remote.
+
+# 30. the reported bug: deleting an already-merged remote feature branch
+# while the CURRENT branch is main. Now exempted.
+_run_case "30: [defect 4] git push origin --delete feature/x, cwd on main" \
+  "$MAIN_REPO" "git push origin --delete feature/x" 0
+
+# 31. -d short flag, same shape as 30.
+_run_case "31: [defect 4] git push origin -d feature/x, cwd on main" \
+  "$MAIN_REPO" "git push origin -d feature/x" 0
+
+# 32. colon-refspec form of the same delete.
+_run_case "32: [defect 4] git push origin :feature/x, cwd on main" \
+  "$MAIN_REPO" "git push origin :feature/x" 0
+
+# 33. -q combined with --delete, a common agent-issued shape.
+_run_case "33: [defect 4] git push -q origin --delete feature/x, cwd on main" \
+  "$MAIN_REPO" "git push -q origin --delete feature/x" 0
+
+# 34. -C shape: the exemption applies after -C is stripped, same as every
+# other pattern.
+_run_case "34: [defect 4] git -C main-repo push origin --delete feature/x" \
+  "$NEUTRAL_CWD" "git -C $MAIN_REPO push origin --delete feature/x" 0
+
+# 35. control: plain git push (no ref at all) — still blocked.
+_run_case "35: [defect 4 control] plain git push, cwd on main" \
+  "$MAIN_REPO" "git push" 2
+
+# 36. control: git push origin main — a real push, still blocked.
+_run_case "36: [defect 4 control] git push origin main, cwd on main" \
+  "$MAIN_REPO" "git push origin main" 2
+
+# 37. control: deleting a PROTECTED branch itself — still blocked, arguably
+# more so.
+_run_case "37: [defect 4 control] git push origin --delete main, cwd on main" \
+  "$MAIN_REPO" "git push origin --delete main" 2
+
+# 38. control: deleting another protected name (develop) — still blocked.
+_run_case "38: [defect 4 control] git push origin --delete develop, cwd on main" \
+  "$MAIN_REPO" "git push origin --delete develop" 2
+
+# 39. control: mixed refspecs — one delete, one real push in the same
+# invocation. Still blocked: not every ref it names is a deletion.
+_run_case "39: [defect 4 control] git push origin :feature/x main, cwd on main" \
+  "$MAIN_REPO" "git push origin :feature/x main" 2
+
+# 40. control: --force alongside --delete — still blocked. The parser
+# treats any flag it does not explicitly recognize as harmless (--delete,
+# -d, -q/--quiet, -v/--verbose) as unsafe, on purpose.
+_run_case "40: [defect 4 control] git push --force origin --delete feature/x, cwd on main" \
+  "$MAIN_REPO" "git push --force origin --delete feature/x" 2
+
+# 41. compound command: the exempted delete does not clear a later, real
+# push in the same command — each invocation is still checked on its own.
+_run_case "41: [defect 4] compound: delete-only push, then a real push" \
+  "$MAIN_REPO" 'git push origin --delete feature/x && git push origin main' 2
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"
