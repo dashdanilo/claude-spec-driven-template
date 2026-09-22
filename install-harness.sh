@@ -693,6 +693,15 @@ PY
 # entry for the folder would also ignore every skill or agent the repo adds
 # there itself, and `git add` would silently skip it. The block is rewritten on
 # every run, so an item the harness adds or drops is reflected here too.
+#
+# It also covers the RUNTIME FILES the portable hooks themselves write once
+# registered: log-agent.sh appends to agent-log.txt and keeps the
+# .agent-log-consumed registry, log-edit.sh appends to tool-log.txt. Only
+# install.sh (the copy-context installer) puts these in the target's own
+# .gitignore; a repo that only ever linked the harness has no reason to carry
+# those names in its committed .gitignore, so they belong in this per-clone
+# block instead — otherwise the first tool call after linking leaves an
+# untracked file `git status`/`git add -A` would pick up.
 MARK="# claude harness (install-harness.sh) — local only, never commit"
 exclude_block() {
   local cat name n
@@ -705,6 +714,7 @@ exclude_block() {
   done
   for n in "${NAMES[@]}"; do printf '.claude/%s\n' "$n"; done
   printf '%s\n' ".claude/settings.local.json" ".claude/**/*.pre-harness" ".claude/*.pre-harness"
+  printf '%s\n' ".claude/agent-log.txt" ".claude/tool-log.txt" ".claude/.agent-log-consumed"
 }
 current_block() {
   awk -v m="$MARK" '$0 == m {f = 1; print; next} f && /^\.claude\// {print; next} {f = 0}' "$EXCLUDE" 2>/dev/null

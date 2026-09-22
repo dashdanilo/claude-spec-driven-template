@@ -83,7 +83,11 @@ da sessão, com o nome do item que falta.
 **Nada é commitado.** Os links vão para o `.git/info/exclude` (nunca sobe) e os
 hooks para o `.claude/settings.local.json` (já gitignorado). Quem clonar o repo
 não vê symlink pendurado, e o CI não vê nada. Ligar num repo que você divide com
-outras pessoas é seguro.
+outras pessoas é seguro. O mesmo bloco também lista os arquivos de runtime que
+os próprios hooks escrevem depois de registrados (`.claude/agent-log.txt`,
+`.claude/tool-log.txt`, `.claude/.agent-log-consumed`), para que a primeira
+chamada de ferramenta depois do link não vire um arquivo não rastreado no
+`git status`.
 
 `.git/info/exclude` não é por clone: mora no diretório git **comum**, então numa
 worktree é o arquivo do checkout principal, compartilhado por todas as
