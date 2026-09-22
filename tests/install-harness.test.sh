@@ -221,6 +221,41 @@ R="$TMP/noorigin"; mkdir -p "$R"
 _hasnt "no origin: no stale-origin warning text at all" "$TMP/wt3" "origin/HEAD points at"
 _ok    "no origin: worktree still created" '[[ -d $TMP/noorigin.probe3 && -f $TMP/noorigin.probe3/.git ]]'
 
+# ---------------------------------------------------------------- 11. runtime hook logs excluded too
+# log-agent.sh (agent-log.txt, .agent-log-consumed) and log-edit.sh
+# (tool-log.txt) are runtime files the registered hooks themselves write, not
+# links install-harness.sh makes — but the exclude block is where every
+# install-time promise of "nothing untracked appears" has to cover them too.
+R=$(new_repo hooklogs)
+inst "$R"
+_has "hooklogs: exclude lists agent-log.txt"                   "$R/.git/info/exclude" ".claude/agent-log.txt"
+_has "hooklogs: exclude lists tool-log.txt"                    "$R/.git/info/exclude" ".claude/tool-log.txt"
+_has "hooklogs: exclude lists the consumed registry"           "$R/.git/info/exclude" ".claude/.agent-log-consumed"
+_ok  "hooklogs: agent-log.txt is git-ignored"                  'git -C "$R" check-ignore -q .claude/agent-log.txt'
+_ok  "hooklogs: tool-log.txt is git-ignored"                   'git -C "$R" check-ignore -q .claude/tool-log.txt'
+_ok  "hooklogs: .agent-log-consumed is git-ignored"            'git -C "$R" check-ignore -q .claude/.agent-log-consumed'
+touch "$R/.claude/agent-log.txt" "$R/.claude/tool-log.txt" "$R/.claude/.agent-log-consumed"
+_ok  "hooklogs: simulated hook writes leave git status clean"  '[[ -z $(git -C "$R" status --porcelain) ]]'
+inst "$R" --unlink
+_ok  "hooklogs: unlink removes the runtime-log exclude lines"  '! grep -qx ".claude/agent-log.txt" "$R/.git/info/exclude"'
+_ok  "hooklogs: unlink drops the whole harness block"          '! grep -q "claude harness" "$R/.git/info/exclude"'
+
+# --dry-run must report the runtime-log lines too, and rerunning must be
+# idempotent — including the upgrade path: a repo installed before this fix
+# has an old-style block missing them, and the next run has to add them
+# without duplicating.
+R=$(new_repo hooklogs-upgrade)
+inst "$R"
+sed -i.bak '/^\.claude\/agent-log\.txt$/d;/^\.claude\/tool-log\.txt$/d;/^\.claude\/\.agent-log-consumed$/d' "$R/.git/info/exclude"
+rm -f "$R/.git/info/exclude.bak"
+inst "$R" --dry-run
+_has "hooklogs upgrade: dry-run reports the exclude needs rewriting" "$TMP/out" "would      write the links to .git/info/exclude"
+inst "$R"
+_has "hooklogs upgrade: rerun adds the missing runtime-log lines"    "$R/.git/info/exclude" ".claude/agent-log.txt"
+cp "$R/.git/info/exclude" "$TMP/ex-upgrade"
+inst "$R"
+_ok  "hooklogs upgrade: rerun again is a no-op (no pile-up)"         'cmp -s "$TMP/ex-upgrade" "$R/.git/info/exclude"'
+
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed"
 [[ $FAIL_COUNT -eq 0 ]]
