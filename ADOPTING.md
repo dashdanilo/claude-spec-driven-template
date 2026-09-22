@@ -641,6 +641,11 @@ if chosen and chosen.get("installPath"):
    git. Se um agent de plugin rodou por engano no repo errado e deixou memória
    que não faz sentido aqui, apague o arquivo, não commite.
 
+   A exceção é repositório **público**: a memória dos agents registra o que
+   eles viram em outros repos (nomes, caminhos, decisões de repos privados),
+   e versionar isso num repo público é vazamento. Nele, mantenha
+   `.claude/agent-memory/` no `.gitignore`, como este próprio harness faz.
+
    Revise também os arquivos que ficam fora dos sete diretórios classificados
    no passo 3:
    `.claude/*.md` soltos (um `.claude/README.md` de época costuma descrever a

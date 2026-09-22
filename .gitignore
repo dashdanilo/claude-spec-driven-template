@@ -1,8 +1,8 @@
 # Personal Claude Code files (do not share)
-# .claude/agent-memory/ (memory: project subagents) is NOT here on purpose:
-# it is versioned and reviewed with the PR like any other file. Only
-# memory: local subagents write to .claude/agent-memory-local/, which stays
-# personal.
+# Adopting repos version .claude/agent-memory/ (memory: project) on purpose.
+# THIS repo is public, and the agents that run here write notes about the
+# private repos they were dispatched against, so here it stays out of git.
+.claude/agent-memory/
 CLAUDE.local.md
 .claude/settings.local.json
 .claude/agent-memory-local/
