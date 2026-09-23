@@ -249,6 +249,46 @@ sends one of those, this whole path (and the bug in it) may already be
 dormant in practice. That requires checking a live payload from a current
 session, not a hook-log after the fact.
 
+## 2026-09-23 - A/B protocol for /lean against /orchestrate (not yet run)
+
+`/lean` (`baseline/skills/lean/SKILL.md`) exists because per-task scaffolding
+is a hypothesis about cost, not a settled fact, once the model is strong
+enough to sequence its own work without a checkbox per step. This section is
+the protocol for judging that hypothesis, not a result: no run has happened
+yet, and the numbers below are deliberately absent rather than guessed.
+
+**Design.** One real feature, sized so a single specialist's context can hold
+it (the same size class `/lean`'s "When to use which" table names as its
+fit), built twice from the same starting commit with the same model: once
+through `/lean`, once through `/orchestrate`. Same acceptance criteria for
+both runs, so the comparison is the driver, not the scope.
+
+**What to read from `/harness-report` after each run:**
+
+- **Tokens.** Total, and the split between main-thread and subagent, same
+  breakdown the 2026-09-10 A/B used for the old and current `orchestrate`
+  drivers.
+- **Dispatches.** Count, and dispatches per message (`/lean` has exactly one
+  build dispatch and one verify dispatch by construction; `/orchestrate`'s
+  count depends on how many clusters it plans).
+- **Main-thread token share.** The number this file's own baseline (71%) and
+  the delegation rule were written to move.
+- **Wall clock.** Start to open PR, both runs.
+- **Rework.** How many times the gate went red before it stayed green, and
+  how many review rounds `code-reviewer` needed to reach zero open blockers.
+  This is the number that would show whether `/lean`'s lighter structure
+  actually costs more corrections later, the way one-agent-per-task did in
+  the imported TLC hypothesis above.
+
+**Why this is a separate protocol and not a rerun of 2026-09-10.** That A/B
+compared two versions of the same driver (the current `orchestrate` against
+the 53-line one it replaced) on 16 unit-test tasks, n=1. It says nothing
+about `/lean`, which did not exist yet, and its own numbers are not
+comparable across it besides (see the 2026-09-12 entries above on the
+delegation and token-total denominators changing). A `/lean` vs `/orchestrate`
+comparison needs its own run, on work sized for `/lean`'s stated fit, read
+against this protocol, not folded into the existing table.
+
 ## Reading a report honestly
 
 - **A small sample is not a trend.** A handful of edits in one session says
