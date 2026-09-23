@@ -50,7 +50,7 @@ Each worktree is best opened as its own editor window so the file view is scoped
 .claude/scripts/harness/spec-worktree.sh --prune           # remove worktrees whose branch is merged into the default branch
 ```
 
-Worktrees are **not** removed automatically on merge — you may still need one. Clean up deliberately, later, with `--remove` or `--prune`. `--prune` skips any worktree that has uncommitted changes.
+Worktrees are **not** removed automatically on merge — you may still need one. Clean up deliberately, later, with `--remove` or `--prune`. `--prune` skips any worktree that has uncommitted changes. See "When a worktree's life ends" in `.claude/rules/harness/git-workflow.md` for the criterion: a worktree that only ever existed to produce a PR is safe to `--remove` as soon as that PR opens, not only after merge.
 
 ## What NOT to do
 
@@ -59,7 +59,7 @@ Worktrees are **not** removed automatically on merge — you may still need one.
 - Do not base the branch on anything but the remote's default branch. Always fresh from it (not local `main`, not a stale checkout).
 - Do not nest the worktree inside the repo. It is a flat sibling (`../<repo>.<slug>`), so git never sees it and it can't be committed by accident.
 - Do not symlink the Repomix export, if one exists. It is per-branch and gets rewritten when refreshed; sharing it corrupts main's copy. The script copies it once, if present; refreshing it in the new worktree afterward is manual (`/skill refresh-snapshot`).
-- Do not remove a worktree just because its PR merged, unless the user asks. Keep it until cleanup.
+- Do not remove a worktree that still has uncommitted changes or commits not yet pushed anywhere, no matter what its PR status is; that work exists nowhere else.
 
 ## Claude Code note
 

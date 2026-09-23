@@ -65,7 +65,7 @@ Dispatch `code-reviewer` once for the whole change - no cluster scope, there is 
 
 ## Finish
 
-Dispatch `reviewer` for the whole branch, run the gate once more, open a **PR to the repo's integration branch**. Never merge - `protect-main` blocks it.
+Dispatch `reviewer` for the whole branch, run the gate once more, open a **PR to the repo's integration branch**. Never merge - `protect-main` blocks it. If this ran in a `spec-worktree` created only to produce this PR, remove it now instead of waiting for merge (see "When a worktree's life ends" in `.claude/rules/harness/git-workflow.md`).
 
 ## STOP and ask a human when
 

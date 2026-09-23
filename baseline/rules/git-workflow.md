@@ -81,6 +81,27 @@ If the human does not answer within 5 minutes, proceed with `spec-worktree` and 
 
 **Why the two worktree mechanisms are not interchangeable.** The agent tool's own worktree lives *inside* the repo, under `.claude/worktrees/`, so a stale one keeps a full copy of whatever the repo held at that moment, and nothing prunes it automatically. On 2026-09-23 that is exactly what made `harness-score` report `njord-back` as L4 (99/108): a leftover `.claude/worktrees/<name>/` directory still held an old, fully vendored copy of 48 skills and 20 agents, and the scanner counted it in full. `spec-worktree` puts the tree outside the repo, at `../<repo>.<slug>`, where no scan ever sees it. See `docs/guides/harness-score.md` for the full mechanism.
 
+### When a worktree's life ends
+
+Two kinds of worktree end differently.
+
+**Created only to produce a PR: dies when the PR opens.** The branch lives on the remote and the PR lives on GitHub; keeping the directory afterward buys nothing, and if review asks for changes the worktree is recreated in seconds from the branch (`spec-worktree.sh <slug>`).
+
+**Has work in progress: stays.** Uncommitted changes, commits not yet pushed anywhere, or an experiment someone will come back to: none of that lives anywhere but the worktree, so it stays until whoever owns it is done with it.
+
+Before removing one, check it is safe to lose nothing:
+
+```bash
+git status -s      # empty: no uncommitted changes
+git log @{u}..      # empty: nothing unpushed
+```
+
+Delete the **local** branch only once its PR has merged; keep it while the PR is open (the remote already has the branch, and a local copy costs nothing while it saves a fetch if the PR needs another commit).
+
+Removing a worktree is not the same as deleting work: the branch and its commits survive on the remote either way. Hoarding worktrees comes from fearing otherwise, and that fear does not apply here.
+
+A stale worktree left inside the repo also distorts `harness-score`; see the note above and `docs/guides/harness-score.md`.
+
 ## Commits
 
 **Format: Conventional Commits.**
