@@ -107,12 +107,6 @@ Files used in agent output, never loaded into context:
 - Separates output resources from documentation
 - Agent can copy/modify these files without reading them into context
 
-## Storage Locations
+## Storage locations (this repo)
 
-| Type | Path | Scope |
-|------|------|-------|
-| Canonical (this repo) | `skills/<name>/` | Edited here, source of truth |
-| Consumer mount (via submodule) | `.agents/skills/<name>/` | Read-only inside parent repos |
-| Personal/local override | `~/.agents/skills/<name>/` | Per-developer machine |
-
-See the **Reference path policy** in `SKILL.md` for which path style to use in cross-references.
+Canonical skills live at `baseline/skills/<name>/SKILL.md`, edited here. A project that links the harness gets one symlink per item at `.claude/skills/<name>` pointing back into this checkout (see `CLAUDE.md` and `README.md`); nothing is vendored or copied. Cross-references between skills use the bare name (`see skill-architect`), not a path, since this repo has no submodule mount to disambiguate.
