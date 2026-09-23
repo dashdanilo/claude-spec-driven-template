@@ -17,6 +17,8 @@ Never claim a change is "done", check a task in `tasks.md`, or open a PR without
 - Before checking a `tasks.md` box, opening a PR, or reporting success
 - As the mandatory gate step in a subagent/`/loop` development loop
 
+If the change touched a screen, also run `verify-ui` and fold its driven-flow claim into the same `.claude/verification/` report before calling this gate green - install/typecheck/build/tests never prove a screen rendered correctly.
+
 ## Discover the commands (do not assume the stack)
 
 Check first, before anything else: does the repo have an executable `script/test` at its root (the Scripts to Rule Them All convention — `docs/guides/script-setup-and-test.md`)? If so, **that is the gate** — run it instead of rediscovering commands from `AGENTS.md`/`package.json`/etc. It already encodes the repo's own order (install, codegen, typecheck, build, tests) and its own exceptions (e.g. a lint step that only checks, never `--fix`s). Do not second-guess it by also running the steps it already runs.

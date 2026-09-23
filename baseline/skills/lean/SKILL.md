@@ -44,7 +44,7 @@ Dispatch **one** specialist with `plan.md` and `checks.md` in full: the stack sp
 
 ## 4 - Verify
 
-Dispatch a **fresh subagent that never built the change** - `tester` by default, since most proofs in `checks.md` are commands or tests it can run directly, and it can still `Read`/`Grep` a `file:line` proof. Hand it `checks.md` and have it grade every claim, writing `.claude/verification/<date>-<slug>.md` (and refreshing `latest.md`) in `verify-before-done`'s "Evidence or zero" format, then run `baseline/scripts/verify-gate.py` on it as the deterministic close.
+Dispatch a **fresh subagent that never built the change** - `tester` by default, since most proofs in `checks.md` are commands or tests it can run directly, and it can still `Read`/`Grep` a `file:line` proof. Hand it `checks.md` and have it grade every claim, writing `.claude/verification/<date>-<slug>.md` (and refreshing `latest.md`) in `verify-before-done`'s "Evidence or zero" format, then run `baseline/scripts/verify-gate.py` on it as the deterministic close. If `plan.md`'s surface touches a screen, an acceptance criterion about that screen is only proven by `verify-ui`'s driven-flow claim in the same report, not by a passing build.
 
 **Red gate means back to step 3 with the specific failure, never a note in the report.** Up to 3x; still red, or the fix looks hacky, is a STOP.
 

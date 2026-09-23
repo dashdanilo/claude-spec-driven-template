@@ -45,6 +45,7 @@ Both paths continue with:
 - Were shortcuts taken that were not in the task steps?
 - Were tests written first (TDD: red-green-refactor)?
 - Are the inline `Notes:` on that task, if any, addressed?
+- If the task touched a screen, is there a `verify-ui` driven-flow claim in the evidence report backing it, not just a green build/test claim?
 
 ### Against conventions
 - Does the code match the nested CLAUDE.md for that folder?
