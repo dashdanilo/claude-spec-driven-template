@@ -226,18 +226,24 @@ _ok    "no origin: worktree still created" '[[ -d $TMP/noorigin.probe3 && -f $TM
 # (tool-log.txt) are runtime files the registered hooks themselves write, not
 # links install-harness.sh makes — but the exclude block is where every
 # install-time promise of "nothing untracked appears" has to cover them too.
+# .claude/verification/ is the same shape, written by the verify-before-done
+# skill (see verify-gate.py) instead of a hook.
 R=$(new_repo hooklogs)
 inst "$R"
 _has "hooklogs: exclude lists agent-log.txt"                   "$R/.git/info/exclude" ".claude/agent-log.txt"
 _has "hooklogs: exclude lists tool-log.txt"                    "$R/.git/info/exclude" ".claude/tool-log.txt"
 _has "hooklogs: exclude lists the consumed registry"           "$R/.git/info/exclude" ".claude/.agent-log-consumed"
+_has "hooklogs: exclude lists the verification report dir"     "$R/.git/info/exclude" ".claude/verification/"
 _ok  "hooklogs: agent-log.txt is git-ignored"                  'git -C "$R" check-ignore -q .claude/agent-log.txt'
 _ok  "hooklogs: tool-log.txt is git-ignored"                   'git -C "$R" check-ignore -q .claude/tool-log.txt'
 _ok  "hooklogs: .agent-log-consumed is git-ignored"            'git -C "$R" check-ignore -q .claude/.agent-log-consumed'
-touch "$R/.claude/agent-log.txt" "$R/.claude/tool-log.txt" "$R/.claude/.agent-log-consumed"
+mkdir -p "$R/.claude/verification"
+_ok  "hooklogs: .claude/verification/ is git-ignored"          'git -C "$R" check-ignore -q .claude/verification/latest.md'
+touch "$R/.claude/agent-log.txt" "$R/.claude/tool-log.txt" "$R/.claude/.agent-log-consumed" "$R/.claude/verification/latest.md"
 _ok  "hooklogs: simulated hook writes leave git status clean"  '[[ -z $(git -C "$R" status --porcelain) ]]'
 inst "$R" --unlink
 _ok  "hooklogs: unlink removes the runtime-log exclude lines"  '! grep -qx ".claude/agent-log.txt" "$R/.git/info/exclude"'
+_ok  "hooklogs: unlink removes the verification exclude line"  '! grep -qx ".claude/verification/" "$R/.git/info/exclude"'
 _ok  "hooklogs: unlink drops the whole harness block"          '! grep -q "claude harness" "$R/.git/info/exclude"'
 
 # --dry-run must report the runtime-log lines too, and rerunning must be
