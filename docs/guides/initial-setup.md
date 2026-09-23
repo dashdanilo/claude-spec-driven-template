@@ -4,8 +4,8 @@ Step-by-step walkthrough for using the template on a new or existing project. Re
 
 ## Prerequisites
 
-- Node.js 20+ (Repomix v1.16+ requires Node 20; older Node produces an empty snapshot)
-- Git (any recent version)
+- Git (any recent version), Bash, and Python 3 (all standard on any dev machine; the repo map and the harness's own checks use only these)
+- Node.js 20+, optional: only needed if you use the manual `refresh-snapshot` skill (Repomix v1.16+ requires Node 20; older Node produces an empty export)
 - At least one AI coding agent installed. Claude Code recommended, but the template works with Codex, Cursor, Copilot, and Gemini too.
 
 ## Path 1: New project (greenfield)
@@ -130,7 +130,7 @@ The skill will:
 - Detect your tech stack from `package.json`, `tsconfig.json`, etc
 - Sample representative files to infer conventions
 - Generate `docs/CONSTITUTION.md`, `docs/CONVENTIONS.md`, `docs/architecture/overview.md`
-- If your project has 100+ files in `src/`, generate a Repomix snapshot at `.claude/context/repomix-snapshot.md`
+- Generate a repo map at `.claude/context/repo-map.md` (always, regardless of project size)
 - Update `AGENTS.md` and `CLAUDE.md` with the detected stack
 
 ### 3. Review generated docs
@@ -179,15 +179,21 @@ loses nothing: the step is a no-op. See
 
 ## Maintaining the template over time
 
-### When to refresh the Repomix snapshot
+### The repo map, and when you'd ever touch Repomix
 
-The `codebase-explorer` subagent refreshes automatically when the snapshot is stale-major (30+ files changed, 14+ days, or config file changed). You don't need to think about it usually.
+The repo map regenerates fresh every time `codebase-explorer` runs. There is
+nothing to refresh and nothing to think about.
 
-Manually refresh before important sessions:
+The Repomix export is a different, separate thing: manual, opt-in, and only
+useful if you need a single-file dump of the codebase for a tool that can't
+read the filesystem itself. Most sessions never need it:
 
 ```
 /skill refresh-snapshot
 ```
+
+See `docs/decisions/0003-repo-map-over-snapshot.md` for why these are two
+different mechanisms now instead of one.
 
 ### When to add a new subagent
 
@@ -213,9 +219,9 @@ When the stack changes (framework upgrade, new external service, major dependenc
 
 Edit `.claude/context/config.json` to adjust thresholds, or disable the hook by removing it from `.claude/settings.json`.
 
-### `analyze-codebase` seems to hang
+### `refresh-snapshot` seems to hang
 
-The Repomix step can take 30-60 seconds on large repos. If it's still going after 2 minutes, cancel and check `.claude/context/config.json` - you may want to lower the `min_files_for_snapshot` threshold or add a `.repomixignore` to reduce scope.
+Only relevant if you're using the manual Repomix export - `analyze-codebase` itself no longer runs Repomix at all, so it should never hang on this. The Repomix step in `refresh-snapshot` can take 30-60 seconds on large repos. If it's still going after 2 minutes, cancel and add a `.repomixignore` to reduce scope.
 
 ### Claude doesn't seem to know about the skills
 

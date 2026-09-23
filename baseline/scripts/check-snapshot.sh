@@ -1,13 +1,23 @@
 #!/usr/bin/env bash
 # check-snapshot.sh
-# Compares the current git HEAD against the metadata in the Repomix snapshot
-# and classifies staleness. Returns JSON on stdout.
+# Repomix's `.claude/context/repomix-snapshot.md` is a manual, opt-in export
+# (see the refresh-snapshot skill) — never auto-generated, never auto-read as
+# context. It packs whole file contents, so unlike the repo map its size
+# scales with the codebase, not with directory count, and on a real repo of a
+# few hundred+ files it routinely lands in the megabytes, tens of times over
+# any usable context budget. This script's first job is now that size
+# budget: classify the snapshot "too-large" before anything else, so nothing
+# downstream reads a multi-megabyte file on the assumption that "a snapshot
+# exists" means "a snapshot fits." Staleness (the original job) is still
+# reported, but only matters once the size check passes.
 #
 # Called by:
-#   - .claude/hooks/check-snapshot-on-session.sh (SessionStart)
-#   - .claude/agents/codebase-explorer.md (as first step of exploration)
+#   - .claude/hooks/check-snapshot-on-session.sh (SessionStart) — warns only
+#     on too-large, since nothing auto-reads this file anymore and a
+#     staleness nag about an artifact nobody reads is just noise
+#   - manually, by anyone deciding whether to open the snapshot at all
 #
-# Exit codes:
+# Returns JSON on stdout. Exit codes:
 #   0 - success (check stdout for JSON verdict)
 #   2 - snapshot does not exist
 #   3 - not a git repository or git error
@@ -24,6 +34,13 @@ STALE_MILD_MAX_FILES=29
 STALE_MILD_MAX_DAYS=13
 # Above these = stale-major
 
+# Size budget: a single artifact should not eat a large slice of a 200k-token
+# context window before an agent has done anything. 300000 bytes is
+# ~75k tokens at the ~4-bytes/token estimate used throughout this repo's
+# docs — generous headroom over the 20-50k tokens the harness originally
+# assumed a snapshot would be, and still refused outright once past it.
+SIZE_BUDGET_BYTES=300000
+
 # Files whose changes signal convention drift and force stale-major
 CONFIG_FILES_REGEX='(tsconfig|jsconfig|package\.json|pnpm-lock|yarn\.lock|\.eslintrc|biome|prettier|tailwind\.config|next\.config|vite\.config|astro\.config|remix\.config|nuxt\.config)'
 
@@ -33,7 +50,7 @@ if [[ ! -f "$SNAPSHOT_PATH" ]]; then
 {
   "status": "missing",
   "recommendation": "generate",
-  "message": "No snapshot exists. Run /skill analyze-codebase or /skill refresh-snapshot."
+  "message": "No snapshot exists. Run /skill refresh-snapshot if you specifically need one (e.g. to hand to a tool with no filesystem access) - the harness itself uses the repo map, not this, for panoramic context."
 }
 EOF
   exit 2
@@ -42,6 +59,23 @@ fi
 if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
   echo '{"status": "error", "message": "Not a git repository"}'
   exit 3
+fi
+
+# Size budget check first - independent of staleness. A huge but fresh
+# snapshot is exactly as unreadable as a huge stale one.
+size_bytes=$(wc -c < "$SNAPSHOT_PATH" | tr -d ' ')
+if (( size_bytes > SIZE_BUDGET_BYTES )); then
+  approx_tokens=$(( size_bytes / 4 ))
+  cat <<EOF
+{
+  "status": "too-large",
+  "recommendation": "do-not-read-whole",
+  "message": "Snapshot is ${size_bytes} bytes (~${approx_tokens} tokens), over the ${SIZE_BUDGET_BYTES}-byte budget. Do not read it as context. Grep it for a specific term if you must, or delete it and use the repo map + Grep/Glob instead.",
+  "size_bytes": $size_bytes,
+  "budget_bytes": $SIZE_BUDGET_BYTES
+}
+EOF
+  exit 0
 fi
 
 # Extract metadata from snapshot header
@@ -109,7 +143,8 @@ cat <<EOF
   "commits_ahead": $commits_ahead,
   "files_changed": $files_changed,
   "days_old": $days_old,
-  "config_changed": $config_changed
+  "config_changed": $config_changed,
+  "size_bytes": $size_bytes
 }
 EOF
 exit 0

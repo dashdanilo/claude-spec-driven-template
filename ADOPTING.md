@@ -927,14 +927,14 @@ casa: as descrições são o gatilho.
 | **`checkpoint`** | você quer um ponto de salvamento confiável. Roda o gate e commita, nunca no vermelho |
 | **`documenting-domains`** | uma feature subiu e o conhecimento precisa sobreviver à spec. Escreve `CLAUDE.md` aninhados |
 | **`handover`** | a sessão está longa ou você vai parar. Reconcilia o `tasks.md` contra a realidade, descreve o que **é verdade** (nunca o que fazer em seguida), **sempre grava um arquivo** (na spec ativa, ou em `.claude/handovers/` quando não há spec), imprime um bloco copiável e manda limpar |
-| **`status`** | "onde eu estou?" Cartão de saúde somente-leitura: spec ativa, tasks abertas, gates, branch, snapshot |
+| **`status`** | "onde eu estou?" Cartão de saúde somente-leitura: spec ativa, tasks abertas, gates, branch |
 
 ### Sobre o próprio harness
 
 | skill | use quando |
 |---|---|
-| **`analyze-codebase`** | uma vez, ao adotar num projeto existente. Detecta stack e convenções, gera a documentação inicial |
-| **`refresh-snapshot`** | o snapshot do Repomix está velho e você quer atualizar agora |
+| **`analyze-codebase`** | uma vez, ao adotar num projeto existente. Detecta stack e convenções, gera a documentação inicial e o repo map |
+| **`refresh-snapshot`** | você quer um export manual do Repomix (um arquivo só) para dar a outra ferramenta sem acesso ao filesystem. Não é o mecanismo de contexto panorâmico do harness, esse é o repo map, sempre atualizado sozinho (ver ADR 0003) |
 | **`harness-report`** | "estou usando isto do jeito que foi desenhado?" Reporta quanto da implementação é de fato delegada, comparado com números medidos |
 | **`skill-architect`** | você vai escrever uma skill ou agent novo e quer que siga o padrão da casa |
 | **`skill-best-practices`** | padrões de autoria: frontmatter, disclosure progressivo, descrições |

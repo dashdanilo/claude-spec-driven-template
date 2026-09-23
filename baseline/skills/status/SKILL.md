@@ -1,6 +1,6 @@
 ---
 name: status
-description: Project health card — the active spec/phase, unchecked tasks, gate status, branch, and snapshot staleness at a glance. Read-only.
+description: Project health card — the active spec/phase, unchecked tasks, gate status, and branch at a glance. Read-only.
 ---
 
 Report a compact status card. Read state; change nothing.
@@ -15,7 +15,7 @@ Report a compact status card. Read state; change nothing.
 - **Lessons** — `lessons.md` entries for the active spec, and any class of failure that appears 3+ times across specs (candidate for promotion to `.claude/rules/`).
 - **Deviations** — open entries in `deviations.md`: count them, and list every `needs decision` and every open `finding` in full. `needs decision` is things the run did that nobody approved; `finding` is a production defect a test revealed, out of scope for this spec. Both age badly — an unresolved deviation is a spec that no longer describes the code, and an unowned finding is a known bug nobody is tracking.
 - **Background agents** — any dispatched in the background and never collected. They cost tokens and block nothing.
-- **Snapshot** — Repomix snapshot staleness (`.claude/scripts/check-snapshot.sh`).
+- **Repomix export** — only worth a line if `.claude/scripts/check-snapshot.sh` reports `too-large`: say so, and point at deleting it or the repo map. Silent otherwise (missing, fresh, or stale-but-small is not news - nothing reads this file automatically, see `docs/decisions/0003-repo-map-over-snapshot.md`).
 - **Uncommitted** — a one-line `git status --short` summary (count of changed files).
 
 Keep it to a short card. Point at files and PRs; do not paste them.
