@@ -48,6 +48,22 @@ Honor the pinned runtime before running anything: `.nvmrc` / `.tool-versions` / 
 - Anything red → **do not claim done**. Report the failing command and its output, fix, and re-run. In a loop, do not advance to the next task until green.
 - Never paraphrase success you did not observe. Paste/summarize the actual result.
 
+## Evidence or zero
+
+A green gate above is necessary, not sufficient: "I ran the tests" is still just your word for it. Prove it instead.
+
+1. Write a short report to `.claude/verification/<YYYY-MM-DD>-<slug>.md` (today's date, a short kebab-case name for the task) and refresh `.claude/verification/latest.md` to the same content. Both are gitignored, a per-clone artifact of this one run, not something a teammate reviews.
+2. Two required sections. `## Commands`: one bullet per command you actually ran, with its exit code, e.g. `` - `yarn test` -> exit 0 ``. `## Claims`: one bullet per thing you are claiming true about the change, each carrying evidence: a `file:line` citation, or a backtick-quoted reference to a command already listed above. A claim with nothing behind it counts as zero, not as done.
+3. Run `baseline/scripts/verify-gate.py .claude/verification/latest.md` (`.claude/scripts/harness/verify-gate.py` in a project that linked the harness). Only claim done once it exits 0; `--json` for a machine-readable result. The script's own header documents the exact format it checks.
+
+If the repo has `script/test`, it is still the gate, unchanged from above. The report records what you claim from its output; it is not a second gate running the same commands twice.
+
+## Prove the test discriminates
+
+Before a passing test counts as evidence for a behavior claim, break that behavior once and watch the test go red. Do it on a COPY in the scratchpad with the import redirected at the copy, never on the file under review: edit the copy, run the test against it, confirm it fails, then confirm `git status` on the real tree is still clean.
+
+This is the floor: apply it by hand to the one or two load-bearing assertions for the claim, not to every test in the suite, since the cost adds up fast. If the repo has a mutation-testing runner, use it instead where it is cheap enough on the touched area; it is the stronger version of the same check.
+
 ## Example (a Node + Prisma + NestJS repo)
 
 Commands come from `AGENTS.md`; here they resolve to:

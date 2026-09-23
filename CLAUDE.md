@@ -24,7 +24,7 @@ The skills in `baseline/skills/` are workflows Claude Code auto-invokes based on
 - `find-existing-first` - reuse before create, invoked before any new file
 - `write-spec` - persists a shaped idea as `specs/YYYY-MM-DD-<slug>/` with `spec.md` filled and `plan.md`/`tasks.md` scaffolded
 - `spec-worktree` - one git worktree per feature (`../<repo>.<slug>`, branch from the remote's default branch); wraps `.claude/scripts/harness/spec-worktree.sh`
-- `verify-before-done` - runs the repo's own verification (install, codegen, typecheck, build, tests) and confirms green before claiming done; the gate for automated loops (stack-agnostic)
+- `verify-before-done` - runs the repo's own verification (install, codegen, typecheck, build, tests), confirms green, then writes a `.claude/verification/` evidence report (commands run, claims with evidence) and checks it with `verify-gate.py` before claiming done; the gate for automated loops (stack-agnostic)
 - `skill-architect` - guided workflow to author a new skill or agent the way this repo does it (CC-BY-4.0, adapted from [tech-leads-club/agent-skills](https://github.com/tech-leads-club/agent-skills))
 - `jury` - decides **between competing options** with a panel of 3-5 subagents that argue blind, then commits to a verdict with dissent and the riskiest assumption preserved (CC-BY-4.0, adapted from [tech-leads-club/agent-skills](https://github.com/tech-leads-club/agent-skills))
 - `devils-advocate` - stress-tests a spec/plan/decision before committing (devil's advocacy, pre-mortem, red-team) (CC-BY-4.0, adapted from [tech-leads-club/agent-skills](https://github.com/tech-leads-club/agent-skills))
