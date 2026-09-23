@@ -41,3 +41,48 @@ jobs:
 
       - name: Check index (strict)
         run: bash baseline/scripts/check-index.sh --strict
+
+  harness-score:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Pinned deliberately, not `npx harness-score@latest`: the tool's own
+      # semver policy allows the maturity model (what earns points) to change
+      # in a minor version, so an unpinned run could regress this gate for
+      # reasons that have nothing to do with a change in this repo. Bump the
+      # pin by hand after reading the new version's CHANGELOG.
+      #
+      # --min-level 2 is the level this repo's own harness actually holds
+      # today on a clean clone (verified 2026-09-23). It intentionally does
+      # NOT match what a human might expect from the harness this repo
+      # ships: see docs/decisions/0002-harness-visibility.md and
+      # docs/guides/harness-score.md for why the Skills & Commands dimension
+      # scores 0/17 regardless of how complete the harness actually is.
+      - name: Run harness-score
+        run: |
+          set +e
+          npx --yes harness-score@1.6.5 --json --md harness-score.md --min-level 2 > harness-score.json
+          hs_exit=$?
+          set -e
+          {
+            echo "## Harness Score"
+            echo
+            cat harness-score.md
+            echo
+            echo "See [docs/decisions/0002-harness-visibility.md](https://github.com/${{ github.repository }}/blob/${{ github.sha }}/docs/decisions/0002-harness-visibility.md) for why Skills & Commands undercounts this repo's harness on purpose."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$hs_exit"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: harness-score-report
+          path: |
+            harness-score.json
+            harness-score.md
+          retention-days: 90
