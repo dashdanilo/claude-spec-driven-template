@@ -67,6 +67,20 @@ cd "../<repo>.<slug>" && claude
 
 Agents: the `spec-worktree` skill wraps this with the when/how. See also `.claude/scripts/harness/README.md`.
 
+### Where the work happens
+
+Before writing the first line of code for a task, ask the human **where**, offering three options:
+
+1. **local**, on the checkout's current branch.
+2. **the agent tool's own worktree**, if the tool provides one (in Claude Code, `EnterWorktree`: the session moves into `.claude/worktrees/<name>`, the app shows an indicator, and on exit it asks whether to keep or remove it).
+3. **`spec-worktree`** (above): a flat sibling `../<repo>.<slug>`, harness linked, `script/setup` run if present, worked from its own session.
+
+If the human does not answer within 5 minutes, proceed with `spec-worktree` and say so.
+
+**Mechanics.** A blocking question dialog has no timeout, so ask as plain text in the conversation and start a background timer alongside it: a backgrounded shell command that sleeps roughly 300 seconds and exits, which notifies the agent when it fires. If it fires with no answer, proceed with the default and state the choice; do not poll for a reply in the meantime.
+
+**Why the two worktree mechanisms are not interchangeable.** The agent tool's own worktree lives *inside* the repo, under `.claude/worktrees/`, so a stale one keeps a full copy of whatever the repo held at that moment, and nothing prunes it automatically. On 2026-09-23 that is exactly what made `harness-score` report `njord-back` as L4 (99/108): a leftover `.claude/worktrees/<name>/` directory still held an old, fully vendored copy of 48 skills and 20 agents, and the scanner counted it in full. `spec-worktree` puts the tree outside the repo, at `../<repo>.<slug>`, where no scan ever sees it. See `docs/guides/harness-score.md` for the full mechanism.
+
 ## Commits
 
 **Format: Conventional Commits.**

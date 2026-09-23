@@ -8,7 +8,7 @@ argument-hint: <what to build, free-form, or an existing spec folder to lean-bui
 
 You are the **lean driver** for: **$ARGUMENTS**. One plan, one build dispatch, one verification pass, one review - for the case where `/orchestrate`'s fine `tasks.md` and task-by-task babysitting cost time and tokens without buying quality. `/orchestrate` stays the right tool for cheaper models and for work that must be audited step by step; this skips the scaffolding, not the discipline.
 
-You coordinate; a specialist implements (`.claude/rules/harness/delegation.md`). Never write feature code from this thread.
+You coordinate; a specialist implements (`.claude/rules/harness/delegation.md`). Never write feature code from this thread. Before step 1, if the human has not already said where this runs, ask ("Where the work happens" in `.claude/rules/harness/git-workflow.md`: local, the agent tool's own worktree, or `spec-worktree`).
 
 ## 1 - Plan, not spec plus tasks
 

@@ -10,6 +10,8 @@ One worktree per **feature**, not per plan. A feature branch (`<type>/<slug>`) l
 
 This skill is the decision layer. The mechanics (git worktree, symlinks, Repomix export seeding, cleanup) live in `.claude/scripts/harness/spec-worktree.sh` so a human or any agent can run them without Claude.
 
+Before invoking, confirm this is the option the human actually picked: it is one of three ("Where the work happens" in `.claude/rules/harness/git-workflow.md`), not the automatic default for every task.
+
 ## When to invoke
 
 - The user is about to **start implementing** a feature and wants it isolated
