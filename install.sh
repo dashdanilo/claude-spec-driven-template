@@ -86,7 +86,12 @@ CLAUDE.local.md
 # the first tool call after linking)
 .claude/tool-log.txt
 .claude/agent-log.txt
-.claude/.agent-log-consumed'
+.claude/.agent-log-consumed
+
+# verify-before-done evidence reports (written by the skill itself, one per
+# run; install-harness.sh mirrors this in .git/info/exclude for a repo that
+# only ever linked the harness)
+.claude/verification/'
 
 log()  { echo "$@" >&2; }
 die()  { echo "error: $*" >&2; exit "${2:-2}"; }
