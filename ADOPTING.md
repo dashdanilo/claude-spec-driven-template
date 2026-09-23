@@ -948,8 +948,8 @@ A maioria é despachada pelas skills acima; você também pode pedir pelo nome.
 |---|---|
 | `codebase-explorer` | arqueologia somente-leitura. Responde "onde mora X", dimensiona uma mudança |
 | `spec-reviewer` | audita o `spec.md` antes de virar plano. O `write-spec` chama sozinho |
-| `code-reviewer` | revisa a implementação contra a spec, o plano e as tasks ativas |
-| `reviewer` | revisão de branch inteira em nível sênior, roda a verificação do repo e pode abrir o PR |
+| `code-reviewer` | revisa a implementação contra a spec, o plano e as tasks ativas. Classifica cada achado por severidade (`blocker`/`should-fix`/`nit`/`pre-existing`) com ID estável, então uma segunda rodada converge em vez de repetir |
+| `reviewer` | revisão de branch inteira em nível sênior, roda a verificação do repo e pode abrir o PR. Mesma taxonomia de severidade e contrato de convergência do `code-reviewer`, lendo a rodada anterior nos comentários do próprio PR |
 | `implementer` | implementador portátil de fallback: usado só quando não existe specialist de stack para o trabalho. Lê o `AGENTS.md`, as rules e o código ao lado da mudança antes de escrever, e nomeia no relatório qual specialist deveria existir |
 | `tester` | escreve e roda testes usando o framework **deste** repo, descoberto do tooling |
 | `researcher` | mergulha numa lib ou API externa. Mantém memória entre sessões |
