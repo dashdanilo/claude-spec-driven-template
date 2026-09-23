@@ -125,7 +125,7 @@ Documented in full in `docs/CONSTITUTION.md`. The short version:
 - `.env*` and any file matching `**/secrets/**` (blocked by `block-secrets.sh` hook)
 - `node_modules/` (if any adopter creates it locally)
 - `CLAUDE.local.md`, `.claude/settings.local.json`, and `.claude/agent-memory-local/` (personal, gitignored)
-- `.claude/context/` (Repomix snapshot and generated state, gitignored)
+- `.claude/context/` (the generated repo map, an optional Repomix export, and other generated state, gitignored)
 - Applied migrations, lockfiles, generated code, except files ending in `.example` (blocked by `protect-critical.sh` hook)
 - The governance surface — `.claude/settings.json`/`settings.local.json`, `baseline/hooks/*.sh`, `.claude/hooks/*.sh`, `baseline/rules/**`, `.claude/rules/**` — when the edit reaches into another repo's checkout, or when the target is gitignored and so would never appear in a review. Editing this repo's own, in a file that lands in its diff, is allowed (blocked by `protect-harness.sh` hook)
 

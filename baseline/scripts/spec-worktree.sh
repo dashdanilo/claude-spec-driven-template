@@ -15,7 +15,11 @@
 # only in the worktree that made them:
 #   - Symlinked (single source of truth): CLAUDE.local.md,
 #     .claude/settings.local.json, .claude/context/config.json
-#   - Copy-seeded (regenerable per-branch cache): .claude/context/repomix-snapshot.md
+#   - Copy-seeded, only if it already exists on main (manual/opt-in export,
+#     not regenerated automatically): .claude/context/repomix-snapshot.md
+#   - Not seeded at all: .claude/context/repo-map.md. It regenerates in
+#     under a second, so seeding a stale copy across worktrees buys nothing
+#     the repo-map skill's own next run wouldn't do for free.
 #
 # If the new worktree has an executable script/setup (Scripts to Rule Them All
 # convention — see docs/guides/), it is run after provisioning, taking the
@@ -161,8 +165,10 @@ provision_locals() {
     [[ $n -gt 0 ]] && log "  linked  $d/* ($n items, harness)"
   done
 
-  # Copy-seed the regenerable snapshot cache (do NOT symlink: it is per-branch
-  # and gets rewritten when it goes stale; sharing it would corrupt main's copy)
+  # Copy-seed the Repomix export if main happens to have one (do NOT
+  # symlink: it is per-branch and gets rewritten when refreshed; sharing it
+  # would corrupt main's copy). This is a manual/opt-in file now - most
+  # repos won't have one, and that's fine, this is a no-op then.
   local snap=".claude/context/repomix-snapshot.md"
   if [[ -f "$MAIN_ROOT/$snap" && ! -e "$wt/$snap" ]]; then
     mkdir -p "$(dirname "$wt/$snap")"

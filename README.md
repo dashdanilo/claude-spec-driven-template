@@ -66,7 +66,7 @@ It combines:
 │  ├─ skills/          20 skills, a /name each, loaded on demand
 │  ├─ rules/            path-scoped conventions, auto-loaded
 │  ├─ hooks/            guardrails that run whatever the model decides
-│  ├─ scripts/          check-index · check-baseline · spec-worktree · check-snapshot
+│  ├─ scripts/          check-index · check-baseline · spec-worktree · repo-map · check-snapshot
 │  └─ docs/             AI-only: dispatching · context-engineering · harness-baseline
 │
 ├─ .claude/           THIS repo's own config — links back into baseline/

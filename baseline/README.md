@@ -11,7 +11,7 @@ A one-screen map of the layers. Each has a different trigger and job. Put a thin
 | **Commands** | `commands/` | you type `/<name>` | **drivers** that orchestrate a multi-step flow in the main thread |
 | **Docs / specs** | `docs/`, `specs/` | on demand / per feature | human-facing docs, ADRs, and per-feature `spec.md` / `plan.md` / `tasks.md` |
 
-Also: `scripts/` (shell helpers, e.g. `spec-worktree.sh`, `check-index.sh`), `context/` (generated Repomix snapshot, gitignored), `settings.json` (permissions + hooks).
+Also: `scripts/` (shell helpers, e.g. `spec-worktree.sh`, `check-index.sh`, `repo-map.sh`), `context/` (the generated repo map, and an optional Repomix export, gitignored), `settings.json` (permissions + hooks).
 
 ## Skills: two kinds
 

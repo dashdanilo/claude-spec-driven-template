@@ -127,7 +127,7 @@ This template ships these hooks:
 - **`protect-main.sh`** intercepts `Bash` tool calls and blocks `commit`, `push`, `merge`, `rebase`, and `reset --hard` when the current branch is protected (main, master, trunk, develop, production, release)
 - **`protect-critical.sh`** intercepts `Edit` and `Write` calls and blocks modifications to a repo's own critical files — lockfiles, applied migrations, generated code, `.env`, `/secrets/` — except files ending in `.example`
 - **`protect-harness.sh`** intercepts `Edit` and `Write` calls and blocks modifications to the harness's own governance surface (its hooks, the config that registers them, its rules). The criterion is reviewability: an edit that will show up in this repo's own diff is allowed, an edit reaching into another repo's checkout or into a gitignored file is not — see `CLAUDE.md` for the exact scope
-- **`check-snapshot-on-session.sh`** runs at session start, checks Repomix snapshot staleness, and warns you if it's stale-major
+- **`check-snapshot-on-session.sh`** runs at session start, checks whether a Repomix export exists and is over its size budget, and warns you if so (never on staleness alone, since nothing auto-reads that file - see `docs/decisions/0003-repo-map-over-snapshot.md`)
 
 That is a good fit for hooks because it is:
 

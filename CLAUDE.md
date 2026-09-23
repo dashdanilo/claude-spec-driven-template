@@ -17,8 +17,8 @@ either loses nothing: the step is a no-op. See
 
 The skills in `baseline/skills/` are workflows Claude Code auto-invokes based on their descriptions. Linked into a project with `./install-harness.sh` (opt-in, per repo), they land in that project's `.claude/skills/`, one link per skill, next to any skill the project versions itself:
 
-- `analyze-codebase` - one-time setup when adopting the template on an existing project
-- `refresh-snapshot` - manually regenerates the Repomix snapshot
+- `analyze-codebase` - one-time setup when adopting the template on an existing project; generates the repo map alongside the other baseline docs
+- `refresh-snapshot` - manually generates a Repomix export for handing to a tool with no filesystem access; not context, not auto-generated, not auto-read (see `docs/decisions/0003-repo-map-over-snapshot.md`)
 - `explore` - free-form investigation before writing a spec
 - `grilling` - relentless one-question-at-a-time interview that walks a decision tree to lock open decisions; called by `explore` for decision rigor (MIT, adapted from [mattpocock/skills](https://github.com/mattpocock/skills))
 - `find-existing-first` - reuse before create, invoked before any new file
@@ -39,7 +39,7 @@ The skills in `baseline/skills/` are workflows Claude Code auto-invokes based on
 
 The subagents in `baseline/agents/` run in isolated context windows:
 
-- `codebase-explorer` - read-only archaeology; uses the Repomix snapshot, refreshes when stale-major
+- `codebase-explorer` - read-only archaeology; generates the repo map fresh on every use (no caching, nothing to go stale), falls back to Grep/Glob for anything narrower
 - `spec-reviewer` - mandatory audit of `spec.md` before it becomes a plan (`write-spec` runs it automatically)
 - `code-reviewer` - reviews implementation against spec, plan, tasks and conventions; under `/orchestrate` auto-gates once per cluster, standalone auto-gates each phase (has persistent memory). Findings carry a severity (`blocker`/`should-fix`/`nit`/`pre-existing`) and a stable ID so a re-review converges instead of repeating itself
 - `reviewer` - portable staff-level review of a whole diff/branch; runs the repo's verification and can open the PR (adapts to any stack). Same severity taxonomy and convergence contract as `code-reviewer`, but reads its prior round from the PR's own comments (`gh pr view --comments`)
@@ -57,7 +57,7 @@ These are skills too — `baseline/skills/<name>/SKILL.md` — but they *drive* 
 - `wave` - the low-ceremony half of `orchestrate`: dispatches **one** batch of cohesive clusters to specialists in parallel (single message = concurrent, one call per cluster), gates once, reports, stops. No spec, no approval table, no PR. Use when `orchestrate` is more process than the work deserves.
 - `handover` - compact, high-signal session handover (done / current state / open decisions / not started) so a fresh session continues without re-deriving context. **State, not instructions** — it describes what is true, never what to do next, because a fact outlives an instruction. **Reconciles `tasks.md` against reality before writing the narrative, always writes a file** (`tasks.md § Handover`, or `.claude/handovers/<date>-<slug>.md` when no spec is active), prints a copyable block, **and ends with an explicit cut** that names that file — state is on disk, clear the session and resume in a fresh one
 - `checkpoint` - safe-save: runs `verify-before-done`, then commits the work on the feature branch (never on a red gate)
-- `status` - read-only project health card: active spec/phase, unchecked tasks, gate status, branch, snapshot staleness
+- `status` - read-only project health card: active spec/phase, unchecked tasks, gate status, branch
 - `harness-report` - read-only report on the **harness itself**: how much implementation is actually delegated, how dispatches are distributed, how many are unattributed — judged against `.claude/docs/harness/harness-baseline.md`. Answers "is this being used the way it is designed", which a rule cannot answer about itself
 
 ### Hooks registered
@@ -70,7 +70,7 @@ For this repo, in `.claude/settings.json`. For a project that linked the harness
 - `PreToolUse` on Edit/Write: `protect-critical.sh` blocks modifications to lockfiles, applied migrations, generated code, and other repo-owned critical files (`.env`, `/secrets/`, `/dist/`, `/build/`, `/node_modules/`, etc), except files ending in the literal `.example`
 - `PreToolUse` on Edit/Write: `protect-harness.sh` blocks modifications to the harness's own governance surface — `.claude/settings.json`/`settings.local.json`, `baseline/hooks/*.sh`, `.claude/hooks/*.sh`, `baseline/rules/**`, `.claude/rules/**`. One rule decides all of them, and the criterion is **reviewability**: an edit reaching into another repo's checkout is blocked, an edit to a gitignored file is blocked (nobody ever reviews it), and an edit to a file that will show up in this repo's own diff — tracked, or new and not ignored — is allowed. Same `.example` exemption. That is why `settings.local.json` is refused where `settings.json` is not
 - `PreToolUse` on Edit/Write/MultiEdit: `block-new-em-dashes.sh` blocks a Markdown edit that would raise the file's em-dash count above what it was before that call; editing next to an existing em-dash, or removing one, still passes. This is a style choice of THIS repo only: it is registered here and nowhere else, not in `install-harness.sh`'s portable set and not in `install.sh`'s `REPO_HOOKS`, so an adopting project never inherits it
-- `SessionStart`: `check-snapshot-on-session.sh` warns if the Repomix snapshot is stale-major
+- `SessionStart`: `check-snapshot-on-session.sh` warns if a Repomix snapshot exists and is over its size budget (never on staleness alone - nothing auto-reads the file anymore, see `docs/decisions/0003-repo-map-over-snapshot.md`)
 - `SessionStart`: `check-index.sh` warns when `CLAUDE.md` and the machinery (`baseline/`, `.claude/`, and `~/.claude/` for names only) have drifted apart — not listed, listed but gone, or malformed (bad frontmatter, name/filename mismatch, hook without `+x`). `--strict` exits 1 for CI. Any path with a `*.pre-harness` component and any file git considers ignored are excluded from the scan, since `install-harness.sh --adopt` leaves the pre-migration copy on disk on purpose and a gitignored file (a generated Repomix snapshot, for instance) is not authored content someone is expected to keep pointers current in
 - `SessionStart`: `check-baseline.sh` warns when your harness checkout is behind its remote, or has **uncommitted** edits under `baseline/` — those are live in every project on the machine, unreviewed. Does not fetch and does not pin
 - `SubagentStop`: `log-agent.sh` appends one audit line per subagent run to the gitignored `.claude/agent-log.txt` — agent type, task description, tokens, duration and tool count, recovered from the subagent's own transcript when the hook payload omits them. When it has to guess the transcript (older clients only), it checks a small gitignored "already charged" registry first so a parallel wave can never bill the same transcript's tokens twice — a repeat hit gets the agent type (still reliable) and `dup=1`, never a copied metric

@@ -41,7 +41,8 @@ Terms specific to this template and their exact meaning:
 - **Nested CLAUDE.md:** a `CLAUDE.md` file inside `src/<folder>` that adds folder-scoped conventions.
 - **Stub:** a small file whose purpose is to point to another file for its real content. `CLAUDE.md` and `.github/copilot-instructions.md` at the root are stubs pointing to `AGENTS.md`.
 - **Source of truth:** the file that owns a piece of information. For project context, this is `AGENTS.md`. For a feature, this is `specs/<slug>/spec.md`.
-- **Fresh, stale-mild, stale-major:** the three states classified by `.claude/scripts/check-snapshot.sh` for the Repomix snapshot.
+- **Too-large, fresh, stale-mild, stale-major:** the states classified by `.claude/scripts/check-snapshot.sh` for the optional, manual Repomix export. Too-large is checked first and independent of the other three (see ADR 0003).
+- **Repo map:** the deterministic, always-regenerated directory-tree-plus-metadata artifact (`baseline/scripts/repo-map.sh` → `.claude/context/repo-map.md`) that replaced the Repomix snapshot as panoramic context. See `docs/decisions/0003-repo-map-over-snapshot.md`.
 
 ## Tech stack (of the template itself, not of adopters)
 

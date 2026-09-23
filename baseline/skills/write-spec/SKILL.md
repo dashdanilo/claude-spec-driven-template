@@ -97,7 +97,7 @@ Then update the headers in the copied files:
 
 Do NOT fill plan.md or tasks.md yet. Those come in the writing-plans step, after the spec is approved.
 
-### 7. Optionally note snapshot dependency
+### 7. Optionally note the need for wide context
 
 If the feature spans multiple areas of the codebase (3+ folders or 5+ files), add at the bottom of `spec.md`:
 
@@ -106,7 +106,7 @@ If the feature spans multiple areas of the codebase (3+ folders or 5+ files), ad
 
 This feature touches multiple areas. When implementing:
 - Invoke the `codebase-explorer` subagent first to establish full context
-- The Repomix snapshot at `.claude/context/repomix-snapshot.md` should be current
+- It generates a fresh repo map itself; nothing to prepare here
 ```
 
 ### 8. Run the spec-reviewer (mandatory — do NOT ask permission)

@@ -1,6 +1,6 @@
 ---
 name: analyze-codebase
-description: Runs once when adopting the template on an existing project. Detects tech stack, architectural patterns, and conventions, then generates initial documentation (CONSTITUTION.md, architecture overview, conventions, patterns). Also creates a Repomix snapshot for projects with 100+ files. Use when the user says something like "analyze this project", "onboard me", "set up this template on an existing codebase", or when adopting the template for the first time.
+description: Runs once when adopting the template on an existing project. Detects tech stack, architectural patterns, and conventions, then generates initial documentation (CONSTITUTION.md, architecture overview, conventions, patterns) and a repo map. Use when the user says something like "analyze this project", "onboard me", "set up this template on an existing codebase", or when adopting the template for the first time.
 disable-model-invocation: true
 ---
 
@@ -37,9 +37,7 @@ If several apply (monorepo), note it and analyze the largest package first.
 
 ### 2. Count files in source directories
 
-Run `find src -type f 2>/dev/null | wc -l` (or the language equivalent - `find app src lib -type f`).
-
-Record the count. If ≥ 100 files, proceed with Repomix snapshot in step 4. If < 100, skip Repomix.
+Run `find src -type f 2>/dev/null | wc -l` (or the language equivalent - `find app src lib -type f`). Record the count for the report; it no longer gates anything below, since the repo map generated in step 4 fits regardless of size.
 
 ### 3. Sample source files to infer conventions
 
@@ -60,42 +58,18 @@ For each, read the file and extract:
 - File naming convention (kebab-case, PascalCase, camelCase)
 - Where tests live (co-located, `__tests__/`, separate `tests/`)
 
-### 4. Generate Repomix snapshot (if applicable)
+### 4. Generate the repo map
 
-Only if the file count from step 2 is ≥ 100 (threshold configurable in `.claude/context/config.json`).
-
-Repomix v1.16+ requires Node 20+. On Node 18 the command runs but yields an empty snapshot, so verify the version first:
+Always, regardless of file count, unlike the old Repomix snapshot this replaced (see `docs/decisions/0003-repo-map-over-snapshot.md`) - it grows with directory count, not file content, so it fits on every repo size measured so far:
 
 ```bash
-node_major=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null)
-if [ "${node_major:-0}" -lt 20 ]; then
-  echo "Node ${node_major} detected. Repomix needs Node 20+; skipping snapshot until Node is upgraded."
-fi
+.claude/scripts/harness/repo-map.sh --output .claude/context/repo-map.md
 ```
 
-Run: `npx repomix --output .claude/context/repomix-snapshot.md.tmp`
-
-Then prepend the metadata header:
-
-```bash
-current_commit=$(git rev-parse HEAD)
-current_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-files_count=$(grep -c "^## File:" .claude/context/repomix-snapshot.md.tmp || echo "?")
-
-cat > .claude/context/repomix-snapshot.md <<EOF
-# Repomix snapshot
-
-generated_at: $current_date
-commit_sha: $current_commit
-branch: $(git branch --show-current)
-files_captured: $files_count
-
----
-
-EOF
-cat .claude/context/repomix-snapshot.md.tmp >> .claude/context/repomix-snapshot.md
-rm .claude/context/repomix-snapshot.md.tmp
-```
+This is the artifact `codebase-explorer` uses for panoramic context going
+forward. Do not also generate a Repomix snapshot here - that mechanism is
+manual/opt-in now, via the `refresh-snapshot` skill, only when a user
+explicitly asks for a single-file export.
 
 ### 5. Generate the documentation
 
@@ -137,7 +111,7 @@ Summarize what you did and what needs human review:
 - docs/architecture/overview.md
 - docs/CONVENTIONS.md
 - docs/patterns/README.md
-- .claude/context/repomix-snapshot.md (if applicable)
+- .claude/context/repo-map.md
 
 ### Updated
 - CLAUDE.md (tech stack section)
@@ -158,5 +132,6 @@ Summarize what you did and what needs human review:
 - Do not run this if `.claude/context/last-analyze.log` already exists, without asking first
 - Do not overwrite hand-written docs (`README.md`, `CONTRIBUTING.md`, existing `ARCHITECTURE.md`); read and reference them
 - Do not invent conventions the codebase doesn't show
-- Do not skip the Repomix step for large projects (100+ files) - the codebase-explorer needs it
-- Do not commit `.claude/context/repomix-snapshot.md` (it's in `.gitignore`)
+- Do not skip the repo map step regardless of project size - it is what `codebase-explorer` uses, and it is cheap precisely because it never depends on how many files exist
+- Do not generate a Repomix snapshot here. That is a separate, manual, opt-in export (`refresh-snapshot` skill) for when a user explicitly asks for one - not part of this flow
+- Do not commit `.claude/context/repo-map.md` (it's in `.gitignore`; regenerate it instead of trusting a stale copy)

@@ -71,7 +71,8 @@ CLAUDE.local.md
 .claude/settings.local.json
 .claude/agent-memory-local/
 
-# Generated context (Repomix snapshot, etc)
+# Generated context (repo map, optional Repomix export, etc)
+.claude/context/repo-map.md
 .claude/context/repomix-snapshot.md
 .claude/context/last-analyze.log
 .claude/context/config.json

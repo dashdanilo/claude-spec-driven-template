@@ -50,7 +50,7 @@ Convention:
 - Branch: `<type>/<slug>`, always created fresh from the remote's default branch (`origin/HEAD` - `origin/main` on most repos, but whatever the remote actually points at, e.g. `origin/develop`)
 - Not removed on merge - clean up deliberately later
 
-Use the helper (it also provisions gitignored local files - symlinks `CLAUDE.local.md` / `.claude/settings.local.json` / `.claude/context/config.json`, and copy-seeds the Repomix snapshot):
+Use the helper (it also provisions gitignored local files - symlinks `CLAUDE.local.md` / `.claude/settings.local.json` / `.claude/context/config.json`, and copy-seeds the Repomix export if main happens to have one):
 
 ```bash
 .claude/scripts/harness/spec-worktree.sh <slug>            # create + branch from the remote's default branch
