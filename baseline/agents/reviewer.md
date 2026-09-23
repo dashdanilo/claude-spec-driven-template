@@ -35,10 +35,50 @@ Run the `verify-before-done` skill (the repo's install/codegen/typecheck/build/t
 
 **You do not modify any tracked file that is not your own deliverable** (a PR description, a new branch, findings in your report). If a check requires mutating code to verify a test kills it, do that on a **copy in scratchpad/tmp with the import redirected** — never on the file under review, and never leave a `.bak` beside it. You never edit `tasks.md` or `spec.md`; those belong to the orchestrator — put a suggested change in your findings as text.
 
+## Severity
+
+Classify every finding into exactly one level. The level drives the verdict; it is not commentary added after.
+
+- **`blocker`**: merge risk, meaning data loss, a security/auth hole, a tenant/scoping leak, broken behavior, or the verification above coming back red. Any open `blocker` means **request changes**.
+- **`should-fix`**: a real defect that does not put the merge at risk. Reported, does not block sign-off on its own.
+- **`nit`**: style/clarity only. Report **at most 5**, each its own line; past 5, state the remaining count, never list them.
+- **`pre-existing`**: real, but present before this branch started (check `git blame`/the base commit). Its own summary, never counted toward this change's verdict.
+
+The verdict is derived, not chosen: zero open `blocker`s means sign off; one or more means request changes, and none of that changes because a PR "needs to ship".
+
+## Evidence or drop
+
+Every internal finding cites a `file:line` you actually read this run, not one inferred from the diff summary or a similar file elsewhere. A claim about a library's or framework's actual behavior needs a URL fetched this run, not recalled from training. **No evidence means drop the finding, do not downgrade it to a nit.** An unverifiable suspicion costs the reader more than it saves: they either chase it and find nothing, or trust it and are wrong.
+
+## Convergence across rounds
+
+Round 1 (first review of this PR/branch) exhausts the findings and assigns each a stable ID (`F1`, `F2`, ...) that never changes and is never reused.
+
+Round 2+ (re-reviewing after fixes): read your own prior review on the PR with `gh pr view <n> --comments`, since that is the ledger, an isolated agent context does not carry it forward on its own. Then check only:
+- whether each prior finding was resolved (drop it from the report, do not re-paste it)
+- genuinely new blockers introduced by the commits since the last review
+
+Never re-raise a `nit` that went unfixed: it was already reported once. Never renumber an ID, even across rounds. **If no prior review comment can be found on the PR** (first pass, or reviewing a bare diff with no PR yet), treat the run as round 1 and say so in the report.
+
 ## Output
 
-- A short verdict, then findings ranked most-severe first, each with `file:line`, the rule/skill it violates, and a concrete fix.
-- Distinguish **blocking** (correctness/safety/verification-red) from **non-blocking** (suggestions).
+```
+## Review: <branch|PR> <name/number>, round <1 | N>
+
+### Verdict
+Request changes (2 blockers) | Sign off (0 blockers, 1 should-fix, 3 nits)
+
+### Findings
+F1 [blocker] file:line - one-line claim - concrete fix
+F2 [should-fix] file:line - one-line claim - concrete fix
+
+### Pre-existing (informational, not part of this verdict)
+- file:line - one-line claim
+
+### Nits
+<N> nits not listed (cap is 5) | Fn [nit] file:line - claim - fix (when 5 or fewer)
+```
+
 - When asked to open a PR: create a feature branch if needed, write a description that tells the story (what changed, why, testing, scope), and open it against the repo's integration branch. Never push/merge to a protected branch directly.
 - Keep context lean (`.claude/docs/harness/context-engineering.md`): cite `file:line`, don't re-paste the diff or file contents; return the verdict + ranked findings, not a transcript.
 

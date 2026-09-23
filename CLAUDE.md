@@ -40,8 +40,8 @@ The subagents in `baseline/agents/` run in isolated context windows:
 
 - `codebase-explorer` - read-only archaeology; uses the Repomix snapshot, refreshes when stale-major
 - `spec-reviewer` - mandatory audit of `spec.md` before it becomes a plan (`write-spec` runs it automatically)
-- `code-reviewer` - reviews implementation against spec, plan, tasks and conventions; under `/orchestrate` auto-gates once per cluster, standalone auto-gates each phase (has persistent memory)
-- `reviewer` - portable staff-level review of a whole diff/branch; runs the repo's verification and can open the PR (adapts to any stack)
+- `code-reviewer` - reviews implementation against spec, plan, tasks and conventions; under `/orchestrate` auto-gates once per cluster, standalone auto-gates each phase (has persistent memory). Findings carry a severity (`blocker`/`should-fix`/`nit`/`pre-existing`) and a stable ID so a re-review converges instead of repeating itself
+- `reviewer` - portable staff-level review of a whole diff/branch; runs the repo's verification and can open the PR (adapts to any stack). Same severity taxonomy and convergence contract as `code-reviewer`, but reads its prior round from the PR's own comments (`gh pr view --comments`)
 - `tester` - portable; writes and runs tests using the repo's own framework, discovered from AGENTS.md/tooling
 - `researcher` - deep-dives on libs and APIs (persistent memory across projects)
 - `security-auditor` - audits auth, secrets, input validation
