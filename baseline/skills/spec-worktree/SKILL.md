@@ -50,7 +50,7 @@ Each worktree is best opened as its own editor window so the file view is scoped
 .claude/scripts/harness/spec-worktree.sh --prune           # remove worktrees whose branch is merged into the default branch
 ```
 
-Worktrees are **not** removed automatically on merge — you may still need one. Clean up deliberately, later, with `--remove` or `--prune`. `--prune` skips any worktree that has uncommitted changes. See "When a worktree's life ends" in `.claude/rules/harness/git-workflow.md` for the criterion: a worktree that only ever existed to produce a PR is safe to `--remove` as soon as that PR opens, not only after merge.
+Worktrees are **not** removed automatically on merge — you may still need one. Clean up deliberately, later, with `--remove` or `--prune`. `--prune` skips any worktree that has uncommitted changes. See "When a worktree's life ends" in `.claude/rules/harness/git-workflow.md` for the criterion: a worktree that only ever existed to produce a PR is safe to `--remove` as soon as that PR opens, not only after merge. Run `checkpoint` first if `git log @{u}..` isn't empty yet: it commits and pushes, so nothing in the worktree exists only there when you remove it.
 
 ## What NOT to do
 

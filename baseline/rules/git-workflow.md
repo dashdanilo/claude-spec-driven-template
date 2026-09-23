@@ -87,7 +87,7 @@ Two kinds of worktree end differently.
 
 **Created only to produce a PR: dies when the PR opens.** The branch lives on the remote and the PR lives on GitHub; keeping the directory afterward buys nothing, and if review asks for changes the worktree is recreated in seconds from the branch (`spec-worktree.sh <slug>`).
 
-**Has work in progress: stays.** Uncommitted changes, commits not yet pushed anywhere, or an experiment someone will come back to: none of that lives anywhere but the worktree, so it stays until whoever owns it is done with it.
+**Has work in progress: stays.** Uncommitted changes, commits not yet pushed anywhere, or an experiment someone will come back to: none of that lives anywhere but the worktree, so it stays until whoever owns it is done with it. Running `checkpoint` closes that gap for anything already worth keeping: it commits and pushes, so `git log @{u}..` goes empty and the worktree stops being the only place that work exists.
 
 Before removing one, check it is safe to lose nothing:
 
