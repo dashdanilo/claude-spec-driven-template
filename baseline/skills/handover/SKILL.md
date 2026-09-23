@@ -71,6 +71,16 @@ Everything in a handover is prose about state, and prose ages — including this
 
 Do not dump file or tool output — link and point to it. This is a map, not the territory.
 
+## Retention
+
+The file is the point: it survives the `/clear` this skill tells you to run, and it is how a fresh session recovers context. Writing a new handover never deletes an older one.
+
+Handovers accumulate, one per stretch of work. A session resuming on this repo reads the **newest** file in `.claude/handovers/` (by the date in its filename, ties broken by mtime) before re-deriving anything, and treats older ones as history, not as current state.
+
+Deleting one is a judgement call the agent makes, never an automatic cleanup. Remove a handover only when the work it describes is closed (merged, abandoned, or superseded by a newer handover covering the same slug), or when the user asks. When in doubt, keep it.
+
+One thing worth knowing because the directory is git-excluded (see "Where to put it" above): `git clean -fdx` deletes handovers along with every other ignored file. Do not run it in this repo without checking `.claude/handovers/` first.
+
 ## Last step — close the session ✂️
 
 A handover is only half the move. Externalizing state has no effect on context weight: the session keeps carrying everything it carried before. **`/handover` externalizes; `/clear` discards. One without the other does nothing.**

@@ -91,7 +91,13 @@ CLAUDE.local.md
 # verify-before-done evidence reports (written by the skill itself, one per
 # run; install-harness.sh mirrors this in .git/info/exclude for a repo that
 # only ever linked the harness)
-.claude/verification/'
+.claude/verification/
+
+# handover notes written when no spec is active (written by the handover
+# skill itself; its own SKILL.md calls this local session state and says
+# not to commit it; install-harness.sh mirrors this in .git/info/exclude
+# for a repo that only ever linked the harness)
+.claude/handovers/'
 
 log()  { echo "$@" >&2; }
 die()  { echo "error: $*" >&2; exit "${2:-2}"; }

@@ -7,6 +7,7 @@ Report a compact status card. Read state; change nothing.
 
 - **Branch / worktree** — the current branch; flag if it is a protected branch.
 - **Active spec** — the most recent `specs/<slug>/` and its status (Draft / Approved / In progress / Done).
+- **Handover**: if `.claude/handovers/` has any files, read the newest one (by the date in its filename) before reporting the rest of this card. It is the fastest route to the state a prior session already wrote down. Treat older files in that directory as history, not current state.
 - **Progress** — from `tasks.md`: total tasks, how many checked, and the first unchecked one (where work resumes).
   - **Sanity-check it.** If the branch has commits the checkboxes do not reflect, the count is stale — say `progress: N/M (suspeito — reconciliar)` instead of reporting a number you do not believe. A stale count is worse than no count: `/orchestrate` and `/wave` plan from it.
 - **Gates** — last known: spec-reviewer verdict, `verify-before-done` result (run it only if cheap, else report the last known), and any open PR for this branch.
