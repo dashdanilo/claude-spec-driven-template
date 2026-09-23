@@ -13,7 +13,7 @@ You coordinate; specialist subagents implement. **Never write feature code yours
 `tasks.md` is prose, and prose drifts. A box is a **claim**, not evidence — plan from the code, never from the checkboxes (`.claude/rules/harness/specs.md`).
 
 1. Read `$ARGUMENTS/spec.md`, `plan.md`, and `tasks.md`. If `tasks.md` is missing or has no unchecked tasks, stop and say so.
-2. Confirm the current branch is a **feature branch/worktree**, not a protected branch (`main` / `master` / `develop`). If on a protected branch, stop and ask the user to create one (`spec-worktree`).
+2. Confirm the current branch is a **feature branch/worktree**, not a protected branch (`main` / `master` / `develop`). If on a protected branch, or if the human has not already said where this runs, ask ("Where the work happens" in `.claude/rules/harness/git-workflow.md`: local, the agent tool's own worktree, or `spec-worktree`) before proceeding.
 3. **Audit the unchecked tasks against reality.** For each one, look for the artifact it claims is missing — the file, the symbol, the migration, the test — in the working tree and in `git log`. Cheap to do in bulk: one pass of Grep/Glob over the paths the tasks name.
 4. Report the drift as a table — `task | claimed | reality | evidence` — counting only rows where the two disagree. Two directions matter:
    - **unchecked but done** — the common rot. Planning waves over these burns a specialist per task to rediscover finished work.
