@@ -112,7 +112,7 @@ If a task's work turned out to be bigger than its class assumed — a "config / 
 
 ## Step 4 — Finish
 
-When every box is checked: dispatch `reviewer` to review the whole branch — it runs its environment-variation checklist (timezones, locales, serial mode, random order; see `.claude/agents/reviewer.md`) rather than trusting the author's green — run the gate once more, and open a **PR to the repo's integration branch** (`main` / `develop`). **Never merge** (`protect-main` blocks it).
+When every box is checked: dispatch `reviewer` to review the whole branch — it runs its environment-variation checklist (timezones, locales, serial mode, random order; see `.claude/agents/reviewer.md`) rather than trusting the author's green — run the gate once more, and open a **PR to the repo's integration branch** (`main` / `develop`). **Never merge** (`protect-main` blocks it). If this ran in a `spec-worktree` created only to produce this PR, remove it now instead of waiting for merge (see "When a worktree's life ends" in `.claude/rules/harness/git-workflow.md`).
 
 If `deviations.md` has any open `finding` (a production defect a test revealed, out of scope for this spec — `.claude/rules/harness/specs.md`), add a **"Findings outside scope"** section to the PR body listing each one in one line, so it does not stay invisible in a file nobody but this run reads. `finding` never blocks the PR; only `needs decision` does.
 
