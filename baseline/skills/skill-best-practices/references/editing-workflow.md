@@ -8,7 +8,7 @@ Before touching any file:
 
 ```bash
 # Find all references to the skill being changed
-git grep -nE 'skills/<name>|\.agents/skills/<name>' -- '*.md'
+git grep -n '<name>' -- '*.md'
 ```
 
 Read every `SKILL.md` that might overlap with the change. List any contradictions and resolve them before writing.
@@ -32,7 +32,7 @@ In the PR description, list the items that must survive the edit:
 | One skill mixes two distinct CI gates or release artifacts | Branch with explicit columns inside one SKILL.md |
 | SKILL.md references are growing > 200 lines and cover unrelated topics | Split references; keep SKILL.md intact |
 | A reference is consulted from more than one skill | Promote to its own skill OR keep in origin and add a cross-link |
-| Skill behavior no longer applies or is superseded | Delete the entire skill; update all cross-references (Rule 7) |
+| Skill behavior no longer applies or is superseded | Delete the entire skill; update all cross-references |
 
 ## E3. Apply the edit
 
@@ -45,15 +45,15 @@ In the PR description, list the items that must survive the edit:
 After renaming or removing a skill:
 
 ```bash
-git grep -nE 'skills/<old-name>|\.agents/skills/<old-name>'
+git grep -n '<old-name>'
 ```
 
 Update every hit, including:
-- `agents/*.md`
-- `README.md`
-- Other `skills/*/SKILL.md` and `references/*.md`
+- `baseline/agents/*.md`
+- `CLAUDE.md` and `README.md`
+- Other `baseline/skills/*/SKILL.md` and `references/*.md`
 
-When a skill is removed or renamed, list the old → new mapping in the PR description so consumer repos know what to update.
+When a skill is removed or renamed, list the old → new mapping in the PR description. A project that links this harness per item (see `baseline/scripts/check-index.sh --strict`) will fail the same check on its side until it picks up the update, so a rename or removal is a breaking change for every linked project, not just this repo.
 
 ## E5. Editing validation checklist
 
@@ -63,5 +63,4 @@ When a skill is removed or renamed, list the old → new mapping in the PR descr
 - [ ] No reference file > 200 lines
 - [ ] SKILL.md still < 200 lines
 - [ ] Behavior intentionally removed: each removal listed in the PR body with rationale
-- [ ] Anti-pattern entries that no longer apply are deleted (Rule 7), not silently kept
-- [ ] Submodule pointer bumped in all consumer repos after merge
+- [ ] Anti-pattern entries that no longer apply are deleted, not silently kept

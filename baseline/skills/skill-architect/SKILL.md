@@ -9,7 +9,7 @@ metadata:
 
 # Skill architect — author a skill our way
 
-Understanding precedes building: don't write a `SKILL.md` until you know the outcome, the trigger, and **who owns the topic**. This is the end-to-end workflow; `skill-best-practices` holds the SKILL.md micro-standards, and the harness repo's own `README.md` explains the layers (not delivered into a project's `.claude/`; `.claude/docs/harness/principles.md` is the part of it that is).
+Understanding precedes building: don't write a `SKILL.md` until you know the outcome, the trigger, and **who owns the topic**. This is the end-to-end workflow for a *new* skill; `skill-best-practices` holds the acceptance standards a finished SKILL.md must meet, plus the workflow for editing, splitting, merging or deleting one that already ships. The harness repo's own `README.md` explains the layers (not delivered into a project's `.claude/`; `.claude/docs/harness/principles.md` is the part of it that is).
 
 ## Phase 1 — Discovery
 
@@ -48,5 +48,5 @@ Understanding precedes building: don't write a `SKILL.md` until you know the out
 
 ## Boundaries (avoid duplication)
 
-- SKILL.md micro-standards / frontmatter details → skill `skill-best-practices`.
+- SKILL.md micro-standards, frontmatter details, and editing an existing skill → skill `skill-best-practices`.
 - The layer model (agents/skills/rules/hooks/docs) → the harness repo's own `README.md`. The three principles it states → `.claude/docs/harness/principles.md`.
