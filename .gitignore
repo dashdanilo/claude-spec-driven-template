@@ -45,3 +45,8 @@ out/
 coverage/
 .nyc_output/
 .claude/tool-log.txt
+
+# harness-score local reports (CI generates these fresh every run, at the
+# repo root only -- anchored so this does not shadow docs/guides/harness-score.md)
+/harness-score.json
+/harness-score.md
