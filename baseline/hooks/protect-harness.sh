@@ -11,10 +11,10 @@
 # install-harness.sh's portable set (it knows about lockfiles and applied
 # migrations, which belong to a repository's own settings, not to something
 # linked over it). This hook is the opposite case — it exists specifically to
-# stop a session in a CONSUMING project from reaching across, by absolute
-# path, into the shared harness checkout and disarming the guard every project
-# depends on — so it has to be registered everywhere, including by
-# install-harness.sh into every adopting project.
+# stop a session from reaching, by absolute path, into the SHARED HARNESS
+# CHECKOUT and disarming the guard every project depends on — so it has to be
+# registered everywhere, including by install-harness.sh into every adopting
+# project.
 #
 # Rationale: install-harness.sh registers hooks in a consuming project's
 # .claude/settings.local.json by ABSOLUTE PATH into the harness checkout — so
@@ -23,6 +23,17 @@
 # directly, no .claude/ in the path at all, and disarm the guard every project
 # sharing this harness depends on. That absolute-path reach is real, not
 # hypothetical, because that is how install-harness.sh wires hooks.
+#
+# What counts as reviewable, restated after the cross-repo rule below was
+# loosened: editing a CONSUMING project's own tracked governance file from a
+# session rooted somewhere else is reviewable exactly like a same-repo edit —
+# it lands in THAT project's own diff and PR, whoever wrote it. It is editing
+# the shared HARNESS CHECKOUT itself, from ANY session, that is never
+# reviewable: per the marketplace's ADR 0003, a consuming project links
+# straight into its working tree, so the edit is live in every project
+# sharing it the instant it is written, with no commit and no reviewer ever
+# in the loop. That is the one case this hook still blocks unconditionally
+# across repos.
 
 set -euo pipefail
 
@@ -130,19 +141,51 @@ if [[ -n "$matched_pattern" ]]; then
     (cd "$common_dir" 2>/dev/null && pwd) || return 1
   }
 
+  # Is a repo (given its WORKTREE TOPLEVEL, not its common git dir) the
+  # harness checkout itself, as opposed to an ordinary project that merely
+  # links into one? Judged structurally: its root holds both
+  # install-harness.sh and a baseline/ directory, the two things every
+  # harness checkout has and no consuming project does.
+  #
+  # Two alternatives were considered and rejected:
+  #   - A hardcoded absolute path (this machine's own
+  #     .../claude-spec-driven-template) works for exactly one person's one
+  #     clone and breaks for every fork, every other developer, and CI.
+  #   - Resolving the .claude/rules/harness symlink only says whether the
+  #     CWD repo is LINKED to a harness; it says nothing about the TARGET
+  #     repo, which is the side this check needs to classify, and it is
+  #     silent for a session rooted in the harness checkout itself (there is
+  #     no symlink to resolve — the rules live there directly).
+  # The structural test is two cheap `-f`/`-d` stats, no subshell and no git
+  # call, and it classifies any harness checkout anywhere, on this machine or
+  # anyone else's.
+  _is_harness_checkout() {
+    # $1 = a repo's WORKTREE TOPLEVEL (not its common git dir —
+    # install-harness.sh and baseline/ live in the working tree, not in
+    # .git). If the directory cannot be read at all, both tests report
+    # false and this classifies as "not a harness checkout" — but that path
+    # is only reached after the caller already failed closed on an
+    # unresolvable toplevel, so an unreadable structure never silently
+    # falls through to a pass.
+    local root="$1"
+    [[ -f "$root/install-harness.sh" && -d "$root/baseline" ]]
+  }
+
   # Degraded-environment policy, decided and fixed here rather than left to
   # fall out of whatever git happens to return: every case where this hook
-  # CANNOT positively confirm "same repo" fails CLOSED (blocks). The
-  # alternative — pass when uncertain — would make the exact cross-repo
-  # attack this hook exists to stop into a silent bypass on any machine
-  # missing git, or for any target path that does not yet exist. A false
-  # positive here costs one blocked edit and a human decision; a false
-  # negative here is a disarmed shared guard.
+  # CANNOT positively confirm "same repo" or "not a harness checkout" fails
+  # CLOSED (blocks). The alternative — pass when uncertain — would make the
+  # exact cross-repo attack this hook exists to stop into a silent bypass on
+  # any machine missing git, or for any target path that does not yet exist.
+  # A false positive here costs one blocked edit and a human decision; a
+  # false negative here is a disarmed shared guard.
   #   - git missing from PATH entirely: cannot resolve either side -> block.
   #   - cwd is not inside a git repo: cannot resolve the session's side -> block.
   #   - target's directory does not exist or is not inside a git repo
   #     (includes writing a brand-new file into a brand-new, not-yet-created
   #     directory): cannot resolve the target's side -> block.
+  #   - target's repo toplevel cannot be resolved (needed only cross-repo, to
+  #     classify the target as a harness checkout or not): block.
   if ! command -v git >/dev/null 2>&1; then
     _block_governance "$matched_pattern" \
       "Could not verify this is a same-repo edit: no 'git' on PATH. Failing closed."
@@ -154,40 +197,15 @@ if [[ -n "$matched_pattern" ]]; then
   if [[ -z "$cwd_repo" || -z "$target_repo" ]]; then
     _block_governance "$matched_pattern" \
       "Could not verify this is a same-repo edit: the session's cwd or the target's directory is not inside a resolvable git repository. Failing closed."
-  elif [[ "$cwd_repo" != "$target_repo" ]]; then
-    _block_governance "$matched_pattern" \
-      "The session is in a different git repository than the file being edited — this looks like an absolute-path reach into another repo's governance surface, not a same-repo change under that repo's own review."
   fi
 
-  # Same repo (including two worktrees of it): the earlier version of this
-  # hook stopped here and let same-repo through unconditionally for source,
-  # while blocking .claude/settings*.json unconditionally regardless of repo.
-  # That was backwards. What actually makes an edit safe is not WHERE it
-  # happens but whether a human reviewer will ever see it: this repo's own
-  # PR process is a real check ONLY for a path that shows up in a diff.
-  #
-  #   - .claude/settings.json is tracked: an edit here is a line in `git
-  #     diff`, and the PR that carries it is the review. Blocking it
-  #     unconditionally bought nothing but friction — meanwhile
-  #     baseline/hooks/*.sh, arguably more dangerous (it IS the guard code),
-  #     passed same-repo with no review requirement at all. An agent could
-  #     already rewrite protect-main.sh to `exit 0` in this very repo; a
-  #     stricter rule on the config that merely REGISTERS that hook was
-  #     protecting something weaker than what it left open next to it.
-  #   - .claude/settings.local.json is gitignored: an edit here is invisible
-  #     to `git diff`, invisible to the PR, invisible to any reviewer who
-  #     only looks at what git tracks. Same-repo does not make this safe —
-  #     it makes it undetectable, which is worse than a change nobody has
-  #     reviewed YET (a new file). A brand-new governance file that does not
-  #     exist on disk yet is not gitignored (unless a .gitignore pattern
-  #     already covers it): it will be `git add`-ed and appear in the PR
-  #     diff like any other new file, so creating one passes here — only a
-  #     path a .gitignore pattern actually excludes is judged unreviewable.
-  #
-  # git check-ignore is the right test, not "is it tracked yet": a brand-new
-  # rule or hook is untracked (it is not in the index) but not ignored, and
-  # blocking on "untracked" would stop the exact workflow that created THIS
-  # hook. Only a path matched by a .gitignore pattern is judged unreviewable.
+  # git check-ignore is the right test for reviewability, not "is it tracked
+  # yet": a brand-new rule or hook is untracked (it is not in the index) but
+  # not ignored, and blocking on "untracked" would stop the exact workflow
+  # that created THIS hook. Only a path matched by a .gitignore pattern is
+  # judged unreviewable. This applies identically whether the edit is
+  # same-repo or cross-repo — a gitignored path is invisible to a reviewer
+  # either way.
   _is_gitignored() {
     # $1 = file_path. Run from the file's own directory so this resolves the
     # same way whether file_path is relative or absolute, and whether or not
@@ -195,9 +213,31 @@ if [[ -n "$matched_pattern" ]]; then
     git -C "$(dirname -- "$1")" check-ignore -q -- "$1" >/dev/null 2>&1
   }
 
+  if [[ "$cwd_repo" != "$target_repo" ]]; then
+    # Cross-repo edit. What actually makes THIS unsafe is not "different
+    # repo" by itself — it is whether the TARGET is the shared harness
+    # checkout (see the header for why that one repo is never reviewable
+    # from any session) versus an ordinary consuming project, whose own
+    # tracked governance file is reviewed exactly like a same-repo edit: in
+    # THAT project's own diff and PR, regardless of which repo the session
+    # editing it happened to start in.
+    target_toplevel="$(git -C "$(dirname -- "$file_path")" rev-parse --show-toplevel 2>/dev/null || true)"
+    if [[ -z "$target_toplevel" ]]; then
+      _block_governance "$matched_pattern" \
+        "Could not verify whether the target repository is a harness checkout ('git rev-parse --show-toplevel' failed on the target's directory). Failing closed."
+    fi
+
+    if _is_harness_checkout "$target_toplevel"; then
+      _block_governance "$matched_pattern" \
+        "The target is inside a HARNESS CHECKOUT (a repo root holding both install-harness.sh and a baseline/ directory), edited from a different repository. Per the marketplace's ADR 0003, a consuming project links straight into a harness checkout's working tree, so this edit would be live in every project sharing it the moment it is written, no commit, no PR, no reviewer. This is the one case that stays blocked across repos regardless of which repo the session started in."
+    fi
+    # Target is an ordinary consuming project, not the harness itself: falls
+    # through to the same gitignored check every same-repo edit gets below.
+  fi
+
   if _is_gitignored "$file_path"; then
     _block_governance "$matched_pattern" \
-      "This path is in the SAME repo but is gitignored — it would never appear in a 'git diff' or a PR, so no reviewer would ever see the change. Gitignored is worse than new: a brand-new file still lands in a commit and a diff. Failing closed."
+      "This path is gitignored in its own repository — it would never appear in a 'git diff' or a PR there, so no reviewer would ever see the change. Gitignored is worse than new: a brand-new file still lands in a commit and a diff. Failing closed."
   else
     ignore_rc=$?
     if [[ "$ignore_rc" -ne 1 ]]; then

@@ -9,28 +9,40 @@
 # `baseline/hooks/*.sh`, `.claude/hooks/*.sh`, `baseline/rules/**`,
 # `.claude/rules/**`) by ONE rule, not two:
 #
-#   1. cwd repo != target repo -> blocked (unchanged: cross-repo reach into
-#      another project's governance surface)
-#   2. same repo AND the target is gitignored -> blocked (invisible to any
-#      reviewer — never shows up in `git diff` or a PR)
-#   3. same repo AND not gitignored -> passes (tracked, or new-and-not-yet-
-#      ignored: either way it lands in a commit and a diff someone reviews)
+#   1. cwd repo != target repo AND the target is inside a HARNESS CHECKOUT
+#      (a repo root with both install-harness.sh and a baseline/ directory)
+#      -> blocked, regardless of which repo the session started in — that
+#      one repo is live everywhere it is linked, with no commit and no
+#      reviewer, the moment it is edited
+#   2. cwd repo != target repo AND the target is an ORDINARY consuming
+#      project's own tracked governance file -> passes — it is reviewable
+#      exactly like a same-repo edit, in THAT project's own diff and PR
+#   3. the target is gitignored in its own repo (same-repo or cross-repo) ->
+#      blocked (invisible to any reviewer — never shows up in `git diff` or
+#      a PR there)
+#   4. otherwise -> passes (tracked, or new-and-not-yet-ignored: either way
+#      it lands in a commit and a diff someone reviews)
 #
 # That collapsed an earlier two-group split (config blocked unconditionally,
 # source blocked only cross-repo) that was judging reviewability by WHICH
-# FILE it was rather than whether a human would ever see the change. Fixture
-# repos build an explicit per-repo `.gitignore` for `.claude/settings.local.json`
-# rather than relying on any ignore rule inherited from outside the disposable
-# repo, since the whole point of the new rule is that gitignore status is
-# resolved with `git check-ignore`, not guessed.
+# FILE it was rather than whether a human would ever see the change, and
+# later loosened the cross-repo rule again: it used to block ANY cross-repo
+# edit, which also caught a consuming project's own tracked governance file
+# edited from a session rooted elsewhere — reviewable, just not same-repo.
+# Fixture repos build an explicit per-repo `.gitignore` for
+# `.claude/settings.local.json` rather than relying on any ignore rule
+# inherited from outside the disposable repo, since the whole point of the
+# rule is that gitignore status is resolved with `git check-ignore`, not
+# guessed.
 #
 # Real git fixtures (built under a mktemp dir, removed on exit via trap —
-# never inside a real repo): REPO_A/REPO_B (same-repo vs cross-repo), a
-# worktree of REPO_A (a worktree of the SAME repo must count as the same
-# repo, not a different one, even though `git rev-parse --show-toplevel`
-# would report a different path for it), a PATH with no `git` (degradation),
-# and a PATH whose `git` shim makes `check-ignore` fail with exit 128
-# (degradation).
+# never inside a real repo): REPO_A/REPO_D are harness checkouts (each has
+# its own install-harness.sh + baseline/), REPO_B is an ordinary consuming
+# project (no install-harness.sh), a worktree of REPO_A (a worktree of the
+# SAME repo must count as the same repo, not a different one, even though
+# `git rev-parse --show-toplevel` would report a different path for it), a
+# PATH with no `git` (degradation), and a PATH whose `git` shim makes
+# `check-ignore` fail with exit 128 (degradation).
 #
 # Run: bash baseline/hooks/tests/protect-harness.test.sh
 
@@ -64,8 +76,9 @@ trap 'rm -rf "$TMPDIR_ROOT"' EXIT
 
 # --- disposable git repos ---
 
-REPO_A="$TMPDIR_ROOT/repo-a"          # simulates "this harness checkout"
-REPO_B="$TMPDIR_ROOT/repo-b"          # simulates a different consuming project (e.g. njord-back)
+REPO_A="$TMPDIR_ROOT/repo-a"          # a harness checkout (gets install-harness.sh below)
+REPO_B="$TMPDIR_ROOT/repo-b"          # an ORDINARY consuming project (e.g. njord-back) — no install-harness.sh
+REPO_D="$TMPDIR_ROOT/repo-d"          # a SECOND, unrelated harness checkout — proves detection is structural, not "whichever repo happens to be REPO_A"
 NO_GIT_CWD="$TMPDIR_ROOT/no-git-cwd"  # plain dir, never git-initialized
 
 _init_repo() {
@@ -93,7 +106,25 @@ _init_repo() {
 
 _init_repo "$REPO_A"
 _init_repo "$REPO_B"
+_init_repo "$REPO_D"
 mkdir -p "$NO_GIT_CWD"
+
+# Mark REPO_A and REPO_D as harness checkouts: the hook's structural test is
+# `install-harness.sh` + `baseline/` at the repo root (baseline/ already
+# exists from _init_repo). Committed, not just written to disk, so the
+# fixture's own git state — tracked file at HEAD — matches what
+# `_is_harness_checkout` reads via `git rev-parse --show-toplevel` on a real
+# checkout. REPO_B is deliberately left WITHOUT install-harness.sh: it is the
+# "ordinary consuming project" fixture the loosened cross-repo rule now
+# passes.
+_mark_as_harness_checkout() {
+  local dir="$1"
+  printf '#!/usr/bin/env bash\n# harness installer (fixture stand-in)\n' > "$dir/install-harness.sh"
+  git -C "$dir" add install-harness.sh
+  git -C "$dir" commit -q -m "add install-harness.sh (harness checkout marker)"
+}
+_mark_as_harness_checkout "$REPO_A"
+_mark_as_harness_checkout "$REPO_D"
 
 # A worktree of REPO_A, on its own branch, in its own directory — proves a
 # worktree of the SAME repo is treated as the same repo, not a different one.
@@ -172,12 +203,13 @@ _run_case() {
 _run_case "1: .claude/settings.json (tracked) passes, cwd in SAME repo as target" \
   "$REPO_A" "$REPO_A/.claude/settings.json" 0
 
-# --- cross-repo is still an unconditional block, for both files ---
+# --- cross-repo into the HARNESS CHECKOUT itself stays blocked (REPO_A is
+# marked as a harness checkout above) ---
 
-_run_case "2: .claude/settings.json blocked, cwd in a DIFFERENT repo" \
+_run_case "2: .claude/settings.json blocked, cwd in a DIFFERENT repo, target is a HARNESS CHECKOUT" \
   "$REPO_B" "$REPO_A/.claude/settings.json" 2
 
-_run_case "3: .claude/settings.local.json blocked, cwd in a DIFFERENT repo" \
+_run_case "3: .claude/settings.local.json blocked, cwd in a DIFFERENT repo, target is a HARNESS CHECKOUT" \
   "$REPO_B" "$REPO_A/.claude/settings.local.json" 2
 
 # --- same-repo but gitignored: invisible to review -> blocked (new) ---
@@ -185,30 +217,31 @@ _run_case "3: .claude/settings.local.json blocked, cwd in a DIFFERENT repo" \
 _run_case "4: .claude/settings.local.json (gitignored) blocked, cwd in SAME repo as target" \
   "$REPO_A" "$REPO_A/.claude/settings.local.json" 2
 
-# --- governance source: same-repo tracked passes, cross-repo blocks (unchanged verdicts) ---
+# --- governance source: same-repo tracked passes; cross-repo into the
+# HARNESS CHECKOUT (REPO_A) still blocks ---
 
 _run_case "5: baseline/hooks/*.sh passes, cwd in SAME repo as target" \
   "$REPO_A" "$REPO_A/baseline/hooks/protect-main.sh" 0
 
-_run_case "6: baseline/hooks/*.sh blocked, cwd in a DIFFERENT repo" \
+_run_case "6: baseline/hooks/*.sh blocked, cwd in a DIFFERENT repo, target is a HARNESS CHECKOUT" \
   "$REPO_B" "$REPO_A/baseline/hooks/protect-main.sh" 2
 
 _run_case "7: .claude/hooks/*.sh passes, cwd in SAME repo as target" \
   "$REPO_A" "$REPO_A/.claude/hooks/some-hook.sh" 0
 
-_run_case "8: .claude/hooks/*.sh blocked, cwd in a DIFFERENT repo" \
+_run_case "8: .claude/hooks/*.sh blocked, cwd in a DIFFERENT repo, target is a HARNESS CHECKOUT" \
   "$REPO_B" "$REPO_A/.claude/hooks/some-hook.sh" 2
 
 _run_case "9: baseline/rules/** passes, cwd in SAME repo as target" \
   "$REPO_A" "$REPO_A/baseline/rules/git-workflow.md" 0
 
-_run_case "10: baseline/rules/** blocked, cwd in a DIFFERENT repo" \
+_run_case "10: baseline/rules/** blocked, cwd in a DIFFERENT repo, target is a HARNESS CHECKOUT" \
   "$REPO_B" "$REPO_A/baseline/rules/git-workflow.md" 2
 
 _run_case "11: .claude/rules/** passes, cwd in SAME repo as target" \
   "$REPO_A" "$REPO_A/.claude/rules/harness/delegation.md" 0
 
-_run_case "12: .claude/rules/** blocked, cwd in a DIFFERENT repo" \
+_run_case "12: .claude/rules/** blocked, cwd in a DIFFERENT repo, target is a HARNESS CHECKOUT" \
   "$REPO_B" "$REPO_A/.claude/rules/harness/delegation.md" 2
 
 # --- a brand-new governance file, not yet on disk and not gitignored -> passes (new) ---
@@ -259,6 +292,30 @@ _run_case "21: a .sh under scripts/ that is not a hook is NOT blocked" \
 
 _run_case "22: .claude/settings.json.example passes (exemption)" \
   "$REPO_A" "$REPO_A/.claude/settings.json.example" 0
+
+# --- the asymmetry that must survive the loosened cross-repo rule: editing a
+# CONSUMING project's own tracked governance file, from a session rooted
+# elsewhere, is reviewable in THAT project's own diff/PR — only the shared
+# HARNESS CHECKOUT itself is special, no matter where the session started ---
+
+_run_case "23: cross-repo, target is tracked .claude/settings.json in a NON-harness repo -> passes" \
+  "$REPO_A" "$REPO_B/.claude/settings.json" 0
+
+_run_case "24: cross-repo, target is tracked baseline/hooks/*.sh in a NON-harness repo -> passes" \
+  "$REPO_A" "$REPO_B/baseline/hooks/protect-main.sh" 0
+
+# --- the HARNESS CHECKOUT itself stays blocked cross-repo, from ANY cwd,
+# including a session already rooted in a (different) harness checkout —
+# proves the check classifies the TARGET, not whether the session "is
+# already inside a harness" ---
+
+_run_case "25: cross-repo, cwd is ALSO a harness checkout, target is a DIFFERENT harness checkout -> blocked" \
+  "$REPO_A" "$REPO_D/baseline/hooks/protect-main.sh" 2
+
+# --- cross-repo target gitignored in its own (non-harness) repo -> still blocked ---
+
+_run_case "26: cross-repo, target gitignored in its own NON-harness repo -> blocked" \
+  "$REPO_A" "$REPO_B/.claude/settings.local.json" 2
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"
