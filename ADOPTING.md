@@ -9,7 +9,7 @@ momento.
 
 ## O que você ganha
 
-Vinte skills, oito subagents, cinco rules e um conjunto de hooks de proteção.
+Vinte e três skills, oito subagents, seis rules e um conjunto de hooks de proteção.
 Uma forma de trabalhar spec-driven que é a mesma em todo repositório onde você
 ligar, e ausente nos que você não ligar.
 
@@ -532,12 +532,15 @@ if chosen and chosen.get("installPath"):
 6. **Edite o `settings.json` commitado do repo:** remova as entradas dos
    hooks portáveis que **estiverem** registradas ali, nem todo repo registrou
    os mesmos. Os candidatos, conferidos no `install-harness.sh` deste
-   harness, são seis: `block-secrets.sh`, `protect-main.sh` e `log-edit.sh`
-   (em `Bash`/`Edit|Write|MultiEdit|NotebookEdit`), `log-agent.sh`
-   (`SubagentStop`), e `check-index.sh` e `check-baseline.sh`
-   (`SessionStart`); no njord-back, por exemplo, `log-edit.sh` e
-   `check-baseline.sh` nunca estiveram commitados ali, não tem entrada para
-   tirar.
+   harness, são nove: em `Bash`, `block-secrets.sh`, `protect-main.sh`,
+   `protect-machine-config.sh` e `log-edit.sh`; em
+   `Edit|Write|MultiEdit|NotebookEdit`, `protect-harness.sh`,
+   `protect-machine-config.sh` e `log-edit.sh` (estes dois últimos
+   registrados nos dois matchers, por isso a soma dos nomes passa de nove);
+   `log-agent.sh` (`SubagentStop`); e `check-handover.sh`, `check-index.sh`
+   e `check-baseline.sh` (`SessionStart`); no njord-back, por exemplo,
+   `log-edit.sh` e `check-baseline.sh` nunca estiveram commitados ali, não
+   tem entrada para tirar.
 
    **Só remova a entrada de um hook do repo que o plugin de stack também
    registra depois de provar, com payload, que a cópia instalada do plugin de
@@ -973,10 +976,11 @@ A maioria é despachada pelas skills acima; você também pode pedir pelo nome.
 ## Rules e hooks
 
 **Rules** carregam sozinhas conforme um glob `paths:`, então não custam nada até
-serem relevantes. Quatro vêm no harness, mais um exemplo:
+serem relevantes. Cinco vêm no harness, mais um exemplo:
 
 - `delegation.md`: sempre ligada. A thread principal coordena, os specialists implementam
 - `git-workflow.md`: sempre ligada. Nome de branch, Conventional Commits, convenção de PR
+- `resuming.md`: sempre ligada. Onde olhar antes de re-derivar contexto ao retomar (handover mais novo ou `tasks.md`, o que `check-handover.sh` já aponta no início da sessão)
 - `specs.md`: em `specs/**`. Afirmações são verificadas contra código e git, nunca copiadas de prosa antiga
 - `adr.md`: em `docs/decisions/**`. ADR é append-only, se supersede em vez de reescrever
 
