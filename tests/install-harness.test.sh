@@ -40,7 +40,7 @@ build_harness() {
   mk_agent "$H/baseline/agents" a1.md
   printf -- '---\npaths: ["**"]\n---\nrule\n' > "$H/baseline/rules/delegation.md"
   echo doc > "$H/baseline/docs/d.md"
-  for h in block-secrets.sh protect-main.sh protect-harness.sh protect-machine-config.sh log-agent.sh log-edit.sh; do printf '#!/bin/sh\nexit 0\n' > "$H/baseline/hooks/$h"; done
+  for h in block-secrets.sh protect-main.sh protect-harness.sh protect-machine-config.sh log-agent.sh log-edit.sh check-handover.sh; do printf '#!/bin/sh\nexit 0\n' > "$H/baseline/hooks/$h"; done
   printf '#!/bin/sh\nexit 0\n' > "$H/baseline/scripts/check-index.sh"
   ( cd "$H" && git init -q . && git add -A && git -c user.email=t@t -c user.name=t commit -q -m init )
 }
@@ -54,6 +54,65 @@ new_repo() {
 }
 inst() { ( cd "$1" && shift && bash "$H/install-harness.sh" "$@" ) > "$TMP/out" 2>&1; echo $? > "$TMP/rc"; }
 rc() { cat "$TMP/rc"; }
+
+# Derives "what should be registered" from install-harness.sh's own WANT
+# dict — the block is sliced out of the real script verbatim, not retyped
+# here — so a hook this suite doesn't know about yet still gets checked, and
+# a hand-copied list can't quietly drift the day a hook is added or moved to
+# a different event/matcher, which is the exact gap this section exists to
+# close. Prints event<TAB>matcher<TAB>command, one line per registered hook.
+want_lines() {  # $1 = harness dir
+  local h="$1"
+  { sed -n '/^WANT = {/,/^}/p' "$ROOT/install-harness.sh"
+    cat <<'PY'
+for event, groups in WANT.items():
+    for matcher, cmds in groups:
+        for c in cmds:
+            print(event + "\t" + (matcher or "") + "\t" + c)
+PY
+  } | python3 -c "
+hooks_dir = '$h/baseline/hooks'
+scripts_dir = '$h/baseline/scripts'
+import sys
+exec(sys.stdin.read())
+"
+}
+
+# Checks settings_file's "hooks" block against the expected event/matcher/
+# command triples in want_file (from want_lines): every expected triple is
+# registered, every registered command's file exists on disk, and no group
+# lists the same command twice (a pile-up from a non-idempotent rerun).
+# Prints one MISSING/PATH-MISSING/DUP line per problem found, "OK" last.
+check_hook_registration() {  # $1 = want_file, $2 = settings_file
+  python3 -c "
+import json, os, sys
+want_file, settings_file = sys.argv[1], sys.argv[2]
+expected = set()
+with open(want_file) as f:
+    for line in f:
+        line = line.rstrip('\n')
+        if not line: continue
+        event, matcher, cmd = line.split('\t')
+        expected.add((event, matcher, cmd))
+d = json.load(open(settings_file))
+ok = True
+actual = set()
+for event, groups in d.get('hooks', {}).items():
+    for g in groups:
+        matcher = g.get('matcher') or ''
+        cmds = [hk.get('command') for hk in g.get('hooks', [])]
+        if len(cmds) != len(set(cmds)):
+            print('DUP %s %s' % (event, matcher)); ok = False
+        for c in cmds:
+            actual.add((event, matcher, c))
+for (event, matcher, cmd) in sorted(expected):
+    if (event, matcher, cmd) not in actual:
+        print('MISSING %s %s %s' % (event, matcher, cmd)); ok = False
+    elif not os.path.exists(cmd):
+        print('PATH-MISSING %s' % cmd); ok = False
+print('OK' if ok else 'FAIL')
+" "$1" "$2"
+}
 
 build_harness
 
@@ -265,6 +324,75 @@ _has "hooklogs upgrade: rerun adds the missing runtime-log lines"    "$R/.git/in
 cp "$R/.git/info/exclude" "$TMP/ex-upgrade"
 inst "$R"
 _ok  "hooklogs upgrade: rerun again is a no-op (no pile-up)"         'cmp -s "$TMP/ex-upgrade" "$R/.git/info/exclude"'
+
+# ---------------------------------------------------------------- 12. hook registration matches WANT, in the right event/matcher
+# The previous sections never open settings.local.json at all — a hook that
+# install-harness.sh's WANT dict lists but never actually registers, or
+# registers on the wrong event or matcher, would still pass every assertion
+# above. want_lines() reads WANT out of the real install-harness.sh, so this
+# section catches that without a second, hand-maintained copy of the list.
+R=$(new_repo hookreg)
+inst "$R"
+want_lines "$H" > "$TMP/want.tsv"
+_ok  "hookreg: settings.local.json exists"           '[[ -f "$R/.claude/settings.local.json" ]]'
+_ok  "hookreg: settings.local.json is valid JSON"    'python3 -m json.tool "$R/.claude/settings.local.json" >/dev/null 2>&1'
+check_hook_registration "$TMP/want.tsv" "$R/.claude/settings.local.json" > "$TMP/hookcheck" 2>&1
+_hasnt "hookreg: every WANT hook is registered (no MISSING)"        "$TMP/hookcheck" "MISSING"
+_hasnt "hookreg: every registered command's file exists (no PATH-MISSING)" "$TMP/hookcheck" "PATH-MISSING"
+_has   "hookreg: SessionStart carries check-handover.sh"            "$R/.claude/settings.local.json" "hooks/check-handover.sh"
+_has   "hookreg: PreToolUse/Edit matcher carries protect-harness.sh" "$R/.claude/settings.local.json" "protect-harness.sh"
+
+# ---------------------------------------------------------------- 13. hook registration survives a rerun without duplicating
+cp "$R/.claude/settings.local.json" "$TMP/settings-before"
+inst "$R"
+_ok  "hookreg rerun: exit 0"                              '[[ $(rc) -eq 0 ]]'
+_has "hookreg rerun: reports hooks already as expected"   "$TMP/out" "ok         hooks already as expected"
+check_hook_registration "$TMP/want.tsv" "$R/.claude/settings.local.json" > "$TMP/hookcheck2" 2>&1
+_hasnt "hookreg rerun: no group lists a command twice (no DUP)"    "$TMP/hookcheck2" "DUP"
+_ok    "hookreg rerun: settings.local.json byte-identical (no pile-up)" 'cmp -s "$TMP/settings-before" "$R/.claude/settings.local.json"'
+
+# ---------------------------------------------------------------- 14. the repo's COMMITTED settings.json is never touched
+# The contract (CLAUDE.md, ADOPTING.md) is: hooks are merged into
+# settings.local.json, already gitignored, so the repo's committed
+# settings.json is never touched. A repo that happens to track its own
+# settings.json (its own permissions, say) must see it byte-identical.
+R="$TMP/committedsettings"; rm -rf "$R"; mkdir -p "$R/.claude"
+printf '{\n  "permissions": { "allow": ["Bash(pnpm test:*)"] }\n}\n' > "$R/.claude/settings.json"
+( cd "$R" && git init -q . && git add -A && git -c user.email=t@t -c user.name=t commit -q -m init )
+cp "$R/.claude/settings.json" "$TMP/settings-json-before"
+inst "$R"
+_ok  "committed settings.json: byte-identical after install"      'cmp -s "$TMP/settings-json-before" "$R/.claude/settings.json"'
+_ok  "committed settings.json: git sees no change to it"          '[[ -z $(git -C "$R" status --porcelain -- .claude/settings.json) ]]'
+_ok  "committed settings.json: hooks landed in settings.local.json instead" '[[ -f "$R/.claude/settings.local.json" ]]'
+_hasnt "committed settings.json: no hooks block added to it"      "$R/.claude/settings.json" "\"hooks\""
+
+# ---------------------------------------------------------------- 15. a repo's OWN settings.local.json keeps what it had
+# A repo can already have a settings.local.json before ever running the
+# installer — its own hook, its own permissions. Installing must merge the
+# harness's hooks in, not replace the file.
+R=$(new_repo ownlocalhooks)
+cat > "$R/.claude/settings.local.json" <<'JSON'
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "/repo-only/my-custom-guard.sh" }
+        ]
+      }
+    ]
+  },
+  "permissions": { "allow": ["Bash(pnpm test:*)"] }
+}
+JSON
+inst "$R"
+_ok  "ownlocalhooks: exit 0"                                       '[[ $(rc) -eq 0 ]]'
+_has "ownlocalhooks: repo's own custom hook still registered"      "$R/.claude/settings.local.json" "/repo-only/my-custom-guard.sh"
+_has "ownlocalhooks: repo's own permissions key survives"          "$R/.claude/settings.local.json" "pnpm test:*"
+_ok  "ownlocalhooks: settings.local.json still valid JSON"         'python3 -m json.tool "$R/.claude/settings.local.json" >/dev/null 2>&1'
+check_hook_registration "$TMP/want.tsv" "$R/.claude/settings.local.json" > "$TMP/hookcheck3" 2>&1
+_hasnt "ownlocalhooks: the full WANT set still lands alongside it" "$TMP/hookcheck3" "MISSING"
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed"
