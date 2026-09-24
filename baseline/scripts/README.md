@@ -21,10 +21,16 @@ is a per-repo guard, not harness method (see `install.sh`'s header).
 
 ## Conventions
 
+Most of these are already how the scripts above behave; this section names the convention so a new one follows it on purpose instead of by accident.
+
 - All scripts must be executable (`chmod +x`)
 - All scripts must exit 0 on success, non-zero on error
 - All scripts that produce structured output must emit JSON on stdout
 - Human-readable messages go to stderr
+- Every error message says how to fix it, not just what went wrong (see `die()` in `spec-worktree.sh`, or the block messages in the hooks under `baseline/hooks/`). "invalid type" is not actionable; "invalid type 'x': must be one of feat fix hotfix refactor docs chore test" is.
+- Exit codes are distinct and documented at the top of the script, because a caller (a hook, another script, CI) matches on the number, not the message. `spec-worktree.sh`'s header comment listing 0/1/2/3 and what each means is the model to follow; do not reuse the same code for two different failure classes.
+- Terminal and pipe output can differ (colored, human-friendly text for a terminal; plain text or JSON when stdout is not a TTY): gate any ANSI codes on `[[ -t 1 ]]`, and additionally suppress them when `NO_COLOR` is set, per the [NO_COLOR](https://no-color.org/) convention (`[[ -n "${NO_COLOR:-}" ]]`). None of the current scripts color their output yet; the next one that does should check both.
+- Anything destructive (deletes a worktree, rewrites a file in place, force-pushes) supports `--dry-run`, printing what it would do without doing it, and `--force` where skipping a safety check is a legitimate, deliberate choice. `spec-worktree.sh --remove` and `--prune` delete worktrees today without either flag; treat that as the gap to close, not the pattern to copy.
 
 ## Adding scripts here
 

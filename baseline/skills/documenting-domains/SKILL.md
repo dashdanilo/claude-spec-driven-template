@@ -81,6 +81,10 @@ Do not update docs for pure formatting, temporary rollout notes, one-off debuggi
 - TODO/TBD placeholders.
 - Mixed-language headings/body in generated domain docs.
 
+## The 5-second test
+
+Read only the first few lines of the doc, as a reader arriving cold would. In that time, they must learn: what this domain is, why it matters, and how to start working in it (the entrypoint or first file to open). If the opening lines make them scroll before answering any of the three, rewrite the opening, not the rest of the doc.
+
 ## Validation gate
 
 Before reporting completion:
@@ -89,6 +93,8 @@ Before reporting completion:
 2. Search for forbidden transient content: specs/plans paths, commands, commits, TODO/TBD, unrelated consumers.
 3. Re-read changed doc against current code and confirm every durable invariant has a home.
 4. Verify no contradiction with parent/local instructions.
+5. Run the 5-second test against the doc's opening lines.
+6. Every code snippet in the doc actually runs or compiles against the current code: paste it against the real file/function it describes, not from memory. A snippet that no longer matches the signature it documents is worse than no snippet, since it teaches the wrong contract with false confidence.
 
 ## Common mistakes
 
