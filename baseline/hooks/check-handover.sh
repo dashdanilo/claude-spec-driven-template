@@ -151,8 +151,20 @@ handover_updated_date() {
 # the Updated: line, so the date line is never shown as if it were prose.
 # Same CRLF-blank-line and trailing-whitespace/CR tolerance as
 # handover_first_line and handover_updated_date above.
+#
+# The date is spelled out as four/two repeated [0-9] classes, not
+# [0-9]{4}/[0-9]{2}: bounded-repetition intervals are an OPTIONAL POSIX ERE
+# feature, and mawk - Debian/Ubuntu's default /usr/bin/awk, and this hook's
+# actual install target since install-harness.sh registers it on whatever
+# `awk` an adopting machine has, not on whatever CI happens to run - does
+# not implement them. Under mawk, `{4}` silently fails to match ANY real
+# date, so this exclusion never fires and an "Updated:" line gets returned
+# as the title instead of being skipped: a broken pointer nobody sees
+# error out, because CI runs on gawk/BSD awk, both of which DO support
+# intervals and so never catch it. Repeated single-char classes are plain
+# ERE with no optional features, portable to every awk in practice.
 handover_title() {
-  awk '/^## Handover/{f=1;next} f && $0 !~ /^[ \t\r]*$/ && $0 !~ /^Updated:[ \t]*[0-9]{4}-[0-9]{2}-[0-9]{2}[ \t\r]*$/ {print; exit}' "$1" 2>/dev/null
+  awk '/^## Handover/{f=1;next} f && $0 !~ /^[ \t\r]*$/ && $0 !~ /^Updated:[ \t]*[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9][ \t\r]*$/ {print; exit}' "$1" 2>/dev/null
 }
 
 # ---------------------------------------------------- JSON string escaping
