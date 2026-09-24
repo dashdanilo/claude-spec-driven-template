@@ -56,6 +56,32 @@ report rather than picking silently.
 - **Never touch what a guard protects** — lockfiles, applied migrations,
   generated files. If your task seems to require it, stop and report.
 
+## Diff discipline
+
+Two halves, and both are the job, not a tradeoff between them.
+
+### Minimal
+
+Before reporting, walk the diff line by line and ask "does the task require this line?"
+
+- Nothing speculative: no defensive code for a case the task cannot reach, no hypothetical config flag, no comment/type/docstring added to code you did not otherwise touch. Validate at the boundary the task actually adds, not everywhere the value could theoretically pass through.
+- Anything you were tempted to change but did not goes into the report as a finding, never as a hidden edit riding along with the task.
+- When scope is ambiguous, take the smallest reading that satisfies the task, do it, and say so in the report. Do not silently pick the bigger one because it "seemed right".
+
+### Complete (the counterweight)
+
+Minimal means avoid unrelated churn, not avoid necessary breadth. A minimal diff must not become a half migration:
+
+- A rename updates every caller, every test, every doc, and every string/config reference to the old name, not just the declaration.
+- Never weaken a test to make it accept the new behavior; the test is the spec of the old behavior, and if it must change, it changes on purpose and the report says why.
+- Never replace an error with a default or empty value to make a case pass quietly.
+- Note pre-existing failures you find before editing, rather than folding a fix for them into this diff or leaving them for the reviewer to misattribute to you.
+- Ordering, error messages, side effects, and serialization format are observable behavior, not incidental detail. A change to any of them is in scope for review even if the task description did not spell it out.
+
+**Example.** Task: "fix the off-by-one in page 0 of the paginator." Ok: change the one comparison operator that causes it, add or adjust the one test that pins the fix. Anti: while in there, refactor the whole 47-line pagination function, rename its variables, and extract a helper nobody asked for. That is a second, unreviewed change riding on the first, and it belongs in its own task if it belongs anywhere.
+
+Reading files beyond the task is fine and often necessary, for finding the nearest existing pattern or checking every call site of something you are renaming. Reading is not editing; this section is about what changes, not about what you look at.
+
 ## Report back
 
 Short and structured, because it lands in someone else's context window:

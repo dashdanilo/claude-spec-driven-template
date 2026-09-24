@@ -92,6 +92,19 @@ Each probe maps to a specific prediction from Phase 3. **Change one variable at 
 
 **Performance regressions:** logs are usually the wrong tool. Establish a baseline measurement (timing harness, profiler, query plan), then bisect. Measure first, fix second.
 
+### When a probe fails unexpectedly
+
+A probe that crashes, times out, or produces an output that fits none of your ranked hypotheses is data, not noise. Do not layer a second change on top of it "to see what happens": that destroys the one signal you just got. Revert to the last understood state, then change exactly **one** variable before rerunning. This is Phase 4's "change one variable at a time" rule applied to the failure case, where the temptation to skip it is strongest.
+
+### Next minimal test template
+
+Before running the next probe, write down:
+
+- **Stays fixed**, what you are holding constant from the last run (inputs, environment, code, data).
+- **Changes**, the single variable you are changing this run.
+- **Predicts**, what each still-live hypothesis says the outcome will be, so one run can discriminate between them.
+- **Stop condition**, the result that ends the loop: either "hypothesis N confirmed" or "all remaining hypotheses ruled out, generate new ones."
+
 ## Phase 5 — Fix + regression test
 
 Write the regression test **before the fix** — but only if a **correct seam** exists: one where the test exercises the real bug pattern as it occurs at the call site. A seam that is too shallow (a unit test that can't replicate the chain that triggered it) gives false confidence.
@@ -107,6 +120,16 @@ With a correct seam:
 5. Re-run the Phase 1 loop against the original, un-minimised scenario.
 
 ## Phase 6 — Cleanup + post-mortem
+
+### Status vocabulary
+
+Report progress with one of these words, never a vaguer one:
+
+- **REPRODUCED**, the Phase 1 loop goes red on the user's exact symptom.
+- **FIXED**, the same loop, unmodified, now goes green, and the Phase 5 regression test passes.
+- **UNVERIFIED**, anything short of that. A process running, an exit code of 0, a server that started, or an output directory existing are not proof the fix works: they prove the thing ran, not that it produced the right result. State what you actually observed and what is still missing to call it FIXED.
+
+Never report FIXED from an UNVERIFIED signal.
 
 Before declaring done:
 

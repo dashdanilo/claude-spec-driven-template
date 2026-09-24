@@ -938,6 +938,7 @@ casa: as descrições são o gatilho.
 | **`documenting-domains`** | uma feature subiu e o conhecimento precisa sobreviver à spec. Escreve `CLAUDE.md` aninhados |
 | **`handover`** | a sessão está longa ou você vai parar. Reconcilia o `tasks.md` contra a realidade, descreve o que **é verdade** (nunca o que fazer em seguida), **sempre grava um arquivo** (na spec ativa, ou em `.claude/handovers/` quando não há spec), imprime um bloco copiável e manda limpar |
 | **`status`** | "onde eu estou?" Cartão de saúde somente-leitura: spec ativa, tasks abertas, gates, branch |
+| **`postmortem`** | um incidente terminou (outage, vazamento cross-tenant, deploy falho) e precisa virar aprendizado, não culpa. Classifica severidade (SEV1-SEV4), reconstrói a timeline, separa causa imediata/subjacente/sistêmica, e lista as 3-5 mudanças que teriam evitado ou detectado, marcando cada uma como confirmada ou avaliação. Não é para depurar um bug ainda ativo, isso é o `diagnosing-bugs` |
 
 ### Sobre o próprio harness
 

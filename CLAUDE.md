@@ -31,6 +31,7 @@ The skills in `baseline/skills/` are workflows Claude Code auto-invokes based on
 - `devils-advocate` - stress-tests a spec/plan/decision before committing (devil's advocacy, pre-mortem, red-team) (CC-BY-4.0, adapted from [tech-leads-club/agent-skills](https://github.com/tech-leads-club/agent-skills))
 - `diagnosing-bugs` - disciplined diagnosis loop for hard bugs and perf regressions; the gate is a tight, red-capable feedback loop before any hypothesis (MIT, adapted from [mattpocock/skills](https://github.com/mattpocock/skills))
 - `documenting-domains` - creates durable local domain documentation (nested CLAUDE.md files) after a feature ships (attribution: [douglasgomes98](https://github.com/douglasgomes98))
+- `postmortem` - blameless postmortem after an incident has ended (outage, cross-tenant leak, failed deploy); severity table, timeline, layered causes, confirmed-vs-assessed preventive changes, owned action items; writes to `docs/postmortems/` (MIT, adapted from [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents))
 - `skill-best-practices` - authoring standards for skills (frontmatter, progressive disclosure, descriptions)
 
 > Stack-specific skills (e.g. React SPA conventions) are **not** part of the baseline — they come from a stack plugin in the [njord marketplace](https://github.com/njord-app/marketplace), installed per project (`/plugin install frontend-react@njord`).

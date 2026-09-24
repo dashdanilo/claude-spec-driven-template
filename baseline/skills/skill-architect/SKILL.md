@@ -29,6 +29,10 @@ Understanding precedes building: don't write a `SKILL.md` until you know the out
 - Each rule file: **Rule / Why / ❌ Incorrect / ✅ Correct**, grounded in a **real file** (cite the path). Imperative and specific — one precise instruction beats three vague paragraphs.
 - Add a **Boundaries (avoid duplication)** section pointing to the owners of adjacent topics.
 
+### Authoring an agent specifically
+
+An agent's `description` needs the same "what + when + NOT for" shape as a skill's (see `implementer`'s or `diagnosing-bugs`' frontmatter for the pattern), and its body needs one more thing a skill's does not: an explicit **"NOT responsible for"** list. Two agents whose scopes silently overlap get dispatched inconsistently and neither one's report tells you which one should have run. Spell out, in the agent's own file, the tasks that belong to a different agent instead, the way `implementer` names the stack specialist it stands in for and tells the caller to dispatch that one instead when it exists.
+
 ## Phase 4 — Validate
 
 - kebab-case folder, `SKILL.md` present, **no `README.md`**, frontmatter valid.
