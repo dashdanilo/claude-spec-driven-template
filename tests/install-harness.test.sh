@@ -40,7 +40,7 @@ build_harness() {
   mk_agent "$H/baseline/agents" a1.md
   printf -- '---\npaths: ["**"]\n---\nrule\n' > "$H/baseline/rules/delegation.md"
   echo doc > "$H/baseline/docs/d.md"
-  for h in block-secrets.sh protect-main.sh protect-harness.sh protect-machine-config.sh log-agent.sh log-edit.sh check-handover.sh; do printf '#!/bin/sh\nexit 0\n' > "$H/baseline/hooks/$h"; done
+  for h in block-secrets.sh protect-main.sh protect-unpushed.sh protect-harness.sh protect-machine-config.sh log-agent.sh log-edit.sh check-handover.sh; do printf '#!/bin/sh\nexit 0\n' > "$H/baseline/hooks/$h"; done
   printf '#!/bin/sh\nexit 0\n' > "$H/baseline/scripts/check-index.sh"
   ( cd "$H" && git init -q . && git add -A && git -c user.email=t@t -c user.name=t commit -q -m init )
 }

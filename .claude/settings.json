@@ -72,6 +72,10 @@
           },
           {
             "type": "command",
+            "command": "baseline/hooks/protect-unpushed.sh"
+          },
+          {
+            "type": "command",
             "command": "baseline/hooks/protect-machine-config.sh"
           },
           {
