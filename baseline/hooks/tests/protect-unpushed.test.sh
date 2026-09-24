@@ -143,6 +143,114 @@ git -C "$NOREMOTE_REPO" add file.txt
 git -C "$NOREMOTE_REPO" commit -q -m "rascunho descartavel"
 git -C "$NOREMOTE_REPO" checkout -q trabalho
 
+# F1 fixtures: three shapes that produce a numstat line of "0<TAB>0<TAB>path"
+# (nothing added, nothing removed) despite the branch genuinely holding a
+# change nowhere else: a pure rename, a newly added empty file, and a
+# mode-only chmod. Never pushed. rename-only and chmod-only get their OWN
+# dedicated baseline files (rename-src.txt, chmod-target.txt), committed and
+# pushed to main before either branch exists: sharing file.txt with the F2
+# fixtures below (which push further, unrelated commits to main afterward)
+# would otherwise contaminate the "pure 0/0" property this test needs, since
+# git diff would then also see the unrelated later content drift on that
+# same path and stop reporting a clean 0/0 (reproduced while building this
+# fixture: feat/chmod-only's own numstat came back as "0 1 file.txt" once F2
+# pushed a change to file.txt after this branch already existed).
+echo "rename me" > "$MAIN_REPO/rename-src.txt"
+echo "chmod me" > "$MAIN_REPO/chmod-target.txt"
+git -C "$MAIN_REPO" add rename-src.txt chmod-target.txt
+git -C "$MAIN_REPO" commit -q -m "add F1 baseline files"
+git -C "$MAIN_REPO" push -q origin main
+
+git -C "$MAIN_REPO" checkout -q -b feat/rename-only main
+git -C "$MAIN_REPO" mv rename-src.txt rename-dst.txt
+git -C "$MAIN_REPO" commit -q -m "rename rename-src.txt"
+git -C "$MAIN_REPO" checkout -q main
+
+git -C "$MAIN_REPO" checkout -q -b feat/empty-file main
+touch "$MAIN_REPO/empty.txt"
+git -C "$MAIN_REPO" add empty.txt
+git -C "$MAIN_REPO" commit -q -m "add empty file"
+git -C "$MAIN_REPO" checkout -q main
+
+git -C "$MAIN_REPO" checkout -q -b feat/chmod-only main
+chmod +x "$MAIN_REPO/chmod-target.txt"
+git -C "$MAIN_REPO" add chmod-target.txt
+git -C "$MAIN_REPO" commit -q -m "chmod +x chmod-target.txt"
+git -C "$MAIN_REPO" checkout -q main
+
+# F2 fixture 1: one-commit branch, squash-merged, then integration advances
+# on the EXACT line the branch touched. numstat alone false-positives here
+# (compares current tips, sees the later integration edit as "missing"
+# branch content); cherry must catch it, since a patch-id is fixed to the
+# historical commit and does not move when integration advances afterward.
+git -C "$MAIN_REPO" checkout -q -b feat/f2-one main
+echo "f2 one work" >> "$MAIN_REPO/file.txt"
+git -C "$MAIN_REPO" add file.txt
+git -C "$MAIN_REPO" commit -q -m "f2 one work"
+git -C "$MAIN_REPO" checkout -q main
+git -C "$MAIN_REPO" merge -q --squash feat/f2-one >/dev/null
+git -C "$MAIN_REPO" commit -q -m "feat: f2 one work (#3)"
+python3 - "$MAIN_REPO/file.txt" <<'PY'
+import sys
+p = sys.argv[1]
+with open(p) as f:
+    lines = f.readlines()
+lines[-1] = "f2 one work, edited later on integration\n"
+with open(p, "w") as f:
+    f.writelines(lines)
+PY
+git -C "$MAIN_REPO" add file.txt
+git -C "$MAIN_REPO" commit -q -m "integration edits the line feat/f2-one touched"
+git -C "$MAIN_REPO" push -q origin main
+
+# F2 fixture 2: three commits squashed into one. The squash commit's single
+# combined patch-id matches none of the three original commits' individual
+# patch-ids, so cherry alone false-positives here; numstat (content, not
+# per-commit patches) must catch it instead.
+git -C "$MAIN_REPO" checkout -q -b feat/f2-three main
+echo "f2c1" >> "$MAIN_REPO/g.txt"
+git -C "$MAIN_REPO" add g.txt
+git -C "$MAIN_REPO" commit -q -m "f2 c1"
+echo "f2c2" >> "$MAIN_REPO/g.txt"
+git -C "$MAIN_REPO" add g.txt
+git -C "$MAIN_REPO" commit -q -m "f2 c2"
+echo "f2c3" >> "$MAIN_REPO/g.txt"
+git -C "$MAIN_REPO" add g.txt
+git -C "$MAIN_REPO" commit -q -m "f2 c3"
+git -C "$MAIN_REPO" checkout -q main
+git -C "$MAIN_REPO" merge -q --squash feat/f2-three >/dev/null
+git -C "$MAIN_REPO" commit -q -m "feat: f2 three work squashed (#4)"
+git -C "$MAIN_REPO" push -q origin main
+
+# F3 fixture: a separate, isolated repo whose origin/HEAD is a symref
+# pointing at a remote-tracking ref that does not exist (the real shape of
+# an upstream default branch renamed or deleted after clone, not
+# hypothetical). A genuinely safe, squash-merged branch must still resolve
+# the integration branch via the main/master/trunk/develop fallback and
+# pass, not block on a dangling ref it cannot diff against.
+F3_REMOTE="$TMPDIR_ROOT/f3-remote.git"
+git init -q --bare "$F3_REMOTE"
+F3_REPO="$TMPDIR_ROOT/f3-repo"
+mkdir -p "$F3_REPO"
+git -C "$F3_REPO" init -q -b tmp-setup
+git -C "$F3_REPO" config user.email "test@example.com"
+git -C "$F3_REPO" config user.name "Test"
+git -C "$F3_REPO" remote add origin "$F3_REMOTE"
+echo "one" > "$F3_REPO/f.txt"
+git -C "$F3_REPO" add f.txt
+git -C "$F3_REPO" commit -q -m "first commit"
+git -C "$F3_REPO" branch -m tmp-setup main
+git -C "$F3_REPO" push -q -u origin main
+git -C "$F3_REPO" checkout -q -b feat/f3-safe
+echo "two" >> "$F3_REPO/f.txt"
+git -C "$F3_REPO" add f.txt
+git -C "$F3_REPO" commit -q -m "f3 safe work"
+git -C "$F3_REPO" checkout -q main
+git -C "$F3_REPO" merge -q --squash feat/f3-safe >/dev/null
+git -C "$F3_REPO" commit -q -m "feat: f3 safe work (#5)"
+git -C "$F3_REPO" push -q origin main
+git -C "$F3_REPO" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/gone-branch
+
 PASS_COUNT=0
 FAIL_COUNT=0
 
@@ -238,8 +346,14 @@ _run_case "4: git branch -d (lowercase) on unpushed-danger" \
   "$MAIN_REPO" "git branch -d feat/unpushed-danger" 2
 
 # 5. -r/--remotes: deleting a local remote-tracking ref never loses work.
-_run_case "5: git branch -r -d origin/does-not-exist" \
-  "$MAIN_REPO" "git branch -r -d origin/does-not-exist" 0
+# Deliberately targets feat/unpushed-danger, a branch that genuinely fails
+# the safety check (case 1 blocks it), so this exercises the -r exemption
+# itself: without it, this would block; passing here is not a coincidence
+# of the target not existing (F4, a mutant removing the -r exemption
+# entirely used to survive against "origin/does-not-exist", which the
+# pre-existing "branch must exist locally" check already skips on its own).
+_run_case "5: git branch -r -d feat/unpushed-danger (exemption, not existence)" \
+  "$MAIN_REPO" "git branch -r -d feat/unpushed-danger" 0
 
 # 6. worktree with uncommitted changes -> blocked.
 _run_case "6: git worktree remove, dirty worktree" \
@@ -253,11 +367,18 @@ _run_case "7: git worktree remove --force, dirty worktree" \
 _run_case "8: git worktree remove, clean worktree" \
   "$MAIN_REPO" "git worktree remove $WT_CLEAN" 0
 
-# 9. not a delete at all.
-_run_case "9a: git branch (list)" \
-  "$MAIN_REPO" "git branch" 0
-_run_case "9b: git branch -a" \
-  "$MAIN_REPO" "git branch -a" 0
+# 9. not a delete at all. 9a and 9b deliberately carry a positional token
+# that IS an existing, genuinely unsafe branch name (feat/unpushed-danger),
+# so a mutant that forces _bd_is_delete=1 regardless of the actual flags
+# would try to safety-check it and block (F4: the previous "git branch"/
+# "git branch -a" commands had no branch-name positional at all, so
+# _bd_branches stayed empty and such a mutant survived undetected — forcing
+# the delete flag on an empty list is a no-op either way, the test wasn't
+# exercising the flag at all).
+_run_case "9a: git branch <existing-branch> (no delete flag)" \
+  "$MAIN_REPO" "git branch feat/unpushed-danger" 0
+_run_case "9b: git branch -a <existing-branch> (no delete flag)" \
+  "$MAIN_REPO" "git branch -a feat/unpushed-danger" 0
 _run_case "9c: git status" \
   "$MAIN_REPO" "git status" 0
 
@@ -363,6 +484,35 @@ else
   echo "FAIL: 19 (D4 explicit fallback): expected exit 2, got $actual_19"
   FAIL_COUNT=$((FAIL_COUNT + 1))
 fi
+
+# 20-22 (F1). A delta-zero numstat line (rename, new empty file, chmod)
+# must still block: each of these branches genuinely holds a change nowhere
+# else, and the old "added -gt 0" check alone let all three through.
+_run_case "20 (F1): rename-only branch, numstat shows 0/0" \
+  "$MAIN_REPO" "git branch -D feat/rename-only" 2
+_run_case "21 (F1): new empty file branch, numstat shows 0/0" \
+  "$MAIN_REPO" "git branch -D feat/empty-file" 2
+_run_case "22 (F1): chmod-only branch, numstat shows 0/0" \
+  "$MAIN_REPO" "git branch -D feat/chmod-only" 2
+
+# 23 (F2, side A). One-commit branch, squash-merged, integration later edits
+# the exact line the branch touched. numstat alone would false-positive
+# (blocked); cherry must catch it since patch-id doesn't move.
+_run_case "23 (F2 side A): squash-merged, integration edits the same line later" \
+  "$MAIN_REPO" "git branch -D feat/f2-one" 0
+
+# 24 (F2, side B). Three commits squashed into one: cherry alone would
+# false-positive (each original patch-id differs from the combined squash
+# commit's), numstat (content-based) must still resolve it.
+_run_case "24 (F2 side B): three commits squashed into one" \
+  "$MAIN_REPO" "git branch -D feat/f2-three" 0
+
+# 25 (F3). origin/HEAD dangling at a remote-tracking ref that does not
+# exist: a genuinely safe, squash-merged branch must still resolve the
+# integration branch via the fallback and pass, not block on a ref it
+# cannot diff against.
+_run_case "25 (F3): dangling origin/HEAD falls back, safe branch passes" \
+  "$F3_REPO" "git branch -D feat/f3-safe" 0
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"

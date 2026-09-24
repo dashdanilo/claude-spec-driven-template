@@ -51,19 +51,19 @@
 #       common case this repo (squash-merge) produces on every single merged
 #       PR: the branch's commits are gone from history, only their squashed
 #       content survives, so `git branch --contains` gives a false negative
-#       on every branch that already shipped. The test used instead is
-#       content-based: `git diff --numstat <integration> <branch>` and check
-#       that nothing is ADDED going from the integration branch to the
-#       branch being deleted (deletions are fine and expected, they just
-#       mean the integration branch moved on since; any addition is content
-#       the branch still uniquely holds). The integration branch is resolved
-#       from `origin/HEAD`, falling back to the first of main/master/trunk/
-#       develop that exists as `origin/<name>` or, failing that, as a local
-#       branch — never hardcoded to "main". If no integration branch can be
-#       resolved at all, a branch that fails (a) is blocked rather than
-#       risking a false pass, since (b) could not be evaluated either way —
-#       sustainable only together with the escape hatch below, since a block
-#       with no way out just gets the guard disabled.
+#       on every branch that already shipped. Checked TWO ways, either one
+#       sufficient (see the functions themselves for why neither alone is
+#       enough): a numstat-based content diff against the integration
+#       branch's CURRENT tip, and a `git cherry` patch-id comparison against
+#       integration's commit history. The integration branch is resolved
+#       from `origin/HEAD` (its target verified to actually exist, not just
+#       resolved as a symref), falling back to the first of main/master/
+#       trunk/develop that exists as `origin/<name>` or, failing that, as a
+#       local branch — never hardcoded to "main". If no integration branch
+#       can be resolved at all, a branch that fails (a) is blocked rather
+#       than risking a false pass, since (b) could not be evaluated either
+#       way — sustainable only together with the escape hatch below, since a
+#       block with no way out just gets the guard disabled.
 #
 # A worktree remove is SAFE, and let through, only when `git status
 # --porcelain` in that worktree is empty. `--force` on the command being
@@ -108,6 +108,18 @@
 #   - a branch name that does not exist locally at the time this hook runs
 #     is not something the delete command can lose either, so it passes
 #     unchecked
+#   - `rm -rf <path>` on a worktree or repo directory, and `git worktree
+#     prune`, are not intercepted at all: this hook only recognizes the two
+#     command shapes named above. Both are real ways to lose the same kind
+#     of work this hook exists to protect, left to a human's judgment for
+#     now rather than this hook's, same as any command it does not parse
+#   - a `git -C <path>` whose path contains a space, even quoted
+#     (`git -C "a b" branch -D x`), is not read correctly: the explicit-dir
+#     capture stops at the first whitespace, same limitation protect-main.sh
+#     accepts for the identical construct. The invocation then resolves
+#     against the running current_dir instead of the quoted path, which is
+#     conservative in the common case (checks the wrong, but still real,
+#     directory) rather than silently skipping the check
 #
 # Registered in .claude/settings.json under hooks.PreToolUse with matcher
 # "Bash". Also in install-harness.sh's portable set: losing local-only work
@@ -257,7 +269,12 @@ _parse_worktree_remove_path() {
 # directly: prefers origin/HEAD, then the first of main/master/trunk/develop
 # that exists as origin/<name>, then the first that exists as a local
 # branch. Never hardcodes "main". Prints the ref and returns 0, or returns 1
-# if nothing resolves.
+# if nothing resolves. origin/HEAD's target is verified to actually exist,
+# not just resolved as a symref: a stale origin/HEAD pointing at a remote
+# branch that was since renamed or deleted (a real, reproduced case, not
+# hypothetical) would otherwise hand back a ref that resolves to nothing,
+# blocking a genuinely safe delete and, worse, telling the person to run a
+# `git diff --numstat` that itself errors out with nowhere to go.
 _resolve_integration_ref() {
   local repo="$1"
   local head_ref name c
@@ -265,8 +282,10 @@ _resolve_integration_ref() {
   head_ref=$(git -C "$repo" symbolic-ref -q refs/remotes/origin/HEAD 2>/dev/null || echo "")
   if [[ -n "$head_ref" ]]; then
     name="${head_ref#refs/remotes/origin/}"
-    printf 'origin/%s' "$name"
-    return 0
+    if git -C "$repo" rev-parse --verify --quiet "refs/remotes/origin/$name" >/dev/null 2>&1; then
+      printf 'origin/%s' "$name"
+      return 0
+    fi
   fi
 
   for c in main master trunk develop; do
@@ -294,23 +313,63 @@ _branch_unique_log() {
   git -C "$repo" log --oneline "$branch" --not --exclude="$branch" --branches --remotes --tags 2>/dev/null
 }
 
-# Criterion (b): nothing the branch holds is missing from the integration
-# ref's current content. `git diff --numstat <integration> <branch>` reads
-# as "changes to go from integration to branch" — an added line is content
-# the branch has that integration does not (unsafe), a deleted line only
-# means integration moved on independently since (irrelevant to this
-# branch's safety). A binary file that differs cannot be judged this way and
-# is treated as unsafe, conservatively.
+# Criterion (b), test 1 of 2: nothing the branch holds is missing from the
+# integration ref's current content. `git diff --numstat <integration>
+# <branch>` reads as "changes to go from integration to branch" — an added
+# line is content the branch has that integration does not (unsafe), a
+# deleted line only means integration moved on independently since
+# (irrelevant to this branch's safety). A binary file that differs cannot be
+# judged this way and is treated as unsafe, conservatively.
+#
+# A rename, a newly added empty file, and a mode-only change (chmod +x) all
+# produce a numstat line of "0<TAB>0<TAB><path>" — zero insertions, zero
+# deletions, same as a file with no change at all, because numstat counts
+# LINES, and none of those three touch a line. Reproduced as a real false
+# pass: a branch that does nothing but rename a.txt to b.txt, never pushed,
+# read as "nothing added" and was let through. A 0/0 line is real, unproven
+# content (git still listed the path as changed), so it is treated as
+# unsafe, the same as an actual addition, rather than silently skipped.
 _content_already_in_integration() {
   local repo="$1" integration="$2" branch="$3"
-  local numstat added
+  local numstat added _rest
   numstat=$(git -C "$repo" diff --numstat "$integration" "$branch" 2>/dev/null) || return 1
   [[ -z "$numstat" ]] && return 0
   while IFS=$'\t' read -r added _rest; do
     [[ -z "$added" ]] && continue
     [[ "$added" == "-" ]] && return 1
     [[ "$added" -gt 0 ]] && return 1
+    [[ "$added" -eq 0 && "$_rest" == 0* ]] && return 1
   done <<< "$numstat"
+  return 0
+}
+
+# Criterion (b), test 2 of 2: `git cherry <integration> <branch>` compares
+# each of the branch's own commits by PATCH-ID (a hash of the diff itself,
+# not of tree state) against integration's commits, marking one `-` when an
+# equivalent patch is already there and `+` when it is not. No `+` line
+# means every commit's content already landed. This exists ALONGSIDE the
+# numstat test, neither replaces the other, because each covers a case the
+# other misses:
+#   - numstat alone false-positives (blocks a genuinely safe delete) once
+#     integration's tip diverges from the branch on a line the branch also
+#     touched, even from unrelated later work — a real, reproduced case: a
+#     one-commit branch squash-merged cleanly, then a LATER, unrelated
+#     integration commit edits that same line, and numstat compares CURRENT
+#     tips, so it sees that edit as the branch "missing" content that is
+#     actually just integration having moved on. cherry is immune to this,
+#     because a patch-id is fixed to the historical commit's own diff and
+#     does not move when integration advances afterward.
+#   - cherry alone false-positives on a squash of MULTIPLE commits: the one
+#     squash commit's combined patch-id matches none of the branch's
+#     several individual commits' patch-ids, so cherry marks all of them
+#     `+` even though the final content is identical. numstat catches this
+#     one instead, since it compares tree content, not per-commit patches.
+# Either test passing is sufficient; both failing is what actually blocks.
+_cherry_clean() {
+  local repo="$1" integration="$2" branch="$3"
+  local cherry_out
+  cherry_out=$(git -C "$repo" cherry "$integration" "$branch" 2>/dev/null) || return 1
+  printf '%s\n' "$cherry_out" | grep -q '^+' && return 1
   return 0
 }
 
@@ -322,7 +381,8 @@ _branch_delete_is_safe() {
   fi
   local integ
   integ="$(_resolve_integration_ref "$repo")" || return 1
-  _content_already_in_integration "$repo" "$integ" "$branch"
+  _content_already_in_integration "$repo" "$integ" "$branch" && return 0
+  _cherry_clean "$repo" "$integ" "$branch"
 }
 
 # Split into one "atomic" command per line at command-position separators,
