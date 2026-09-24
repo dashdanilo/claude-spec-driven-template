@@ -100,6 +100,12 @@ For each wave, in the approved order:
 
 4. **Test + review.** `tester` runs once for the wave, covering the union of the gates the wave's clusters selected in Step 1 (each cluster carries the strictest class it contains). `code-reviewer` runs **once per cluster**, scoped to the files that cluster's specialist reported touching — dispatch every cluster's `code-reviewer` **in one message**, same as the implementation wave. Per-cluster is the granularity that matches who wrote the code: one review across the whole wave is too coarse to catch what a review sized to one specialist's output catches, and one review per task is too fine to hold the cluster's context (`.claude/docs/harness/harness-baseline.md`, 2026-09-10). Neither `tester` nor `code-reviewer` modifies a tracked file outside its own deliverable — see the verification-agent rule in `.claude/docs/harness/dispatching.md`. Blocking findings → back to the responsible specialist.
 
+   **Cap the loop.** A cluster's review/fix cycle runs at most **2-3 rounds** (the Producer-Reviewer cap in `.claude/docs/harness/dispatching.md`) before you STOP and hand the human the open ledger instead of dispatching a 4th round. Continue the live `code-reviewer` for round 2+ rather than a fresh dispatch (same doc, "Re-review"), so it converges against its own prior findings instead of re-deriving them. Also STOP on a **plateau**: if two consecutive rounds leave the same blocker count open, or the findings are not converging (new blockers keep appearing at the same rate they're fixed), that is a sign the fix is addressing symptoms, not the cause, and a human should look before a 3rd round is spent on it.
+
+   **A dispatch failure is not a red gate.** If a specialist's or reviewer's dispatch dies, runs out of context, or returns empty/truncated output, that is infrastructure noise, not a code defect: re-dispatch once (continue the same agent if the tool allows it, otherwise a fresh dispatch with the same scope), and report it in your notes as a **dispatch failure**, separate from any code failure the gate found. Only treat it as a gate failure if the re-dispatch also fails, or the code the dispatch did produce is itself broken.
+
+   **Inconclusive evidence is a FAIL, not a pass.** A gate or review that cannot reach a verdict, meaning the tests did not run to completion, the reviewer could not obtain the diff, coverage data was missing, counts as `NEEDS_CHANGES`/red for that wave, never as an implicit `APPROVED`. Silence is not evidence of correctness.
+
 5. **Docs gate** — for the tasks whose class selected it: ensure the relevant doc or nested `src/<folder>/CLAUDE.md` is updated (`documenting-domains`) before marking done.
 
 6. **Check the boxes** for the wave in `tasks.md` (Edit) — only the tasks that are actually green. A task the specialist did not finish does not get a box because the rest of its cluster passed, and a cluster does not get its boxes because its wave-mates passed. Add a short inline `Note:` if useful.
@@ -134,6 +140,7 @@ Anything you log as `needs decision` is a **STOP**, not a note. Report it and wa
 - A task needs a **decision**: an irreversible target (a DB/migration, a new secret/env var) or a product question.
 - A **hook blocks** something (a protected-branch operation, a critical-file edit).
 - The gate stays **red after retries**, or a fix would be hacky.
+- A cluster's review/fix loop reaches its **2-3 round cap**, or **plateaus** (two consecutive rounds with no drop in open blockers).
 - `tasks.md` is **ambiguous**.
 - **Stagnation / budget:** no task got checked off in the last **3** iterations, or you have run ~**10** task-iterations without finishing — halt and report status instead of spinning.
 

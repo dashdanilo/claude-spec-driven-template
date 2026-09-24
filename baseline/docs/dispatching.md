@@ -67,6 +67,7 @@ Same input, several independent angles, then one merge.
 - **Fits when** the same artifact needs different lenses (correctness, security, tests, performance).
 - **Watch out:** the **merge** decides the quality. A lazy merge throws away everything the parallel runs found.
 - **With sub-agents:** dispatch all of them **in one message** — this is the shape where that rule pays most. Do the merge yourself, or give it its own dispatch when it is heavy.
+- **The synthesizer handles all three outcomes explicitly**, not just the happy path: **all returned** merges normally; **partial** (some branches came back, one died or timed out) still merges what arrived, and names which branch is missing rather than silently presenting a full-coverage merge; **zero returned** is not a merge with nothing in it, it is a reported failure, same as a dispatch failure elsewhere in this doc. A merge that cannot tell the reader which of the three happened is worse than no merge.
 
 ### 3. Expert pool
 
@@ -88,6 +89,7 @@ A router picks the one specialist the input needs.
 
 - **Fits when** quality matters and there is an objective criterion to check against.
 - **Watch out:** **cap the retries at 2-3.** Without a cap this loops forever, and each turn costs a full pass.
+- **Escalate on a plateau, not just on the cap.** If the score or the open-findings count is not improving round over round (round 2 leaves the same count open as round 1, or new findings appear as fast as old ones close), that is a sign the fix is treating a symptom rather than the cause. Stop at that point even if rounds remain under the 2-3 cap, and escalate to a human with the open ledger rather than spending the remaining round on the same approach.
 - **With sub-agents:** two dispatches per round, feeding the reviewer's findings into the producer's next prompt. Same loop the gate already runs. Prefer continuing the live reviewer for round 2 (see below) instead of dispatching a fresh one.
 
 ### 5. Supervisor
