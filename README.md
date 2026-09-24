@@ -63,7 +63,7 @@ It combines:
 ```
 ├─ baseline/          THE HARNESS — symlinked into projects, never committed
 │  ├─ agents/           8 subagents (7 reviewers/explorers + implementer)
-│  ├─ skills/          20 skills, a /name each, loaded on demand
+│  ├─ skills/          23 skills, a /name each, loaded on demand
 │  ├─ rules/            path-scoped conventions, auto-loaded
 │  ├─ hooks/            guardrails that run whatever the model decides
 │  ├─ scripts/          check-index · check-baseline · spec-worktree · repo-map · check-snapshot
@@ -171,6 +171,7 @@ Superpowers ships brainstorming, writing-plans, subagent-driven-development, TDD
 The template includes contributions from the broader Claude Code community:
 
 - **[documenting-domains](baseline/skills/documenting-domains/SKILL.md)** skill by [douglasgomes98](https://github.com/douglasgomes98) - creates durable local domain documentation
+- **[postmortem](baseline/skills/postmortem/SKILL.md)** skill adapted from [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) (MIT) - blameless postmortem after an incident
 
 Original attribution is preserved inline in each file. When you fork this template, keep the attribution intact if you keep the file.
 
