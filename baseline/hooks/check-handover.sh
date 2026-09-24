@@ -95,25 +95,40 @@ date_from_epoch() {
   date -d "@$1" +%Y-%m-%d 2>/dev/null || date -r "$1" +%Y-%m-%d 2>/dev/null || echo "1970-01-01"
 }
 
-# The first non-empty line after a "## Handover" heading, if any.
+# The first non-empty line after a "## Handover" heading, if any. "Empty"
+# means empty even in a CRLF file: a blank line there is not the empty
+# string, it is a lone \r (awk/grep split records on \n only), and awk's
+# default NF-based emptiness check does NOT treat \r as whitespace, so a
+# CRLF blank line reads as one non-empty field and gets returned as if it
+# were content - which, sitting right after the heading, would either bury
+# a real Updated: line one record later or hand an empty "\r" back as the
+# title. Matching explicitly against "only spaces, tabs or a lone \r"
+# avoids both.
 handover_first_line() {
-  awk '/^## Handover/{f=1;next} f && NF {print; exit}' "$1" 2>/dev/null
+  awk '/^## Handover/{f=1;next} f && $0 !~ /^[ \t\r]*$/ {print; exit}' "$1" 2>/dev/null
 }
 # That line's date, only when it is the `Updated: YYYY-MM-DD` line the
 # `handover` skill now asks for - empty otherwise, which the caller treats
 # as "fall back to mtime" (see the header note on why mtime is only an
-# approximation).
+# approximation). Trailing whitespace and a trailing CR (a tasks.md saved
+# with CRLF line endings) are tolerated on both sides of the date: awk and
+# grep split records on \n only, so a CRLF file leaves \r attached to the
+# captured line, and an anchor that only allowed the date to sit immediately
+# before end-of-line would silently miss it - falling back to mtime with no
+# sign anything was wrong, the same failure mode F2 fixed for the title.
 handover_updated_date() {
   local line
   line="$(handover_first_line "$1")"
-  if [[ "$line" =~ ^Updated:[[:space:]]*([0-9]{4}-[0-9]{2}-[0-9]{2})$ ]]; then
+  if [[ "$line" =~ ^Updated:[[:space:]]*([0-9]{4}-[0-9]{2}-[0-9]{2})[[:space:]]*$ ]]; then
     printf '%s' "${BASH_REMATCH[1]}"
   fi
 }
 # The title line: the first non-empty line after "## Handover" that is NOT
 # the Updated: line, so the date line is never shown as if it were prose.
+# Same CRLF-blank-line and trailing-whitespace/CR tolerance as
+# handover_first_line and handover_updated_date above.
 handover_title() {
-  awk '/^## Handover/{f=1;next} f && NF && $0 !~ /^Updated:[ \t]*[0-9]{4}-[0-9]{2}-[0-9]{2}$/ {print; exit}' "$1" 2>/dev/null
+  awk '/^## Handover/{f=1;next} f && $0 !~ /^[ \t\r]*$/ && $0 !~ /^Updated:[ \t]*[0-9]{4}-[0-9]{2}-[0-9]{2}[ \t\r]*$/ {print; exit}' "$1" 2>/dev/null
 }
 
 # ---------------------------------------------------- JSON string escaping
