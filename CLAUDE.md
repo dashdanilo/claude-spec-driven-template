@@ -60,6 +60,12 @@ These are skills too — `baseline/skills/<name>/SKILL.md` — but they *drive* 
 - `status` - read-only project health card: active spec/phase, unchecked tasks, gate status, branch
 - `harness-report` - read-only report on the **harness itself**: how much implementation is actually delegated, how dispatches are distributed, how many are unattributed — judged against `.claude/docs/harness/harness-baseline.md`. Answers "is this being used the way it is designed", which a rule cannot answer about itself
 
+### Scripts available
+
+Most of `baseline/scripts/` backs a hook or a skill and is described where that hook or skill is (see `baseline/scripts/README.md` for the full list). A couple are standalone utilities a repo or an agent invokes directly, and unlike a hook they are **not** auto-registered by `install-harness.sh`: running one is a permission an adopting repo grants itself, once, in its own committed `.claude/settings.json`:
+
+- `env-set.sh` - upserts ONE key in a `.env`-style file without ever printing the file's contents; the value comes from STDIN, never an argument, so it never lands in argv, shell history, or a transcript. Pairs with `Bash(.claude/scripts/harness/env-set.sh:*)` allowed and `Read(.env)` kept denied in the adopting repo's settings, so a session can SET a secret without ever being able to READ the file. See ADOPTING.md's "Scripts com permissão própria" for the exact permission lines and `baseline/scripts/README.md` for the script's safety guarantees.
+
 ### Hooks registered
 
 For this repo, in `.claude/settings.json`. For a project that linked the harness, `./install-harness.sh` registers the portable ones in that project's gitignored `.claude/settings.local.json`, pointing at absolute paths in this checkout — the repo's committed `settings.json` is never touched. `protect-critical.sh` and `check-snapshot-on-session.sh` are **deliberately excluded** from the global set: the first knows about lockfiles and migrations, the second about a per-repo snapshot, so both belong to a repo and not to a machine. `block-new-em-dashes.sh` is excluded for a different reason: it enforces THIS repo's own typographic style preference, not a portable convention, so `install-harness.sh` does not carry it into an adopting project. `protect-harness.sh` is the opposite case and **is** in the global set: it exists specifically to stop a session in the adopting project from reaching, by absolute path, into the shared harness checkout and disarming the guard every project depends on, so it has to be registered everywhere.
