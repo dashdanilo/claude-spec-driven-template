@@ -166,12 +166,22 @@ ordem:
    `fica` do passo 3, não `LOCAL`, porque nenhuma fonte o entrega hoje. Liste
    o que ficou assim, indisponível localmente até o plugin realmente
    atualizar de versão, e não invente o conteúdo que falta.
-2. **Abra a sessão de dentro do repo que vai migrar**, não do clone do
-   harness. O `protect-harness.sh` bloqueia, por desenho, edição de
-   `.claude/settings.json`, hooks e rules de **outro** repositório, e decide o
-   que é "outro repo" pelo diretório em que a sessão está rodando. Uma sessão
-   aberta no clone do harness não consegue fazer esta migração num projeto
-   diferente, e isso é a guarda funcionando, não um bug.
+2. **Abrir a sessão de dentro do repo que vai migrar continua sendo a forma
+   mais simples**, mas deixou de ser exigido pela guarda. O `protect-harness.sh`
+   só bloqueia edição cross-repo quando o alvo é o PRÓPRIO checkout do harness
+   (uma raiz com `install-harness.sh` e `baseline/`, dessa máquina ou de
+   qualquer outra) ou um caminho gitignorado no repo alvo (ex.:
+   `.claude/settings.local.json`, que nunca é editado por Edit/Write de
+   qualquer forma, só pelo `install-harness.sh`). Editar `.claude/settings.json`
+   já rastreado, um hook ou uma rule de um projeto comum a partir de uma sessão
+   aberta no clone do harness passa: essa edição aparece no diff e no PR
+   daquele repo, igual a uma edição feita de dentro dele. Risco residual aceito
+   conscientemente: a mudança pode ficar sem commit no working tree do repo
+   alvo por um tempo, ativa em qualquer sessão aberta ali antes de alguém
+   revisar o diff (review adiado, não ausente). Ainda assim, abrir a sessão
+   dentro do repo evita o resto da fricção de caminho absoluto (comandos
+   relativos, o `AGENTS.md` certo carregado), então continua sendo a
+   recomendação padrão.
 3. **Classifique os arquivos versionados antes de rodar `--adopt`, com duas
    perguntas independentes.** Conteúdo em `.claude/skills`, `.claude/agents`,
    `.claude/rules`, `.claude/docs`, `.claude/scripts`, `.claude/hooks` ou
@@ -994,11 +1004,17 @@ uma máquina.
 
 `protect-harness.sh` está nas duas listas **de propósito**, não é uma exceção
 esquecida: é a própria governança do harness, e a regra dela é o critério, não
-a lista de padrões (essa está no `CLAUDE.md`) — um agente pode mexer no que
-vai aparecer num review deste repo, nunca no de outro repo, nunca no que é
-gitignorado e por isso invisível. Por isso o `install.sh` também o vendoriza
-(`REPO_HOOKS`, mesmo array dos dois acima), como rede de segurança para o caso
-de `install-harness.sh` nunca ter rodado naquele repo.
+a lista de padrões (essa está no `CLAUDE.md`). Um agente pode mexer no que vai
+aparecer num review, seja no repo onde a sessão está rodando, seja num projeto
+comum diferente (ex.: replicar uma mudança rastreada de `.claude/settings.json`
+num terceiro repo, a partir de uma sessão aberta aqui). O que continua
+bloqueado, de qualquer sessão, é editar o PRÓPRIO checkout do harness a partir
+de outro repo (esse fica vivo em todo projeto linkado sem passar por commit
+nenhum, ver o cabeçalho de `protect-harness.sh`) e editar o que é gitignorado,
+próprio ou alheio, e por isso invisível a qualquer review. Por isso o
+`install.sh` também o vendoriza (`REPO_HOOKS`, mesmo array dos dois acima),
+como rede de segurança para o caso de `install-harness.sh` nunca ter rodado
+naquele repo.
 
 Um terceiro fica de fora só do método, por um motivo diferente:
 `block-new-em-dashes.sh` aplica uma preferência tipográfica **deste**

@@ -19,14 +19,28 @@
 #   protect-critical.sh into protect-harness.sh UNCHANGED. Every payload's
 #   verdict matched the oracle, 29/29.
 #
-#   Round 2 (this one): the governance RULE itself changed. It used to judge
-#   safety by WHICH FILE (config always blocked, source blocked only
-#   cross-repo); it now judges by REVIEWABILITY (same-repo AND gitignored is
-#   blocked, same-repo and not-gitignored passes, cross-repo is still always
-#   blocked). That is a deliberate behavior change, not a regression, so this
-#   suite no longer claims full equivalence — it claims equivalence on every
-#   payload the change didn't touch, and documents exactly which payloads
-#   diverge and why. See CHANGED_CASES below.
+#   Round 2: the governance RULE itself changed. It used to judge safety by
+#   WHICH FILE (config always blocked, source blocked only cross-repo); it
+#   started judging by REVIEWABILITY (same-repo AND gitignored is blocked,
+#   same-repo and not-gitignored passes, cross-repo was still always blocked
+#   at this point). That is a deliberate behavior change, not a regression,
+#   so this suite stopped claiming full equivalence — it claims equivalence
+#   on every payload each round's change didn't touch, and documents exactly
+#   which payloads diverge and why.
+#
+#   Round 3 (this one): the cross-repo half of the rule loosened further. It
+#   is no longer "cross-repo always blocks" — it is "cross-repo blocks only
+#   when the TARGET is a harness checkout (a repo root with both
+#   install-harness.sh and a baseline/ directory); an ordinary consuming
+#   project's own tracked governance file, reached cross-repo, now passes,
+#   reviewable in THAT project's own diff and PR". This fixture's REPO_A was
+#   never marked as a harness checkout (see protect-harness.test.sh for that
+#   fixture, which added one on purpose), so under the new rule REPO_A reads
+#   as an ordinary consuming project and every cross-repo TRACKED payload
+#   against it now passes. Five more payloads move from "unchanged" to
+#   "changed" here for exactly that reason (harness-2, 6, 8, 10, 12); the
+#   gitignored cross-repo payload (harness-3) is untouched, since the
+#   gitignore check runs regardless of harness-checkout status.
 #
 # Run: bash baseline/hooks/tests/protect-critical-harness-equivalence.test.sh
 
@@ -228,18 +242,13 @@ fi
 # Unchanged: governance payloads whose verdict the new rule preserves
 # ==================================================================
 
-_run_case_unchanged "harness-2: settings.json, cross repo"                "$REPO_B" "$REPO_A/.claude/settings.json"
 _run_case_unchanged "harness-3: settings.local.json, cross repo"          "$REPO_B" "$REPO_A/.claude/settings.local.json"
 _run_case_unchanged "harness-4: settings.local.json, same repo (gitignored on disk, blocked either way)" \
   "$REPO_A" "$REPO_A/.claude/settings.local.json"
 _run_case_unchanged "harness-5: baseline/hooks/*.sh, same repo"           "$REPO_A" "$REPO_A/baseline/hooks/protect-main.sh"
-_run_case_unchanged "harness-6: baseline/hooks/*.sh, cross repo"          "$REPO_B" "$REPO_A/baseline/hooks/protect-main.sh"
 _run_case_unchanged "harness-7: .claude/hooks/*.sh, same repo"            "$REPO_A" "$REPO_A/.claude/hooks/some-hook.sh"
-_run_case_unchanged "harness-8: .claude/hooks/*.sh, cross repo"           "$REPO_B" "$REPO_A/.claude/hooks/some-hook.sh"
 _run_case_unchanged "harness-9: baseline/rules/**, same repo"             "$REPO_A" "$REPO_A/baseline/rules/git-workflow.md"
-_run_case_unchanged "harness-10: baseline/rules/**, cross repo"           "$REPO_B" "$REPO_A/baseline/rules/git-workflow.md"
 _run_case_unchanged "harness-11: .claude/rules/**, same repo"             "$REPO_A" "$REPO_A/.claude/rules/harness/delegation.md"
-_run_case_unchanged "harness-12: .claude/rules/**, cross repo"            "$REPO_B" "$REPO_A/.claude/rules/harness/delegation.md"
 _run_case_unchanged "harness-13: brand-new rule file, not gitignored, same repo" \
   "$REPO_A" "$REPO_A/baseline/rules/not-yet-created-rule.md"
 _run_case_unchanged "harness-14: cwd in worktree, target in main"         "$REPO_A_WT" "$REPO_A/baseline/hooks/protect-main.sh"
@@ -252,7 +261,8 @@ _run_case_unchanged "harness-21: non-hook .sh under scripts/"            "$TMPDI
 _run_case_unchanged "harness-22: .claude/settings.json.example"          "$REPO_A" "$REPO_A/.claude/settings.json.example"
 
 # ==================================================================
-# CHANGED: exactly two payloads diverge from the oracle, on purpose.
+# CHANGED: seven payloads diverge from the oracle, on purpose (two from
+# round 2, five more from round 3 — see the header comment).
 # ==================================================================
 
 _run_case_changed "harness-1: settings.json (tracked), same repo" \
@@ -264,9 +274,26 @@ _run_case_changed "harness-19: [degradation] git check-ignore exits 128" \
   "the old hook never called check-ignore at all, so this PATH override does not affect it (oracle passes, same-repo, as usual); the new hook's same-repo branch depends on check-ignore succeeding, and fails closed when it cannot determine ignore status — a degradation the old rule had no concept of" \
   "$GIT_CHECK_IGNORE_ERRORS_DIR"
 
+_round3_reason="round 3: cross-repo no longer blocks unconditionally, only when the TARGET is a harness checkout (install-harness.sh + baseline/ at its root); this fixture's REPO_A carries no install-harness.sh, so it reads as an ordinary consuming project and its own TRACKED governance file, reached cross-repo, is now reviewable in REPO_A's own diff/PR and passes (see protect-harness.test.sh cases 23-26 for the harness-checkout-vs-not distinction with a fixture built to carry it)"
+
+_run_case_changed "harness-2: settings.json, cross repo (target not a harness checkout)" \
+  "$REPO_B" "$REPO_A/.claude/settings.json" 0 "$_round3_reason"
+
+_run_case_changed "harness-6: baseline/hooks/*.sh, cross repo (target not a harness checkout)" \
+  "$REPO_B" "$REPO_A/baseline/hooks/protect-main.sh" 0 "$_round3_reason"
+
+_run_case_changed "harness-8: .claude/hooks/*.sh, cross repo (target not a harness checkout)" \
+  "$REPO_B" "$REPO_A/.claude/hooks/some-hook.sh" 0 "$_round3_reason"
+
+_run_case_changed "harness-10: baseline/rules/**, cross repo (target not a harness checkout)" \
+  "$REPO_B" "$REPO_A/baseline/rules/git-workflow.md" 0 "$_round3_reason"
+
+_run_case_changed "harness-12: .claude/rules/**, cross repo (target not a harness checkout)" \
+  "$REPO_B" "$REPO_A/.claude/rules/harness/delegation.md" 0 "$_round3_reason"
+
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"
-echo "(2 of these are DECLARED verdict changes, checked against their new expected value, not the oracle)"
+echo "(7 of these are DECLARED verdict changes, checked against their new expected value, not the oracle)"
 
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
   exit 1
