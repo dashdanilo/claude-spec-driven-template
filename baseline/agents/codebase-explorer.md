@@ -103,7 +103,15 @@ Return a structured report:
 
 ### Uncertainties
 - <thing you couldn't determine>
+
+### Files inspected
+- <path> - <why>
+
+### Not inspected
+- <path or area> - <why it was skipped or out of scope for this question>
 ```
+
+Every claim about who owns a behavior ("X handles Y", "the retry logic lives in Z") names the file it came from; a claim with no file behind it is a guess and does not belong in the report. "Files inspected" and "Not inspected" are mandatory on every report, even a short one: they tell the main thread exactly how far the investigation reached, so it knows whether a gap is "not there" or "not looked at".
 
 ## Step 5: Update MEMORY.md
 

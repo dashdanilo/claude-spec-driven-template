@@ -58,6 +58,20 @@ Both paths continue with:
 - Any duplication of logic that already exists elsewhere?
 - **For new logic or tests: is each central assertion actually falsifiable?** The implementer's handoff required proving it kills a mutation (`orchestrate` Step 3 item 1): spot-check the claim rather than trusting it, especially at named denominators and arithmetic boundaries. Treat an "equivalent mutant" claim as unproven until it is shown **by construction against the real call site**; a claim resting only on the parameter's declared type is not proof, since a query-string or untransformed-DTO value routinely arrives outside that type.
 
+### Half migrations
+A rename or a contract change is either propagated everywhere or it is a defect, not a style nit. Check:
+- Every caller of a renamed symbol updated, not just the declaration (`grep` the old name across the tree, including strings).
+- Tests updated to the new name/shape, not left passing against a re-exported alias.
+- Docs and nested `CLAUDE.md` that named the old thing.
+- Config, env var names, and string literals (log messages, error codes, feature-flag keys) that reference the old name.
+
+A finding here is a `blocker` when a caller was missed and would break at runtime or compile time; `should-fix` when it is a stale doc/comment/string with no runtime effect.
+
+### Breaking contract changes
+- Is an API/GraphQL field, endpoint, or exported type removed, renamed, or its nullability tightened (optional to required) without a deprecation path?
+- Does a consumer outside this diff's own files depend on the old shape? If you cannot tell from the diff alone, say so as an uncertainty rather than assuming it is safe.
+- A breaking change with no deprecation window, no version bump, and no migration note is a `blocker`, even if every test in this diff passes, because the tests in this diff cannot see the external consumer.
+
 ## Severity
 
 Classify every finding into exactly one level. The level drives the verdict; it is not commentary added after.
@@ -72,6 +86,14 @@ The verdict is derived, not chosen: zero open `blocker`s means `APPROVED`; one o
 ## Evidence or drop
 
 Every finding cites a `file:line` you actually read this run, not one inferred from the task description, the diff summary, or memory of a similar file. An external claim (a library's documented behavior, a CVE) needs a URL fetched this run. **No evidence means drop the finding, do not downgrade it to a nit.** An unverifiable suspicion costs the reader more than it saves: they either chase it and find nothing, or trust it and are wrong.
+
+## No quota verdicts
+
+A finding exists only because you found it with evidence, never to fill out a report shape. Do not manufacture a finding to hit a count, and do not default to `NEEDS_CHANGES` because a review with nothing to say feels incomplete. If the diff is clean, `APPROVED` with zero findings is a valid, complete review; padding it with an invented nit is the same defect as dropping a real blocker, just in the other direction. This is the opposite of the severity/convergence contract above: severity and IDs exist to make a real finding traceable, not to give a quota something to count toward.
+
+**Anti-example:** a diff that only renames a variable and adds one test. Wrong: reporting a `nit` about brace style two files away that this diff never touched, just so the report is not "empty". Right: `APPROVED (0 blockers, 0 should-fix, 0 nits)` with an empty Findings section.
+
+A prior round's report claiming "zero issues" or "looks perfect" is a reason to look harder this round, not a reason to skip straight to `APPROVED`: re-run the checks above against the current diff yourself rather than inheriting the previous verdict.
 
 ## Convergence across rounds
 
