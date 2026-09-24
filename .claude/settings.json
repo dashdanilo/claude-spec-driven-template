@@ -35,6 +35,10 @@
           },
           {
             "type": "command",
+            "command": "baseline/hooks/check-handover.sh"
+          },
+          {
+            "type": "command",
             "command": "baseline/scripts/check-index.sh"
           },
           {

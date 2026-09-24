@@ -617,8 +617,14 @@ scripts_dir = os.path.join(here, "baseline", "scripts")
 # log-edit.sh is registered on BOTH matchers: Edit/Write/MultiEdit/
 # NotebookEdit (always has been) and now also Bash, so a write done through a
 # redirect, `sed -i`, `tee`, `cp` or `mv` is no longer invisible to it.
+#
+# check-handover.sh is portable, unlike check-snapshot-on-session.sh: it
+# points at a session's OWN .claude/handovers/ (local, gitignored state any
+# adopting repo can have) rather than at a repo-specific snapshot file, so
+# every project benefits the same way check-index.sh and check-baseline.sh
+# already do.
 WANT = {
-    "SessionStart": [(None, [scripts_dir + "/check-index.sh", scripts_dir + "/check-baseline.sh"])],
+    "SessionStart": [(None, [hooks_dir + "/check-handover.sh", scripts_dir + "/check-index.sh", scripts_dir + "/check-baseline.sh"])],
     "SubagentStop": [(None, [hooks_dir + "/log-agent.sh"])],
     "PreToolUse": [
         ("Bash", [hooks_dir + "/block-secrets.sh", hooks_dir + "/protect-main.sh", hooks_dir + "/protect-machine-config.sh", hooks_dir + "/log-edit.sh"]),
