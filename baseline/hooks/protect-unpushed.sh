@@ -120,6 +120,18 @@
 #     against the running current_dir instead of the quoted path, which is
 #     conservative in the common case (checks the wrong, but still real,
 #     directory) rather than silently skipping the check
+#   - a branch that was squash-merged and LATER REVERTED on the integration
+#     branch: `git cherry` still finds the original patch-id in
+#     integration's history and reports clean, and that alone is enough to
+#     pass criterion (b), the OR composition above, even though numstat on
+#     its own would (correctly, on its own reading) call it unsafe. Left
+#     open on purpose rather than adding a third criterion: if the revert
+#     was deliberate, the branch's content is still sitting in its own
+#     history either way, reachable through the branch itself, so deleting
+#     it loses an obsolete branch, not real work — and each criterion added
+#     to this OR so far has cost a full review round of new false-positive
+#     surface, which is the more expensive failure mode for a guard people
+#     need to keep trusting
 #
 # Registered in .claude/settings.json under hooks.PreToolUse with matcher
 # "Bash". Also in install-harness.sh's portable set: losing local-only work
@@ -364,7 +376,18 @@ _content_already_in_integration() {
 #     several individual commits' patch-ids, so cherry marks all of them
 #     `+` even though the final content is identical. numstat catches this
 #     one instead, since it compares tree content, not per-commit patches.
-# Either test passing is sufficient; both failing is what actually blocks.
+# The two tests are OR'd: EITHER passing is enough to call the delete safe,
+# and only both failing blocks it. That is weaker than "these two cover
+# each other's blind spots" might suggest: the guarantee is that at least
+# one of them correctly says unsafe, not that the pair together catches
+# every way a delete could be unsafe. A squash-merged branch later REVERTED
+# on integration is exactly that gap: cherry sees the original patch-id in
+# integration's history and says clean, numstat sees the revert as the
+# branch now holding a line integration lacks and says unsafe on its own,
+# but only ONE has to accidentally agree with numstat's "unsafe" reading
+# for the block to hold — here cherry's "clean" is the one that leaks
+# through, on its own, and the OR lets the delete pass. Deliberately not
+# closed; see the accepted-gaps note below for why.
 _cherry_clean() {
   local repo="$1" integration="$2" branch="$3"
   local cherry_out
