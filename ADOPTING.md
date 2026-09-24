@@ -532,11 +532,11 @@ if chosen and chosen.get("installPath"):
 6. **Edite o `settings.json` commitado do repo:** remova as entradas dos
    hooks portáveis que **estiverem** registradas ali, nem todo repo registrou
    os mesmos. Os candidatos, conferidos no `install-harness.sh` deste
-   harness, são nove: em `Bash`, `block-secrets.sh`, `protect-main.sh`,
-   `protect-machine-config.sh` e `log-edit.sh`; em
+   harness, são dez: em `Bash`, `block-secrets.sh`, `protect-main.sh`,
+   `protect-unpushed.sh`, `protect-machine-config.sh` e `log-edit.sh`; em
    `Edit|Write|MultiEdit|NotebookEdit`, `protect-harness.sh`,
    `protect-machine-config.sh` e `log-edit.sh` (estes dois últimos
-   registrados nos dois matchers, por isso a soma dos nomes passa de nove);
+   registrados nos dois matchers, por isso a soma dos nomes passa de dez);
    `log-agent.sh` (`SubagentStop`); e `check-handover.sh`, `check-index.sh`
    e `check-baseline.sh` (`SessionStart`); no njord-back, por exemplo,
    `log-edit.sh` e `check-baseline.sh` nunca estiveram commitados ali, não
@@ -994,10 +994,10 @@ uma cópia antiga do harness", acima, para o que fazer com o conteúdo antes
 disso acontecer).
 
 **Hooks** são proteções que rodam independente do que o Claude decidir. Os
-portáveis são registrados pelo `install-harness.sh`, nove ao todo:
-`block-secrets.sh`, `protect-main.sh`, `protect-harness.sh`,
-`protect-machine-config.sh`, `check-handover.sh`, `log-agent.sh` e
-`log-edit.sh` (de `baseline/hooks/`), mais `check-index.sh` e
+portáveis são registrados pelo `install-harness.sh`, dez ao todo:
+`block-secrets.sh`, `protect-main.sh`, `protect-unpushed.sh`,
+`protect-harness.sh`, `protect-machine-config.sh`, `check-handover.sh`,
+`log-agent.sh` e `log-edit.sh` (de `baseline/hooks/`), mais `check-index.sh` e
 `check-baseline.sh` (de `baseline/scripts/`, registrados do mesmo jeito, no
 `SessionStart`; `check-handover.sh` também é `SessionStart`, mas mora em
 `baseline/hooks/`, não em `baseline/scripts/`).

@@ -613,6 +613,9 @@ scripts_dir = os.path.join(here, "baseline", "scripts")
 # (git identity in ~/.gitconfig, a shell rc file) that sits outside every
 # repo, invisible to any diff or reviewer regardless of which project the
 # session is working in — so it belongs in every adopting project too.
+# protect-unpushed.sh is portable for the same reason: losing a branch's
+# unpushed commits, or a worktree's uncommitted changes, to `git branch -D`
+# or `git worktree remove` is a risk in any repo, not specific to this one.
 #
 # log-edit.sh is registered on BOTH matchers: Edit/Write/MultiEdit/
 # NotebookEdit (always has been) and now also Bash, so a write done through a
@@ -627,7 +630,7 @@ WANT = {
     "SessionStart": [(None, [hooks_dir + "/check-handover.sh", scripts_dir + "/check-index.sh", scripts_dir + "/check-baseline.sh"])],
     "SubagentStop": [(None, [hooks_dir + "/log-agent.sh"])],
     "PreToolUse": [
-        ("Bash", [hooks_dir + "/block-secrets.sh", hooks_dir + "/protect-main.sh", hooks_dir + "/protect-machine-config.sh", hooks_dir + "/log-edit.sh"]),
+        ("Bash", [hooks_dir + "/block-secrets.sh", hooks_dir + "/protect-main.sh", hooks_dir + "/protect-unpushed.sh", hooks_dir + "/protect-machine-config.sh", hooks_dir + "/log-edit.sh"]),
         ("Edit|Write|MultiEdit|NotebookEdit", [hooks_dir + "/protect-harness.sh", hooks_dir + "/protect-machine-config.sh", hooks_dir + "/log-edit.sh"]),
     ],
 }
