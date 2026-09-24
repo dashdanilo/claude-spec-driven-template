@@ -87,10 +87,34 @@ fi
 [[ "$SOURCE" == "compact" ]] && exit 0
 
 # ------------------------------------------------------- portable file stat
-mtime_of() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0; }
+# GNU form (`stat -c %Y`) tried FIRST, BSD/macOS form (`stat -f %m`) as the
+# fallback - the reverse of the obvious "try BSD, then GNU" ordering, and
+# for a specific reason: on GNU coreutils, `-f` does not mean "use this
+# format", it means "report on the FILESYSTEM the file lives on instead of
+# the file itself", so `stat -f %m` on Linux silently succeeds and prints
+# the MOUNT POINT (e.g. "/"), not a timestamp - it never falls through to
+# the correct GNU form at all, because the first command in the `||` chain
+# already "worked". BSD stat has no such trap: `-c` is not a flag it
+# recognizes, so it fails loudly (exit 1, no stdout) and the fallback runs
+# as intended. Trying the form that fails CLEANLY on the other platform
+# first is what makes a `||` chain like this safe without an `uname`
+# branch. The result is validated as digits-only before use - defense
+# against a third stat dialect answering something unexpected - so a
+# downstream `(( ))` arithmetic comparison can never choke on it and take
+# the whole hook down with a nonzero exit (the CI failure this fixes:
+# ubuntu-latest's `stat -f %m` silently returning "/" fed straight into an
+# arithmetic comparison).
+mtime_of() {
+  local v
+  v="$(stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null)"
+  [[ "$v" =~ ^[0-9]+$ ]] && printf '%s' "$v" || printf '0'
+}
 size_of()  { wc -c < "$1" 2>/dev/null | tr -d ' '; }
-# Epoch seconds -> YYYY-MM-DD. GNU date takes `-d @EPOCH`; BSD/macOS date
-# rejects that form and takes `-r EPOCH` instead, so try both.
+# Epoch seconds -> YYYY-MM-DD. Same reasoning and ordering as mtime_of
+# above: GNU date's `-d @EPOCH` is tried first because BSD/macOS date fails
+# it cleanly (no `-d` flag at all), while the reverse order risks a BSD
+# form that some GNU date build tolerates in an unintended way. `-r EPOCH`
+# is the BSD/macOS fallback.
 date_from_epoch() {
   date -d "@$1" +%Y-%m-%d 2>/dev/null || date -r "$1" +%Y-%m-%d 2>/dev/null || echo "1970-01-01"
 }
