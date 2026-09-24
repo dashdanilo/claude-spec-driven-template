@@ -57,7 +57,9 @@ rc() { cat "$TMP/rc"; }
 
 # Derives "what should be registered" from install-harness.sh's own WANT
 # dict — the block is sliced out of the real script verbatim, not retyped
-# here — so a hook this suite doesn't know about yet still gets checked, and
+# here — so a hook added to WANT after this suite was written still gets
+# checked for registration (it does need adding to build_harness above, or
+# it reports PATH-MISSING rather than going unnoticed), and
 # a hand-copied list can't quietly drift the day a hook is added or moved to
 # a different event/matcher, which is the exact gap this section exists to
 # close. Prints event<TAB>matcher<TAB>command, one line per registered hook.
@@ -334,6 +336,13 @@ _ok  "hooklogs upgrade: rerun again is a no-op (no pile-up)"         'cmp -s "$T
 R=$(new_repo hookreg)
 inst "$R"
 want_lines "$H" > "$TMP/want.tsv"
+# Guards the derivation itself. If the WANT slice ever stops matching (a
+# space added to the header, a type annotation, the dict moved inside a
+# function), sed returns nothing, python dies on stderr, want.tsv comes out
+# empty, and every MISSING assertion below passes while checking nothing.
+# The floor is deliberately loose: it catches an empty or gutted derivation
+# without breaking the day a tenth hook is added.
+_ok  "hookreg: the WANT derivation is not empty"     '[[ $(wc -l < "$TMP/want.tsv") -ge 9 ]]'
 _ok  "hookreg: settings.local.json exists"           '[[ -f "$R/.claude/settings.local.json" ]]'
 _ok  "hookreg: settings.local.json is valid JSON"    'python3 -m json.tool "$R/.claude/settings.local.json" >/dev/null 2>&1'
 check_hook_registration "$TMP/want.tsv" "$R/.claude/settings.local.json" > "$TMP/hookcheck" 2>&1
