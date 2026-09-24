@@ -1024,6 +1024,43 @@ repositório, não uma convenção portátil. Nem o `install.sh` nem o
 
 ---
 
+## Scripts com permissão própria
+
+Skills e hooks portáveis chegam prontos para uso: symlink e, no caso dos
+hooks, já registrados. Um script de `baseline/scripts/` que faça algo sensível
+o bastante para merecer consentimento explícito do repositório é diferente:
+chega pelo mesmo symlink (`.claude/scripts/harness/<nome>.sh`), mas o harness
+nunca concede a si mesmo permissão para rodá-lo. Essa concessão é sempre do
+`.claude/settings.json` **commitado do próprio repositório**, nunca do
+`settings.local.json` que o harness gerencia.
+
+`env-set.sh` é o primeiro caso assim. Faz upsert de UMA chave num arquivo
+`.env` sem nunca imprimir o conteúdo do arquivo (o valor entra por stdin,
+nunca por argumento, então não fica em argv, histórico de shell ou transcript
+de agente). Existe justamente para o caso em que uma sessão precisa GRAVAR um
+segredo novo mas continua proibida de LER o arquivo inteiro. Para habilitar,
+o repo adiciona ao seu próprio `.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(.claude/scripts/harness/env-set.sh:*)"],
+    "deny": ["Read(.env)", "Read(.env.local)", "Read(.env.*.local)"]
+  }
+}
+```
+
+`Read(.env)` continua negado. O deny troca um `Read(.env.*)` genérico, que
+bloquearia até a leitura de uma variante sem segredo como `.env.example`,
+pelas variantes locais que de fato guardam segredo. Ver o cabeçalho de
+`baseline/scripts/env-set.sh` e `baseline/scripts/README.md` para as
+garantias do script (nunca imprime o arquivo, recusa o backup se ele não
+ficaria gitignorado, nunca encolhe o arquivo). Essa edição no `settings.json`
+commitado é sempre do repositório, feita uma vez: o harness não a faz por
+você, do mesmo jeito que não toca em nenhuma outra linha desse arquivo.
+
+---
+
 ## Quando algo der errado
 
 **O `/orchestrate` sumiu, as skills não existem.** Os links quebraram, quase
