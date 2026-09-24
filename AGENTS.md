@@ -28,13 +28,24 @@ Read [`docs/CONSTITUTION.md`](./docs/CONSTITUTION.md) for the full philosophy, p
 
 ## Build, test, lint
 
-No build. No test suite. No linter. This is a template repository.
+No build step and no linter: this is a template repository. There **is** a test
+suite, and CI runs it on every push.
 
-Contributions are validated by:
+- `baseline/hooks/tests/*.test.sh` and `baseline/scripts/tests/*.test.sh`, one
+  suite per hook and per script, plus `tests/install-harness.test.sh` for the
+  installer. Each is a standalone bash script: run one directly, or all of them
+  the way `.github/workflows/test.yml` does.
+- CI runs the whole set on **ubuntu-latest and macos-latest**. The two matter:
+  a hook that passes on macOS can fail on Linux over BSD versus GNU `stat`,
+  `date` and `awk`, and that has already happened here.
+- `baseline/scripts/check-index.sh --strict` gates the index in `CLAUDE.md`
+  against what is actually on disk, and `harness-score --min-level 2` gates the
+  harness itself.
+
+Contributions are also validated by:
 
 - Manual review against `CONTRIBUTING.md` checklist
 - Cross-checking directory tree in `README.md` against actual filesystem
-- Testing shell scripts standalone (see `CONTRIBUTING.md`)
 - Verifying internal links resolve
 
 ```bash
