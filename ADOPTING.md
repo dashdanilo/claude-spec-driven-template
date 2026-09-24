@@ -989,11 +989,13 @@ uma cópia antiga do harness", acima, para o que fazer com o conteúdo antes
 disso acontecer).
 
 **Hooks** são proteções que rodam independente do que o Claude decidir. Os
-portáveis são registrados pelo `install-harness.sh`, oito ao todo:
+portáveis são registrados pelo `install-harness.sh`, nove ao todo:
 `block-secrets.sh`, `protect-main.sh`, `protect-harness.sh`,
-`protect-machine-config.sh`, `log-agent.sh` e `log-edit.sh` (de
-`baseline/hooks/`), mais `check-index.sh` e `check-baseline.sh` (de
-`baseline/scripts/`, registrados do mesmo jeito, no `SessionStart`).
+`protect-machine-config.sh`, `check-handover.sh`, `log-agent.sh` e
+`log-edit.sh` (de `baseline/hooks/`), mais `check-index.sh` e
+`check-baseline.sh` (de `baseline/scripts/`, registrados do mesmo jeito, no
+`SessionStart`; `check-handover.sh` também é `SessionStart`, mas mora em
+`baseline/hooks/`, não em `baseline/scripts/`).
 
 Dois **não** entram junto com o método de propósito, porque são guardas que o
 repositório deve a todos, inclusive a quem nunca instalou isto: o `install.sh`
