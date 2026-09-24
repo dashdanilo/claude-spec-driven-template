@@ -5,10 +5,12 @@
 # Covers: silence with nothing to point at, a single handover, picking the
 # newest of several by filename date, a filename-date tie broken by mtime,
 # silence on source=compact, tolerance of an empty/missing payload, the
-# tasks.md "## Handover" fallback when .claude/handovers/ has nothing, and -
-# the precedence fix - both sources present at once: the newer one wins
-# (whichever source it is), a same-day tie goes to the spec, and the loser
-# is cited in exactly one line, never with its own Date/Size/Title.
+# tasks.md "## Handover" fallback when .claude/handovers/ has nothing, both
+# sources present at once (the newer one wins, a same-day tie goes to the
+# spec, the loser is cited in exactly one line), the spec side comparing by
+# the section's own "Updated:" line or an mtime fallback instead of the
+# spec folder's creation date, and a title containing a tab and a CRLF line
+# ending still producing valid JSON.
 #
 # The hook never shells out to git (it only reads the filesystem relative to
 # cwd), so unlike protect-main.test.sh or check-snapshot-on-session.test.sh
@@ -68,6 +70,10 @@ _assert_not_contains() {
 REPO="$TMPDIR_ROOT/repo"
 mkdir -p "$REPO"
 cd "$REPO" || exit 99
+
+# Used by the "Updated:"-line and mtime-fallback tests below, so their
+# expectations do not depend on which day the suite happens to run.
+TODAY="$(date +%Y-%m-%d)"
 
 run_hook() {
   local payload="$1"
@@ -192,6 +198,10 @@ _assert_not_contains "spec newer than handover: loser's title not restated" "$OU
 rm -rf .claude specs
 
 # ------------------------ 9. both sources present, handover newer: handover wins, spec cited
+# The spec's own "Updated:" line pins its comparable date to 2026-01-01 -
+# without it, mtime fallback would make "now" (today) the comparable date
+# instead, since the fixture file is written during this very test run, and
+# the whole point of this case (the spec is the OLD one) would be lost.
 mkdir -p .claude/handovers specs/2026-01-01-antiga
 cat > .claude/handovers/2026-09-24-recente.md << 'EOF'
 # Recente
@@ -202,6 +212,7 @@ cat > specs/2026-01-01-antiga/tasks.md << 'EOF'
 - [x] task
 
 ## Handover
+Updated: 2026-01-01
 
 Antiga finished months ago.
 EOF
@@ -232,6 +243,75 @@ _assert_eq "same-day tie: exit 0" "$EXIT_CODE" "0"
 _assert_contains "same-day tie: spec wins" "$OUT" "specs/2026-09-24-tied/tasks.md"
 _assert_contains "same-day tie: loose file cited, one line" "$OUT" "Also present, not chosen: .claude/handovers/2026-09-24-loose.md"
 rm -rf .claude specs
+
+# ---------- 11. F1 regression: old spec FOLDER, recent "## Handover" section,
+# beats an intermediate loose file. The folder date (2026-09-01) is older
+# than the loose file's date (2026-09-10); only reading the section's own
+# "Updated:" line, not the folder name, gets this right.
+mkdir -p .claude/handovers specs/2026-09-01-active-feature
+cat > .claude/handovers/2026-09-10-old.md << 'EOF'
+# Old, unrelated
+EOF
+cat > specs/2026-09-01-active-feature/tasks.md << EOF
+# Tasks
+
+- [x] task
+
+## Handover
+Updated: $TODAY
+
+Active feature is in progress; written today despite the September 1st
+folder name.
+EOF
+OUT="$(run_hook '{"source":"clear"}')"; EXIT_CODE=$?
+_assert_eq "F1 reviewer repro: exit 0" "$EXIT_CODE" "0"
+_assert_contains "F1 reviewer repro: spec section wins despite the older folder date" "$OUT" "specs/2026-09-01-active-feature/tasks.md"
+_assert_contains "F1 reviewer repro: comparable date is the Updated: line" "$OUT" "Date:  $TODAY"
+_assert_not_contains "F1 reviewer repro: comparable date is not the folder date" "$OUT" "Date:  2026-09-01"
+_assert_contains "F1 reviewer repro: intermediate loose file cited, not chosen" "$OUT" "Also present, not chosen: .claude/handovers/2026-09-10-old.md"
+rm -rf .claude specs
+
+# --------------------------- 12. mtime fallback, no "Updated:" line at all
+# The spec folder is dated 2026-01-01 - far older than the loose file's
+# 2026-09-20 - yet the spec still wins, because its tasks.md was written
+# (mtime) after the loose file and carries no Updated: line to override
+# that. Proves the fallback reads mtime, not the folder name, when the line
+# is absent.
+mkdir -p .claude/handovers specs/2026-01-01-legacy-folder
+cat > .claude/handovers/2026-09-20-loose.md << 'EOF'
+# Loose, dated before today
+EOF
+cat > specs/2026-01-01-legacy-folder/tasks.md << 'EOF'
+# Tasks
+
+- [x] task
+
+## Handover
+
+No Updated: line in this section - recency has to come from mtime, not
+this 2026-01-01 folder name.
+EOF
+OUT="$(run_hook '{"source":"clear"}')"; EXIT_CODE=$?
+_assert_eq "mtime fallback: exit 0" "$EXIT_CODE" "0"
+_assert_contains "mtime fallback: spec wins via mtime despite the 2026-01-01 folder name" "$OUT" "specs/2026-01-01-legacy-folder/tasks.md"
+_assert_contains "mtime fallback: comparable date is today's mtime" "$OUT" "Date:  $TODAY"
+_assert_not_contains "mtime fallback: not the folder's own date" "$OUT" "Date:  2026-01-01"
+rm -rf .claude specs
+
+# ------------------------- 13. F2 regression: tab and CRLF in a title still
+# produce valid JSON. A raw tab or carriage return in additionalContext
+# used to break Claude Code's own JSON parse ("Invalid control character"),
+# silently discarding the hook's context.
+mkdir -p .claude/handovers
+printf '# Weird\tTab\r\n\r\nBody line with a CRLF ending.\r\n' > .claude/handovers/2026-09-24-control-chars.md
+OUT="$(run_hook '{"source":"clear"}')"; EXIT_CODE=$?
+_assert_eq "control chars in title: exit 0" "$EXIT_CODE" "0"
+if printf '%s' "$OUT" | python3 -m json.tool > /dev/null 2>&1; then
+  _pass "control chars in title: output is valid JSON"
+else
+  _fail "control chars in title: output is valid JSON (got: $OUT)"
+fi
+rm -rf .claude/handovers
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"

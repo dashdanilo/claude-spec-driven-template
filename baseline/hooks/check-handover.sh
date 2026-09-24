@@ -41,6 +41,29 @@
 #     handover file with unexpected permissions) - reporting nothing is
 #     always safer than a hook that errors on SessionStart
 #
+# Deliberately NOT silent on source="resume": a session resumed days later
+# benefits from the same reminder a fresh startup gets, and the pointer
+# costs only a few dozen tokens against the real risk of losing track of
+# state. If this looks like an oversight later, it is not - only "compact"
+# is silenced, on purpose.
+#
+# Comparing recency across sources: a loose .claude/handovers/<date>-
+# <slug>.md file's date comes straight from its filename, which is accurate
+# because a new handover is always a NEW file (see the `handover` skill's
+# "Retention" section). A spec's <slug>/tasks.md is different: it can be
+# edited many times after its directory was created, so the folder's own
+# YYYY-MM-DD is only when the spec STARTED, never when its "## Handover"
+# section was last written - comparing against it would reintroduce, on the
+# spec side, the exact staleness bug this hook exists to avoid on the
+# handovers-directory side. The section is expected to carry its own
+# `Updated: YYYY-MM-DD` line (see the `handover` skill); when a `tasks.md`
+# predates that convention and has no such line, this hook falls back to
+# the file's mtime instead - an APPROXIMATION, because ticking an unrelated
+# checkbox in the same file also bumps its mtime and would make a stale
+# handover section look freshly written. The folder's own date is still
+# shown as part of the path; it is just never used to decide which source
+# wins.
+#
 # Never blocks. Always exits 0.
 #
 # Registered in .claude/settings.json under hooks.SessionStart.
@@ -66,19 +89,51 @@ fi
 # ------------------------------------------------------- portable file stat
 mtime_of() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0; }
 size_of()  { wc -c < "$1" 2>/dev/null | tr -d ' '; }
+# Epoch seconds -> YYYY-MM-DD. GNU date takes `-d @EPOCH`; BSD/macOS date
+# rejects that form and takes `-r EPOCH` instead, so try both.
+date_from_epoch() {
+  date -d "@$1" +%Y-%m-%d 2>/dev/null || date -r "$1" +%Y-%m-%d 2>/dev/null || echo "1970-01-01"
+}
+
+# The first non-empty line after a "## Handover" heading, if any.
+handover_first_line() {
+  awk '/^## Handover/{f=1;next} f && NF {print; exit}' "$1" 2>/dev/null
+}
+# That line's date, only when it is the `Updated: YYYY-MM-DD` line the
+# `handover` skill now asks for - empty otherwise, which the caller treats
+# as "fall back to mtime" (see the header note on why mtime is only an
+# approximation).
+handover_updated_date() {
+  local line
+  line="$(handover_first_line "$1")"
+  if [[ "$line" =~ ^Updated:[[:space:]]*([0-9]{4}-[0-9]{2}-[0-9]{2})$ ]]; then
+    printf '%s' "${BASH_REMATCH[1]}"
+  fi
+}
+# The title line: the first non-empty line after "## Handover" that is NOT
+# the Updated: line, so the date line is never shown as if it were prose.
+handover_title() {
+  awk '/^## Handover/{f=1;next} f && NF && $0 !~ /^Updated:[ \t]*[0-9]{4}-[0-9]{2}-[0-9]{2}$/ {print; exit}' "$1" 2>/dev/null
+}
 
 # ---------------------------------------------------- JSON string escaping
-# Only backslash, double-quote and embedded newlines need handling here -
-# the strings we emit come from filenames, dates, byte counts and a single
-# line of file content (a title). The newline join is done with awk, not
-# sed's classic N;ba loop: BSD sed (macOS) reads everything after a `:label`
-# up to end of line as the label name, so a semicolon-joined `:a;N;$!ba;...`
-# script fails there with "unused label" while working fine on GNU sed -
-# awk's NR-based join has no such split.
+# Backslash, double-quote, embedded newlines, tabs and carriage returns all
+# need handling here. Most of what we emit is ours (paths, dates, byte
+# counts), but the title line is not: it comes straight from a handover's
+# own content, which this hook does not control. A tab or a CRLF line
+# ending in that title, left raw, breaks the JSON Claude Code tries to
+# parse ("Invalid control character"), and the whole hook's context is then
+# silently discarded exactly when it mattered most. The newline join is
+# done with awk, not sed's classic N;ba loop: BSD sed (macOS) reads
+# everything after a `:label` up to end of line as the label name, so a
+# semicolon-joined `:a;N;$!ba;...` script fails there with "unused label"
+# while working fine on GNU sed - awk's NR-based join has no such split.
 json_escape() {
   local s="$1"
   s="${s//\\/\\\\}"
   s="${s//\"/\\\"}"
+  s="${s//$'\t'/\\t}"
+  s="${s//$'\r'/\\r}"
   printf '%s' "$s" | awk '{printf "%s%s", (NR > 1 ? "\\n" : ""), $0}'
 }
 
@@ -104,11 +159,11 @@ if [[ -d "$HANDOVER_DIR" ]]; then
     base="$(basename "$f")"
     [[ "$base" =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2})-.+\.md$ ]] || continue
     handover_count=$((handover_count + 1))
-    date="${BASH_REMATCH[1]}"
+    d_date="${BASH_REMATCH[1]}"
     mtime="$(mtime_of "$f")"
-    if [[ -z "$newest_file" ]] || [[ "$date" > "$newest_date" ]] || { [[ "$date" == "$newest_date" ]] && (( mtime > newest_mtime )); }; then
+    if [[ -z "$newest_file" ]] || [[ "$d_date" > "$newest_date" ]] || { [[ "$d_date" == "$newest_date" ]] && (( mtime > newest_mtime )); }; then
       newest_file="$f"
-      newest_date="$date"
+      newest_date="$d_date"
       newest_mtime="$mtime"
     fi
   done
@@ -119,7 +174,11 @@ fi
 # an active spec's tasks.md (see the `handover` skill's "Where to put it" -
 # a spec active means the handover goes there, not to .claude/handovers/).
 # Spec directories are named YYYY-MM-DD-<slug>/ by the write-spec skill's
-# own convention, so the same newest-by-date-then-mtime rule applies.
+# own convention, but that folder date is when the spec was CREATED, not
+# when this section was last written - see the header note on why it is
+# never the comparison key. spec_date below is comparable recency (the
+# section's own `Updated:` line, or mtime as a fallback); the folder's date
+# is not tracked separately because the path itself already shows it.
 spec_file=""
 spec_date=""
 spec_mtime=0
@@ -130,13 +189,14 @@ if [[ -d "specs" ]]; then
     tf="${d}tasks.md"
     [[ -f "$tf" ]] || continue
     grep -q '^## Handover' "$tf" 2>/dev/null || continue
-    base="$(basename "$d")"
-    [[ "$base" =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2})- ]] || continue
-    date="${BASH_REMATCH[1]}"
+    d_base="$(basename "$d")"
+    [[ "$d_base" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}- ]] || continue
     mtime="$(mtime_of "$tf")"
-    if [[ -z "$spec_file" ]] || [[ "$date" > "$spec_date" ]] || { [[ "$date" == "$spec_date" ]] && (( mtime > spec_mtime )); }; then
+    d_date="$(handover_updated_date "$tf")"
+    [[ -n "$d_date" ]] || d_date="$(date_from_epoch "$mtime")"
+    if [[ -z "$spec_file" ]] || [[ "$d_date" > "$spec_date" ]] || { [[ "$d_date" == "$spec_date" ]] && (( mtime > spec_mtime )); }; then
       spec_file="$tf"
-      spec_date="$date"
+      spec_date="$d_date"
       spec_mtime="$mtime"
     fi
   done
@@ -167,7 +227,7 @@ fi
 
 if (( use_spec )); then
   size_bytes="$(size_of "$spec_file")"
-  title="$(awk '/^## Handover/{f=1;next} f && NF {print; exit}' "$spec_file" 2>/dev/null)"
+  title="$(handover_title "$spec_file")"
   [[ -n "$title" ]] || title="(spec: $(basename "$(dirname "$spec_file")"))"
 
   ctx="A previous session left a handover in the active spec. Read the

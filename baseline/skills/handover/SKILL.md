@@ -53,7 +53,16 @@ Everything in a handover is prose about state, and prose ages — including this
 
 **A handover that exists only in chat is destroyed by the `/clear` this skill tells you to run.** The last step below discards the session; if the chat was the only copy, the skill just deleted its own output. Write the file first, print the block second.
 
-- **Spec active** → append/update a `## Handover` section at the bottom of `specs/<slug>/tasks.md`. Durable, re-findable, and versioned alongside the work it describes.
+- **Spec active** → append/update a `## Handover` section at the bottom of `specs/<slug>/tasks.md`. Durable, re-findable, and versioned alongside the work it describes. Start the section with a single `Updated: YYYY-MM-DD` line (today's date, ISO format), immediately after the `## Handover` heading and before any prose:
+
+  ```markdown
+  ## Handover
+  Updated: 2026-09-24
+
+  ...prose below, same as always...
+  ```
+
+  The spec folder's own date (`specs/YYYY-MM-DD-<slug>/`) is when the spec was *created*, not when this section was last written, and the two drift apart the moment the spec runs past one `/handover`. `check-handover.sh` reads the `Updated:` line to compare this section's recency against a loose file in `.claude/handovers/`; without it, the hook falls back to the file's mtime, which a plain checkbox edit elsewhere in `tasks.md` can bump without touching this section at all. Overwrite the `Updated:` line every time you update the section, the same way you overwrite the prose below it.
 - **No spec active** (repo-level, exploratory, or harness work) → write `.claude/handovers/<YYYY-MM-DD>-<slug>.md`, where `<slug>` names the stretch of work (`harness`, `marketplace-migration`). Say in the file's header that there is no active spec, so the next reader knows why it lives there.
 
   Keep that directory out of git with the repo's local exclude file, not `.gitignore`: a handover is local session state, and `.gitignore` is a committed file belonging to the repo — the harness must not add lines to it in a project that merely adopted the harness. Add the line once, if missing:
