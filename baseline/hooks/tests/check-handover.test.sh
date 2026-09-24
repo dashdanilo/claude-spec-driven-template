@@ -10,9 +10,13 @@
 # spec, the loser is cited in exactly one line), the spec side comparing by
 # the section's own "Updated:" line or an mtime fallback instead of the
 # spec folder's creation date, a title containing a tab and a CRLF line
-# ending still producing valid JSON, and an "Updated:" line itself ending
-# in CRLF still parsing as its literal date instead of silently dropping to
-# the mtime fallback.
+# ending still producing valid JSON, an "Updated:" line itself ending in
+# CRLF still parsing as its literal date instead of silently dropping to
+# the mtime fallback, and a genuinely BLANK CRLF line (a lone \r, not the
+# empty string) between the heading and the "Updated:" line not being
+# mistaken for content in its place - a narrower case than a CRLF line
+# ending, and the one that actually exercises awk's emptiness check rather
+# than just its end-of-line anchor.
 #
 # Every fixture whose comparable date matters for an assertion pins it
 # literally (a filename date, or an explicit "Updated:" line) rather than
@@ -381,6 +385,32 @@ if printf '%s' "$OUT" | python3 -m json.tool > /dev/null 2>&1; then
 else
   _fail "CRLF Updated: line: output is valid JSON (got: $OUT)"
 fi
+rm -rf specs
+
+# --------------------- 15. F9 regression: CRLF blank line before "Updated:"
+# Test 14's fixture puts "Updated:" immediately after the "## Handover"
+# heading, with no blank line between them - that shape happens to pass
+# even with awk's default NF emptiness check, because NF only misclassifies
+# a genuinely BLANK CRLF line (a lone \r) as non-empty, and test 14 never
+# has one. This fixture does: a blank line separates the heading from
+# Updated:, matching how the `handover` skill's own example in SKILL.md is
+# formatted (heading, then the Updated: line - but a human or an editor
+# routinely leaves a blank line there too, and CRLF turns that blank line
+# into a lone \r, not the empty string). Under the old `f && NF` check, that
+# \r reads as one non-empty field and gets returned as the "first non-empty
+# line" in place of the real Updated: line, which falls back to mtime -
+# silently, with no error. Proof this fixture actually exercises the fix
+# (not just re-confirms test 14): reverting check-handover.sh's emptiness
+# check from `$0 !~ /^[ \t\r]*$/` back to `f && NF` turns this fixture's
+# "Date:" into today's mtime-derived date instead of the pinned 2026-03-15,
+# while test 14 alone stays green either way.
+mkdir -p specs/2026-01-01-crlf-blank-spec
+printf '# Tasks\r\n\r\n- [x] task\r\n\r\n## Handover\r\n\r\nUpdated: 2026-03-15\r\n\r\nWritten with a blank CRLF line before Updated:.\r\n' > specs/2026-01-01-crlf-blank-spec/tasks.md
+OUT="$(run_hook '{"source":"clear"}')"; EXIT_CODE=$?
+_assert_eq "CRLF blank line before Updated:: exit 0" "$EXIT_CODE" "0"
+_assert_contains "CRLF blank line before Updated:: parses the pinned date, not mtime" "$OUT" "Date:  2026-03-15"
+_assert_not_contains "CRLF blank line before Updated:: does not fall back to mtime" "$OUT" "Date:  $TODAY"
+_assert_contains "CRLF blank line before Updated:: title skips both the blank line and the Updated: line" "$OUT" "Title: Written with a blank CRLF line before Updated:."
 rm -rf specs
 
 echo ""
