@@ -75,6 +75,37 @@ _run_case() {
   fi
 }
 
+# --- Bash coverage: the same critical_patterns, reached through a Bash
+# write instead of Edit/Write.
+
+_make_bash_payload() {
+  "$PYTHON_BIN" -c 'import json, sys; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}, "cwd": sys.argv[2]}))' "$1" "$2"
+}
+
+# $1 = name, $2 = cwd (also the payload cwd), $3 = command, $4 = expected
+# exit code.
+_run_bash_case() {
+  local name="$1" cwd="$2" command_str="$3" expected="$4"
+
+  local payload
+  payload="$(_make_bash_payload "$command_str" "$cwd")"
+
+  local actual
+  actual=$(
+    cd "$cwd" || exit 99
+    printf '%s' "$payload" | bash "$HOOK" >/dev/null 2>&1
+    echo $?
+  )
+
+  if [[ "$actual" == "$expected" ]]; then
+    echo "PASS: $name (exit $actual)"
+    PASS_COUNT=$((PASS_COUNT + 1))
+  else
+    echo "FAIL: $name (expected $expected, got $actual)"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  fi
+}
+
 # --- pre-existing behavior: must not regress ---
 
 _run_case "1: .env is blocked" \
@@ -116,6 +147,70 @@ else
   echo "FAIL: 10: payload missing file_path exits 0 (expected 0, got $actual_missing)"
   FAIL_COUNT=$((FAIL_COUNT + 1))
 fi
+
+# ===================================================================
+# Bash coverage: the exact same critical_patterns, reached through a write
+# performed via Bash (redirect, sed -i, tee, cp, mv, python3 -c, a python
+# heredoc) instead of Edit/Write. Before this hook learned about Bash, every
+# one of these sailed straight through it.
+# ===================================================================
+
+_run_bash_case "11: Bash redirect into .env is blocked" \
+  "$TMPDIR_ROOT" "echo hi > .env" 2
+
+_run_bash_case "12: Bash sed -i into pnpm-lock.yaml is blocked" \
+  "$TMPDIR_ROOT" "sed -i s/a/b/ pnpm-lock.yaml" 2
+
+_run_bash_case "13: Bash tee into a secrets/ file is blocked" \
+  "$TMPDIR_ROOT" "echo hi | tee secrets/token.txt" 2
+
+_run_bash_case "14: Bash cp into package-lock.json is blocked" \
+  "$TMPDIR_ROOT" "cp foo.json package-lock.json" 2
+
+_run_bash_case "15: Bash mv into an applied migration is blocked" \
+  "$TMPDIR_ROOT" "mv foo.sql db/migrations/2026_applied.sql" 2
+
+# --- the mandatory case: this is the one that motivated pulling the Bash
+# write parser out into its own shared file. A `python3 -c "...open(path,
+# 'w')..."` (or the equivalent heredoc) writing into a critical file used to
+# sail straight through this hook. ---
+
+_run_bash_case "16: [MANDATORY] python3 -c writing to .env is blocked" \
+  "$TMPDIR_ROOT" "python3 -c \"open('.env','w').write('x')\"" 2
+
+_run_bash_case "17: [MANDATORY] python3 heredoc writing to .env is blocked" \
+  "$TMPDIR_ROOT" "python3 - <<'PY'
+open('.env', 'w').write('x')
+PY" 2
+
+# --- the other mandatory case: the SAME shapes, targeting an ordinary
+# repo-owned file instead of a critical one, must still pass ---
+
+_run_bash_case "18: [MANDATORY] python3 -c writing to a common file passes" \
+  "$TMPDIR_ROOT" "python3 -c \"open('README.md','w').write('x')\"" 0
+
+_run_bash_case "19: python3 heredoc writing to a common file passes" \
+  "$TMPDIR_ROOT" "python3 - <<'PY'
+open('README.md', 'w').write('x')
+PY" 0
+
+# --- the .example exemption applies through Bash too ---
+
+_run_bash_case "20: Bash redirect into .env.example passes (exemption)" \
+  "$TMPDIR_ROOT" "echo hi > .env.example" 0
+
+# --- a target this parser cannot resolve to a literal path must be SKIPPED,
+# never blocked — a guard that blocks on "could not tell" gets disabled
+# outright instead of fixed ---
+
+_run_bash_case "21: Bash redirect target built from a shell variable is not blocked (unresolvable, skipped)" \
+  "$TMPDIR_ROOT" 'echo hi > "$SOME_UNSET_VAR"' 0
+
+# --- a command that writes to MULTIPLE targets: one critical, one ordinary
+# -> blocked, because one match is enough ---
+
+_run_bash_case "22: Bash command with two targets, one critical one ordinary, is blocked" \
+  "$TMPDIR_ROOT" "cp foo.txt ordinary.txt && cp foo.txt pnpm-lock.yaml" 2
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"

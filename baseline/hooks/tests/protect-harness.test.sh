@@ -197,6 +197,41 @@ _run_case() {
   fi
 }
 
+# --- Bash coverage: the same governance rule, reached through a Bash write
+# instead of Edit/Write. $2 is the payload's own "cwd" field AND the process
+# cwd the hook actually runs from — kept identical here so these cases
+# exercise the governance/cross-repo logic, not the payload-cwd-vs-process-
+# cwd fallback (that is covered by protect-unpushed.test.sh's own fixtures).
+
+_make_bash_payload() {
+  "$PYTHON_BIN" -c 'import json, sys; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}, "cwd": sys.argv[2]}))' "$1" "$2"
+}
+
+# $1 = name, $2 = cwd (also the payload cwd), $3 = command, $4 = expected
+# exit code, $5 = optional PATH override.
+_run_bash_case() {
+  local name="$1" cwd="$2" command_str="$3" expected="$4" path_override="${5:-}"
+
+  local payload
+  payload="$(_make_bash_payload "$command_str" "$cwd")"
+
+  local actual
+  actual=$(
+    cd "$cwd" || exit 99
+    [[ -n "$path_override" ]] && export PATH="$path_override"
+    printf '%s' "$payload" | bash "$HOOK" >/dev/null 2>&1
+    echo $?
+  )
+
+  if [[ "$actual" == "$expected" ]]; then
+    echo "PASS: $name (exit $actual)"
+    PASS_COUNT=$((PASS_COUNT + 1))
+  else
+    echo "FAIL: $name (expected $expected, got $actual)"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  fi
+}
+
 # --- reviewability, not location: same-repo tracked config now PASSES ---
 # (this is the verdict that changed: the old Group A blocked this unconditionally)
 
@@ -316,6 +351,113 @@ _run_case "25: cross-repo, cwd is ALSO a harness checkout, target is a DIFFERENT
 
 _run_case "26: cross-repo, target gitignored in its own NON-harness repo -> blocked" \
   "$REPO_A" "$REPO_B/.claude/settings.local.json" 2
+
+# ===================================================================
+# Bash coverage: the exact same governance rule, reached through a write
+# performed via Bash (redirect, sed -i, tee, cp, mv, python3 -c, a python
+# heredoc) instead of Edit/Write. Before this hook learned about Bash, every
+# one of these sailed straight through it.
+# ===================================================================
+
+_run_bash_case "27: Bash redirect into governance file, SAME repo (tracked) -> passes" \
+  "$REPO_A" "echo hi > $REPO_A/.claude/settings.json" 0
+
+_run_bash_case "28: Bash redirect into governance file, cross-repo, target is a HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "echo hi > $REPO_A/.claude/settings.json" 2
+
+_run_bash_case "29: Bash sed -i into governance file, cross-repo HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "sed -i s/a/b/ $REPO_A/baseline/hooks/protect-main.sh" 2
+
+_run_bash_case "30: Bash tee into governance file, cross-repo HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "echo hi | tee $REPO_A/.claude/hooks/some-hook.sh" 2
+
+_run_bash_case "31: Bash cp into governance file, cross-repo HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "cp $REPO_B/.claude/settings.json $REPO_A/baseline/rules/git-workflow.md" 2
+
+_run_bash_case "32: Bash mv into governance file, cross-repo HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "mv $REPO_B/.claude/settings.json $REPO_A/.claude/rules/harness/delegation.md" 2
+
+# --- the mandatory case: this is the one that motivated pulling the Bash
+# write parser out into its own shared file. A `python3 -c "...open(path,
+# 'w')..."` (or the equivalent heredoc) writing into the harness's own
+# .claude/settings.json used to sail straight through this hook. ---
+
+_run_bash_case "33: [MANDATORY] python3 -c writing to .claude/settings.json, cross-repo HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "python3 -c \"import json; d=json.load(open('$REPO_A/.claude/settings.json')); json.dump(d, open('$REPO_A/.claude/settings.json','w'))\"" 2
+
+_run_bash_case "34: [MANDATORY] python3 heredoc writing to .claude/settings.json, cross-repo HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "python3 - <<'PY'
+import json
+d = json.load(open('$REPO_A/.claude/settings.json'))
+json.dump(d, open('$REPO_A/.claude/settings.json', 'w'))
+PY" 2
+
+# --- the other mandatory case: the SAME shapes, targeting an ordinary
+# repo-owned file instead of governance, must still pass ---
+
+_run_bash_case "35: [MANDATORY] python3 -c writing to a common repo file -> passes" \
+  "$REPO_B" "python3 -c \"open('$REPO_A/README.md','w').write('x')\"" 0
+
+_run_bash_case "36: python3 heredoc writing to a common repo file, same repo -> passes" \
+  "$REPO_A" "python3 - <<'PY'
+open('$REPO_A/README.md', 'w').write('x')
+PY" 0
+
+# --- a target this parser cannot resolve to a literal path must be SKIPPED,
+# never blocked — a guard that blocks on "could not tell" gets disabled
+# outright instead of fixed ---
+
+_run_bash_case "37: Bash redirect target built from a shell variable -> not blocked (unresolvable, skipped)" \
+  "$REPO_A" 'echo hi > "$SOME_UNSET_VAR"' 0
+
+# --- a command that writes to MULTIPLE targets: one governance (cross-repo
+# harness checkout), one ordinary -> blocked, because one match is enough ---
+
+_run_bash_case "38: Bash command with two targets, one governance one ordinary -> blocked" \
+  "$REPO_B" "cp $REPO_B/.claude/settings.json $REPO_B/ordinary.txt && cp $REPO_B/.claude/settings.json $REPO_A/.claude/settings.json" 2
+
+# --- session-side repo resolution must trust the payload's own "cwd", never
+# the hook process's own $PWD (see the header note — protect-unpushed.sh
+# once became a no-op from exactly this confusion). _run_bash_case always
+# keeps both identical on purpose (see its own comment), so this case is
+# built by hand: process cwd is REPO_A, but the payload says the session is
+# in REPO_B. A write into REPO_A's own settings.json (an absolute-path
+# target, so target resolution is not in question here) must be judged
+# CROSS-repo — blocked, because REPO_A is a harness checkout — only if the
+# session side is read from the payload's "cwd" and not from $PWD. ---
+
+_payload_cwd_mismatch="$("$PYTHON_BIN" -c 'import json, sys; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}, "cwd": sys.argv[2]}))' \
+  "python3 -c \"open('$REPO_A/.claude/settings.json','w').write('x')\"" "$REPO_B")"
+
+_actual_cwd_mismatch=$(
+  cd "$REPO_A" || exit 99
+  printf '%s' "$_payload_cwd_mismatch" | bash "$HOOK" >/dev/null 2>&1
+  echo $?
+)
+
+if [[ "$_actual_cwd_mismatch" == "2" ]]; then
+  echo "PASS: 39: session-side repo resolution reads the payload cwd, not the process \$PWD (exit $_actual_cwd_mismatch)"
+  PASS_COUNT=$((PASS_COUNT + 1))
+else
+  echo "FAIL: 39: session-side repo resolution reads the payload cwd, not the process \$PWD (expected 2, got $_actual_cwd_mismatch)"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+
+# --- an open() argument built from STRING CONCATENATION (a literal plus a
+# variable, `'x' + repo_a + '/.claude/settings.json'`) must never be
+# resolved to a path at all, even though the fragment text happens to spell
+# out a governance-looking suffix. A naive "starts and ends with a matching
+# quote" check is fooled by this: greedy backtracking finds the LAST quote
+# character in the whole expression and treats everything before it as one
+# literal, silently swallowing the embedded quotes and the "+" operators
+# along the way. Caught by dogfooding this very hook mid-task (a test
+# fixture heredoc containing exactly this shape tripped the live guard on
+# this session's own Bash call). Regression case for
+# lib/bash-write-targets.py's LITERAL_ARG_RE, exercised through the hook
+# since that is the observable behavior: block vs pass. ---
+
+_run_bash_case "40: python3 -c open() arg is string concatenation (literal + variable), not a literal -> not blocked (unresolvable, skipped)" \
+  "$REPO_A" "python3 -c \"open('x' + repo_a + '/.claude/settings.json', 'w')\"" 0
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"
