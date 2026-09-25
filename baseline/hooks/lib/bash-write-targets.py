@@ -104,13 +104,17 @@
 #     handles. Accepted rather than fixed with a real (nested-paren-aware)
 #     scanner, which this single regex is not equipped to become without
 #     turning into a small parser of its own.
-#   - the heredoc-stripping pass (above, before the main tokenizer runs) is
-#     NOT cd_seen-aware: a `cd` appearing before a heredoc is not tracked
-#     across that separate pass, only within the main segment loop below.
-#     `cd <harness> && python3 - <<'PY' ... PY` is covered (the "cd" segment
-#     and the heredoc's OPENER line both go through the main loop); a `cd`
-#     placed so that only the heredoc BODY's own open() calls are affected
-#     is not.
+#   - the heredoc-stripping pass (above, before the main tokenizer runs) does
+#     NOT track `cd`/`pushd`: a directory change appearing before a heredoc
+#     is not seen across that separate pass, only within the main segment
+#     loop below. `cd <harness> && python3 - <<'PY' ... PY` is covered (the
+#     "cd" segment and the heredoc's OPENER line both go through the main
+#     loop); a `cd` placed so that only the heredoc BODY's own open() calls
+#     are affected is not.
+#   - `popd` is not tracked at all (the directory stack it pops back to is
+#     not something this parser maintains), and `pushd`/`popd` used
+#     together to return to the ORIGINAL directory read as still having
+#     moved, same as any other cd this parser cannot fully model.
 #   - a command is split into segments at `; && || | & (newline)`, so a `;`
 #     or `&&` embedded inside a quoted argument (rare, but legal shell) can
 #     mis-split.
@@ -213,30 +217,35 @@ def _is_cwd_relative(raw):
     return not os.path.isabs(raw) and raw != "~" and not raw.startswith("~/")
 
 
-def resolve_target(raw, cwd, cd_seen=False):
+def resolve_target(raw, base, base_unresolvable=False):
     # Returns (is_unresolvable, absolute_path_or_None). absolute_path is
     # None only when is_unresolvable is False and raw is empty — callers
     # never see that case in practice since the tokenizer never emits an
     # empty WORD as a target.
     #
-    # cd_seen: an earlier segment of this SAME command ran `cd`. A relative
-    # target from here on is judged against the WRONG base if resolved
-    # against the payload's cwd — the effective directory changed mid-
-    # command, and this parser does not track cd's own (also possibly
-    # unresolvable) argument to know the real one. This is not "no target",
-    # it is "the wrong verdict about which file": `cd <harness> && echo
-    # pwned > .claude/settings.json` resolved against the payload's cwd
-    # reads as an ordinary file in the SESSION's own repo and passes, while
-    # the write actually lands cross-repo in the harness checkout. Marking
-    # it unresolvable is the minimum fix: never silently resolve against a
-    # cwd the command itself already moved away from. An absolute target
-    # (or `~`) is unaffected — those never depended on cwd in the first
-    # place.
+    # base / base_unresolvable: the EFFECTIVE current directory for this
+    # point in the command, not necessarily the payload's own cwd anymore —
+    # see the "cd" dispatch in extract_targets for how an earlier `cd`/
+    # `pushd` in this SAME command updates it. base_unresolvable is True
+    # only when an earlier cd/pushd target could not itself be resolved (a
+    # shell variable, `cd -`, a bare `pushd` swap): a relative target from
+    # here on cannot be pinned to a real path at all, not "resolved against
+    # a slightly stale cwd" — `cd "$VAR" && echo pwned > x` genuinely could
+    # land anywhere. A resolvable cd/pushd argument updates `base` instead
+    # of setting this flag, which is the whole point of tracking it: `cd
+    # <harness> && echo pwned > .claude/settings.json` now resolves against
+    # the harness checkout, the directory the write actually lands in, not
+    # against the payload's cwd (which used to read this as an ordinary
+    # file in the session's own repo and pass) and not against a bare "?"
+    # either (which used to pass by abstention, safer than a wrong verdict
+    # but still a gap: the write itself went undetected). An absolute
+    # target (or `~`) is unaffected either way — those never depended on
+    # any cwd in the first place.
     if any(c in raw for c in ("$", "`", "*", "?")):
         return True, None
-    if cd_seen and _is_cwd_relative(raw):
+    if base_unresolvable and _is_cwd_relative(raw):
         return True, None
-    return False, resolve_absolute(raw, cwd)
+    return False, resolve_absolute(raw, base)
 
 
 def extract_open_call_targets(code):
@@ -375,28 +384,38 @@ def find_command(seg):
 def extract_targets(command, cwd):
     # Returns a list of (kind_label, is_unresolvable, absolute_path_or_None).
     out = []
-    # A single-element cell (not a plain bool) so the nested functions below
-    # can both READ and, at the "cd" dispatch further down, WRITE the same
-    # flag without a `nonlocal` declaration in each one.
-    cd_seen = [False]
+    # Single-element cells (not plain values) so the nested functions below
+    # can both READ and, at the "cd"/"pushd" dispatch further down, WRITE
+    # the same state without a `nonlocal` declaration in each one.
+    # base_dir: the EFFECTIVE current directory for whatever point in the
+    # command we are at — starts as the payload's own cwd, and is updated
+    # in place by a resolvable `cd`/`pushd` argument encountered along the
+    # way (see the "cd" dispatch below).
+    # base_unresolvable: True once a `cd`/`pushd` argument could not itself
+    # be resolved (a shell variable, `cd -`, a bare `pushd` swap) — every
+    # relative target from there on is unresolvable, UNTIL a later cd/pushd
+    # with a resolvable (in particular, absolute) argument re-establishes a
+    # known base regardless of the unresolvable one in between.
+    base_dir = [cwd]
+    base_unresolvable = [False]
 
     def handle(kind_label, raw):
-        unresolvable, target = resolve_target(raw, cwd, cd_seen[0])
+        unresolvable, target = resolve_target(raw, base_dir[0], base_unresolvable[0])
         out.append((kind_label, unresolvable, target))
 
     def handle_open_calls(kind_label, code):
         for unresolvable, path in extract_open_call_targets(code):
             if unresolvable:
                 out.append((kind_label, True, None))
-            elif cd_seen[0] and _is_cwd_relative(path):
-                # Same reasoning as resolve_target's own cd_seen check: an
-                # `open(...)` call inside a `python3 -c`/heredoc that runs
-                # AFTER an earlier `cd` in this same command is resolved
-                # against the wrong directory if joined with the payload's
-                # cwd, so it is reported unresolvable instead of guessed at.
+            elif base_unresolvable[0] and _is_cwd_relative(path):
+                # Same reasoning as resolve_target's own base_unresolvable
+                # check: an `open(...)` call inside a `python3 -c`/heredoc
+                # that runs AFTER an earlier cd/pushd whose destination this
+                # parser could not resolve is itself unresolvable, not
+                # silently guessed at against a stale base.
                 out.append((kind_label, True, None))
             else:
-                out.append((kind_label, False, resolve_absolute(path, cwd)))
+                out.append((kind_label, False, resolve_absolute(path, base_dir[0])))
 
     # --- heredoc bodies handed to python3/python: scanned here, then
     # stripped from the text before the general shell tokenizer ever sees
@@ -461,17 +480,51 @@ def extract_targets(command, cwd):
         base = cmd_word.rstrip("/").split("/")[-1]
         words = [v for k, v in seg[cmd_idx + 1:] if k == "WORD"]
 
-        if base == "cd":
-            # Every relative target from HERE ON in this same command is
-            # resolved against a directory the command itself already left
-            # — see resolve_target's own cd_seen note for why that makes it
-            # unresolvable, not just "resolved against a slightly stale
-            # cwd". Deliberately does not try to resolve cd's OWN argument
-            # (itself may be unresolvable, e.g. `cd "$(some-thing)"`) and
-            # use that as the new base instead: silently trusting a second
-            # unresolvable value to fix the first one is how a guard ends
-            # up confidently wrong instead of honestly unsure.
-            cd_seen[0] = True
+        if base in ("cd", "pushd"):
+            # Resolve cd's/pushd's OWN argument and use it as the new base
+            # for every relative target from HERE ON in this same command —
+            # see resolve_target's own base_unresolvable note for why this
+            # is better than just marking everything after it unresolvable.
+            # `cd`/`pushd` allow flags before the directory (-L/-P for cd,
+            # +N/-N/-n for pushd, none of which name a directory), so the
+            # first word that is neither a flag nor cd's own destination
+            # marker is the one we want. A bare "-" is NOT a flag here — for
+            # `cd` it IS the destination (meaning $OLDPWD) — so it is kept
+            # even though it starts with "-"; only a LONGER "-something" is
+            # treated as a flag and skipped.
+            dest_words = [w for w in words if w == "-" or not (w.startswith("-") or w.startswith("+"))]
+            if not dest_words:
+                # `cd` with no argument goes to $HOME — a real, resolvable
+                # base. `pushd` with no argument SWAPS with the top of the
+                # directory stack, which this parser does not track.
+                if base == "cd":
+                    base_dir[0] = os.environ.get("HOME", base_dir[0])
+                    base_unresolvable[0] = False
+                else:
+                    base_unresolvable[0] = True
+            else:
+                dest = dest_words[0]
+                if dest == "-" or any(c in dest for c in ("$", "`", "*", "?")):
+                    # `cd -`/`pushd -` goes to $OLDPWD, not tracked. A
+                    # shell variable or command substitution in the
+                    # destination is exactly as unresolvable as any other
+                    # target this parser cannot pin to a literal path —
+                    # trusting a SECOND unresolvable value to fix the first
+                    # one is how a guard ends up confidently wrong instead
+                    # of honestly unsure.
+                    base_unresolvable[0] = True
+                elif os.path.isabs(dest) or dest == "~" or dest.startswith("~/"):
+                    # An absolute (or ~) destination does not depend on the
+                    # CURRENT base at all, so it can safely re-establish a
+                    # known base even if we were unresolvable a moment ago
+                    # (`cd "$VAR" && cd <harness> && ...` recovers here).
+                    base_dir[0] = resolve_absolute(dest, base_dir[0])
+                    base_unresolvable[0] = False
+                elif not base_unresolvable[0]:
+                    # A relative destination only resolves safely against a
+                    # base we actually know; if we do not, this cd cannot
+                    # fix that either, and base_unresolvable stays True.
+                    base_dir[0] = resolve_absolute(dest, base_dir[0])
         elif base == "sed":
             has_i = any(w == "-i" or w.startswith("-i") or w.startswith("--in-place") for w in words)
             if has_i:
@@ -482,19 +535,41 @@ def extract_targets(command, cwd):
                 # if -e/--expression or -f/--file appears anywhere, every
                 # non-flag word is a file; otherwise the FIRST non-flag word
                 # is the script, and every non-flag word after it is a file.
-                # Not a guess -- this is literally how sed itself decides,
-                # so this is the one write-command here where "which word is
-                # the target" is fully knowable, not just accepted-inexact.
-                has_explicit_script = any(
-                    w in ("-e", "--expression", "-f", "--file")
-                    or w.startswith("--expression=")
-                    or w.startswith("--file=")
-                    or (w.startswith("-e") and w != "-e")
-                    or (w.startswith("-f") and w != "-f")
-                    for w in words
-                )
-                non_flag = [w for w in words if not w.startswith("-")]
-                files = non_flag if has_explicit_script else non_flag[1:]
+                #
+                # The SEPARATED form (`-e SCRIPT`, `-f FILE`, one space, two
+                # words) needs the word immediately after the flag CONSUMED
+                # as that flag's own operand, not counted as a file:
+                # `sed -i -e /node_modules/d .gitignore` used to report
+                # "/node_modules/d" (the -e expression itself, never written
+                # to) as a write target, alongside the real file, purely
+                # because SOME -e was present anywhere in the word list.
+                # `-f script.sed` was worse: that file is READ by sed, never
+                # written, and got reported as a write target regardless.
+                # The GLUED forms (`-escript`, `--expression=script`,
+                # `-fscript.sed`, `--file=script.sed`) carry no separate
+                # word to consume; they still mark has_explicit_script and
+                # are excluded from the file list, same as before.
+                has_explicit_script = False
+                positionals = []
+                consume_next = False
+                for w in words:
+                    if consume_next:
+                        consume_next = False
+                        continue
+                    if w in ("-e", "--expression", "-f", "--file"):
+                        has_explicit_script = True
+                        consume_next = True
+                        continue
+                    if w.startswith("--expression=") or w.startswith("--file="):
+                        has_explicit_script = True
+                        continue
+                    if (w.startswith("-e") and w != "-e") or (w.startswith("-f") and w != "-f"):
+                        has_explicit_script = True
+                        continue
+                    if w.startswith("-"):
+                        continue
+                    positionals.append(w)
+                files = positionals if has_explicit_script else positionals[1:]
                 for w in files:
                     handle("Bash:sed-i", w)
         elif base == "tee":
@@ -536,7 +611,38 @@ def extract_targets(command, cwd):
                     if basename:
                         handle("Bash:" + base, target_dir.rstrip("/") + "/" + basename)
             elif len(sources) >= 2:
-                handle("Bash:" + base, sources[-1])
+                # No -t: the LAST positional is cp's/mv's destination, but
+                # that destination is a DIRECTORY, not the file actually
+                # written, whenever cp/mv syntax says so (more than one
+                # source — cp/mv itself requires the last argument to be a
+                # directory then) or a trailing slash says so (the command
+                # itself wrote `dest/`), or the filesystem says so (it
+                # already exists as a directory — checked directly, since
+                # this parser runs synchronously on the same machine as the
+                # session, right before the real command would execute, so
+                # there is no meaningful window for the answer to change
+                # out from under it). Without this, the COMMON shape of
+                # this write, `cp file <governed-dir>/` or into a directory
+                # that already exists with no trailing slash, reported the
+                # bare directory as the target — which `os.path.normpath`
+                # then strips the trailing slash from, so it stopped
+                # matching a directory-shaped governance/critical pattern
+                # (one with no trailing `$`) that the SAME write, spelled
+                # with an explicit destination filename, still caught.
+                dest = sources[-1]
+                real_sources = sources[:-1]
+                dest_is_dir = (
+                    len(real_sources) > 1
+                    or dest.endswith("/")
+                    or os.path.isdir(resolve_absolute(dest, base_dir[0]))
+                )
+                if dest_is_dir:
+                    for src in real_sources:
+                        basename = src.rstrip("/").split("/")[-1]
+                        if basename:
+                            handle("Bash:" + base, dest.rstrip("/") + "/" + basename)
+                else:
+                    handle("Bash:" + base, dest)
         elif base in ("python3", "python") and "-c" in words:
             ci = words.index("-c")
             if ci + 1 < len(words):

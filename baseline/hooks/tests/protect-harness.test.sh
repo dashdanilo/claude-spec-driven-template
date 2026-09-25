@@ -500,6 +500,30 @@ _run_bash_case "47: 2> (stderr redirect, still creates/truncates the target) int
 _run_bash_case "48: >&2 (bare fd reference, no file at all) is NOT treated as a write, not blocked" \
   "$REPO_B" "echo pwned >&2" 0
 
+# FD_REF_RE's exclusion cannot be proven through this hook's own BLOCK/PASS
+# decision the way every other case above is: doing so would need a bare fd
+# reference (a plain digit or "-") to coincidentally match a governance
+# pattern, and none of this repo's governance patterns are digit-shaped —
+# `_check_path` returns 0 for the literal string "2" or "-" whether it was
+# correctly excluded or wrongly treated as a write, so no mutation of
+# FD_REF_RE is observable via exit code here. What IS provable at this
+# layer is that the shared parser's raw output for a bare fd reference is
+# empty — no target at all — checked directly against
+# lib/bash-write-targets.py, same technique log-edit.test.sh's case 10f
+# already uses (and where the mutation-proof for this mechanic actually
+# lives, since log-edit's assertions inspect exact output lines rather than
+# a downstream block/pass decision).
+_LIB="$SCRIPT_DIR/../lib/bash-write-targets.py"
+_fdref_payload="$("$PYTHON_BIN" -c 'import json; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": "echo pwned >&2"}, "cwd": "/tmp"}))')"
+_fdref_out="$(printf '%s' "$_fdref_payload" | "$PYTHON_BIN" "$_LIB")"
+if [[ -z "$_fdref_out" ]]; then
+  echo "PASS: 48b: shared parser reports NO target at all for >&2 (bare fd reference)"
+  PASS_COUNT=$((PASS_COUNT + 1))
+else
+  echo "FAIL: 48b: shared parser reports NO target at all for >&2 (bare fd reference) (got: $_fdref_out)"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+
 # ===================================================================
 # F3: a heredoc's OPENING line can carry more than just the delimiter — most
 # notably a redirect. The regex used to require the newline immediately
@@ -590,6 +614,84 @@ _run_bash_case "54: cp -t DIR, DIR is a governance directory -> blocked" \
 
 _run_bash_case "55: cp SRC DEST (no -t), DEST last as usual -> unaffected, still blocked" \
   "$REPO_B" "cp ordinary.txt $REPO_A/.claude/settings.json" 2
+
+# ===================================================================
+# F5 [round 2]: the COMMON form of "copy into a directory" -- no -t, just
+# `cp SRC DIR` or `cp SRC DIR/` -- used to report the bare DIR as the
+# target, and os.path.normpath then stripped any trailing slash before
+# that string ever reached the governance-pattern check, so a
+# no-trailing-`$` directory pattern stopped matching. The RARE `-t DIR`
+# form (round 1, above) was already protected; the common form was not.
+# ===================================================================
+
+_run_bash_case "64: [MANDATORY] cp SRC DIR/ (trailing slash, no -t), DIR is governed -> blocked" \
+  "$REPO_B" "cp ordinary.txt $REPO_A/.claude/rules/" 2
+
+_run_bash_case "65: [MANDATORY] mv SRC DIR (no trailing slash, DIR already exists on disk), DIR is governed -> blocked" \
+  "$REPO_B" "mv ordinary.txt $REPO_A/.claude/rules" 2
+
+_run_bash_case "66: cp SRC DIR/explicit.md (unchanged shape) -> still blocked" \
+  "$REPO_B" "cp ordinary.txt $REPO_A/baseline/rules/explicit.md" 2
+
+_run_bash_case "67: cp SRC1 SRC2 DIR (more than one source, DIR must be a directory by cp's own syntax) -> blocked" \
+  "$REPO_B" "cp a.txt b.txt $REPO_A/.claude/rules" 2
+
+_run_bash_case "68: cp SRC DEST, DEST does not exist as a directory on disk -> still a plain file destination, not blocked" \
+  "$REPO_B" "cp ordinary.txt $REPO_A/not-a-real-directory" 0
+
+# ===================================================================
+# F12 [round 2 blocker]: `sed -i -e SCRIPT` / `-f FILE` (the SEPARATED
+# form, one space, two words) reported SCRIPT/FILE itself as a write target
+# whenever -e/-f appeared ANYWHERE, because "has_explicit_script" only
+# checked presence, never consumed the flag's own next word. A routine
+# `sed -i -e /node_modules/d .gitignore` blocked with a message naming
+# "/node_modules/d" (the expression, never written to) as a critical/
+# governance match. -f is worse: that file is READ by sed, never written.
+# ===================================================================
+
+_run_bash_case "56: [MANDATORY] sed -i -e EXPR FILE, EXPR text shaped like a governance path -> not blocked (EXPR is a flag operand, not a file)" \
+  "$REPO_B" "sed -i -e $REPO_A/baseline/rules/d ordinary.txt" 0
+
+_run_bash_case "57: sed -i -f SCRIPT FILE, SCRIPT itself governance-shaped -> not blocked (SCRIPT is read, not written)" \
+  "$REPO_B" "sed -i -f $REPO_A/.claude/settings.json ordinary.txt" 0
+
+_run_bash_case "58: sed -i -e EXPR FILE, FILE is governance-shaped -> still blocked (the real file, not the expression)" \
+  "$REPO_B" "sed -i -e s/a/b/ $REPO_A/.claude/settings.json" 2
+
+# ===================================================================
+# F4 [round 2]: `cd`'s own literal argument is now RESOLVED and used as the
+# new base for every later relative target in the same command, instead of
+# only marking them unresolvable. `pushd` is tracked the same way. A
+# genuinely unresolvable cd argument (a shell variable) still marks later
+# relative targets unresolvable, same as round 1 -- it just no longer stops
+# there when the argument IS knowable.
+# ===================================================================
+
+_run_bash_case "59: [MANDATORY] cd <harness> && a RELATIVE governance write -> now actually BLOCKED, not just skipped" \
+  "$REPO_B" "cd $REPO_A && echo pwned > .claude/settings.json" 2
+
+_run_bash_case "60: pushd <harness> && a RELATIVE governance write -> blocked, same as cd" \
+  "$REPO_B" "pushd $REPO_A && echo pwned > .claude/settings.json" 2
+
+_run_bash_case "61: cd \"\$VAR\" (genuinely unresolvable) && a relative write -> still not blocked (unresolvable, skipped)" \
+  "$REPO_B" 'cd "$VAR" && echo pwned > .claude/settings.json' 0
+
+_run_bash_case "62: cd \"\$VAR\" then cd <harness> (absolute, recovers) && a relative write -> blocked" \
+  "$REPO_B" "cd \"\$VAR\" && cd $REPO_A && echo pwned > .claude/settings.json" 2
+
+# ===================================================================
+# F13: the half of F3 that keeps the heredoc's OPENER line (its own
+# trailing redirect) in the token stream instead of dropping it along with
+# the body. Here the REDIRECT itself is the governance-shaped target, with
+# an ordinary body -- the inverse of case 49, which has it the other way
+# around, so this fails on its own if the opener-preservation line is ever
+# reverted even though case 49 stays green.
+# ===================================================================
+
+_run_bash_case "63: heredoc opener's OWN redirect target is governance-shaped, body is ordinary -> blocked" \
+  "$REPO_B" "cat <<'EOF' > $REPO_A/.claude/settings.json
+ordinary body text
+EOF" 2
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"

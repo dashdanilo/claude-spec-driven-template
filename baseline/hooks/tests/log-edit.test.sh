@@ -254,16 +254,22 @@ _run_case "22: mv target is a command substitution — logged with path=?" \
   "$(_bash_payload 'mv out.txt "$(echo sub)/report.txt"')" \
   "main${TAB}Bash:mv${TAB}?${TAB}"
 
-# A `cd` earlier in the SAME command means every relative target from there
-# on is resolved against a directory the command itself already left —
-# logged with path=?, not silently resolved against the (now stale) cwd.
-# Regression case: `cd <somewhere> && echo pwned > .claude/settings.json`
-# used to resolve the relative target against the ORIGINAL cwd and report a
-# concrete (wrong) path; the real write lands wherever the `cd` actually
-# went, which this parser does not (and, for an unresolvable cd target,
-# cannot) know.
-_run_case "22b: relative target after a cd in the same command — logged with path=?" \
+# A `cd` earlier in the SAME command changes the base a later relative
+# target resolves against. `cd`'s own argument is resolved and used as the
+# new base when it can be (round 2): a LITERAL relative destination like
+# `sub` is fully knowable, so the later target now resolves against it
+# instead of the payload's original cwd — "sub/out.txt", not "?". Round 1
+# only ever marked this unresolvable; round 2 actually follows the cd.
+_run_case "22b: relative target after a cd with a LITERAL destination — resolved against the NEW base" \
   "$(_bash_payload 'cd sub && echo pwned > out.txt')" \
+  "main${TAB}Bash:redirect${TAB}sub/out.txt${TAB}"
+
+# `cd`'s own argument can still be genuinely unresolvable (a shell
+# variable, a command substitution): THAT keeps every later relative
+# target at path=?, since there is no way to know where the command
+# actually ended up.
+_run_case "22c: relative target after a cd whose OWN destination is unresolvable — logged with path=?" \
+  "$(_bash_payload 'cd "$SOME_DIR" && echo pwned > out.txt')" \
   "main${TAB}Bash:redirect${TAB}?${TAB}"
 
 # -------------------------------------------------------------- multiple targets

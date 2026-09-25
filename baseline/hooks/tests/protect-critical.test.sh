@@ -231,6 +231,24 @@ _run_bash_case "26: 2> (stderr redirect, still creates/truncates the target) int
 _run_bash_case "27: >&2 (bare fd reference, no file at all) is not treated as a write" \
   "$TMPDIR_ROOT" "echo pwned >&2" 0
 
+# FD_REF_RE's exclusion cannot be proven through this hook's own BLOCK/PASS
+# decision: none of critical_patterns is digit-shaped, so a bare fd
+# reference ("2", "-") never coincidentally matches one whether it was
+# correctly excluded or wrongly treated as a write. What IS provable here
+# is that the shared parser's raw output is empty for it — checked
+# directly, same technique log-edit.test.sh's case 10f already uses (the
+# actual mutation-proof for this mechanic).
+_LIB="$SCRIPT_DIR/../lib/bash-write-targets.py"
+_fdref_payload="$("$PYTHON_BIN" -c 'import json; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": "echo pwned >&2"}, "cwd": "/tmp"}))')"
+_fdref_out="$(printf '%s' "$_fdref_payload" | "$PYTHON_BIN" "$_LIB")"
+if [[ -z "$_fdref_out" ]]; then
+  echo "PASS: 27b: shared parser reports NO target at all for >&2 (bare fd reference)"
+  PASS_COUNT=$((PASS_COUNT + 1))
+else
+  echo "FAIL: 27b: shared parser reports NO target at all for >&2 (bare fd reference) (got: $_fdref_out)"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+
 # ===================================================================
 # F3: a heredoc's OPENING line can carry more than the delimiter (e.g. a
 # redirect); the body must still be scanned, and a body that only MENTIONS
@@ -278,6 +296,69 @@ _run_bash_case "31: sed -i with the critical file NOT last -> still blocked" \
 
 _run_bash_case "32: cp -t DIR, DIR is a critical directory -> blocked" \
   "$TMPDIR_ROOT" "cp -t secrets ordinary.txt" 2
+
+# ===================================================================
+# F5 [round 2]: the COMMON form of "copy into a directory" -- no -t, just
+# `cp SRC DIR` or `cp SRC DIR/` -- used to report the bare DIR as the
+# target, and os.path.normpath then stripped any trailing slash before
+# that string ever reached the critical-pattern check, so a no-trailing-`$`
+# directory pattern (like `/secrets/`) stopped matching. The rare `-t DIR`
+# form (above) was already protected; the common form was not.
+# ===================================================================
+
+mkdir -p "$TMPDIR_ROOT/secrets"
+
+_run_bash_case "33: [MANDATORY] cp SRC DIR/ (trailing slash, no -t), DIR is critical -> blocked" \
+  "$TMPDIR_ROOT" "cp ordinary.txt secrets/" 2
+
+_run_bash_case "34: [MANDATORY] mv SRC DIR (no trailing slash, DIR exists on disk), DIR is critical -> blocked" \
+  "$TMPDIR_ROOT" "mv ordinary.txt secrets" 2
+
+_run_bash_case "35: cp SRC1 SRC2 DIR (more than one source, DIR must be a directory by cp's own syntax) -> blocked" \
+  "$TMPDIR_ROOT" "cp a.txt b.txt secrets" 2
+
+_run_bash_case "36: cp SRC DEST, DEST does not exist as a directory on disk -> still a plain file destination, not blocked" \
+  "$TMPDIR_ROOT" "cp ordinary.txt not-a-real-directory" 0
+
+# ===================================================================
+# F12 [round 2 blocker]: `sed -i -e SCRIPT` / `-f FILE` (the SEPARATED
+# form) reported SCRIPT/FILE itself as a write target whenever -e/-f
+# appeared anywhere in the word list, because the flag's own operand was
+# never consumed. `-f script.sed` was worse: that file is READ by sed,
+# never written.
+# ===================================================================
+
+_run_bash_case "37: [MANDATORY] sed -i -e EXPR FILE, EXPR text shaped like a critical path -> not blocked (EXPR is a flag operand, not a file)" \
+  "$TMPDIR_ROOT" "sed -i -e /secrets/d ordinary.txt" 0
+
+_run_bash_case "38: sed -i -f SCRIPT FILE, SCRIPT itself critical-shaped -> not blocked (SCRIPT is read, not written)" \
+  "$TMPDIR_ROOT" "sed -i -f .env ordinary.txt" 0
+
+_run_bash_case "39: sed -i -e EXPR FILE, FILE is critical-shaped -> still blocked (the real file, not the expression)" \
+  "$TMPDIR_ROOT" "sed -i -e s/a/b/ .env" 2
+
+# ===================================================================
+# F4 [round 2]: `cd`'s own literal argument is resolved and used as the new
+# base for later relative targets, not just marked unresolvable.
+# ===================================================================
+
+_run_bash_case "40: [MANDATORY] cd sub && a relative critical write -> resolved against the NEW base, blocked" \
+  "$TMPDIR_ROOT" "cd sub && echo pwned > .env" 2
+
+_run_bash_case "41: cd \"\$VAR\" (genuinely unresolvable) && a relative write -> not blocked (unresolvable, skipped)" \
+  "$TMPDIR_ROOT" 'cd "$VAR" && echo pwned > .env' 0
+
+# ===================================================================
+# F13: the half of F3 that keeps the heredoc's OPENER line (its own
+# trailing redirect) in the token stream instead of dropping it with the
+# body. Here the REDIRECT itself is the critical target, with an ordinary
+# body -- the inverse of case 28, which has it the other way around.
+# ===================================================================
+
+_run_bash_case "42: heredoc opener's OWN redirect target is critical-shaped, body is ordinary -> blocked" \
+  "$TMPDIR_ROOT" "cat <<'EOF' > .env
+ordinary body text
+EOF" 2
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"

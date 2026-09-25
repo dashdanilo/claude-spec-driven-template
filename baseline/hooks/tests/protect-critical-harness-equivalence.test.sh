@@ -338,11 +338,24 @@ _run_bash_case_both() {
   fi
 }
 
-_run_bash_case_both "bash-1: unresolvable target (shell variable) is skipped by BOTH hooks, never blocked" \
-  "$TMPDIR_ROOT" 'echo hi > "$SOME_UNSET_VAR"' 0
+# A target with a shell variable in it, but shaped so that IF it were
+# resolved anyway (the mutation this proves against: the shared parser's
+# own unresolvable check reverted) the resulting text would still match a
+# real critical pattern -- `"$X.env"` resolves (if wrongly allowed to) to
+# something ending in literal ".env". A target that would not match ANY
+# pattern even when resolved (e.g. a bare variable name) cannot prove this:
+# skipping it or not is invisible to the exit code either way, which is
+# exactly the gap the previous version of this case had.
+_run_bash_case_both "bash-1: unresolvable target (shell variable), shaped to match a real pattern IF wrongly resolved, is skipped by BOTH hooks" \
+  "$TMPDIR_ROOT" 'echo hi > "$X.env"' 0
 
-_run_bash_case_both "bash-2: &> is recognized as a write by BOTH hooks (an ordinary target, so both pass)" \
-  "$TMPDIR_ROOT" "echo hi &> ordinary.txt" 0
+# A write into TWO real files through `&>`, one shaped for EACH hook's own
+# pattern set (governance and critical patterns are disjoint, so no single
+# target matches both) -- if `&>` recognition were removed from the shared
+# parser, NEITHER target would ever be reported to either hook, and both
+# would pass; with it, each hook finds and blocks its own.
+_run_bash_case_both "bash-2: &> into a real governed/critical file (one target per hook) is recognized as a write and blocked by BOTH hooks" \
+  "$TMPDIR_ROOT" "echo hi &> .env && echo hi &> .claude/settings.json" 2
 
 # Missing lib/bash-write-targets.py: both hooks must warn on stderr and
 # pass, never silently no-op. Copies of each hook into a directory with no
