@@ -220,23 +220,47 @@ failure mode is someone else's unreviewed code landing on a protected branch. Th
 cost of the mistake is not paid by the person who makes it, and it is invisible
 once merged.
 
-### Merge a stacked PR by deleting its branch
+### Retarget a stacked PR before merging the one under it
 
 ```bash
-gh pr merge <n> --squash --delete-branch
+gh pr edit <top> --base "$(git symbolic-ref --short refs/remotes/origin/HEAD | cut -d/ -f2-)"
+gh pr merge <bottom> --squash --delete-branch
 ```
 
 A stacked PR is one whose base is another feature branch instead of the
-integration branch. Merging the bottom PR **and deleting its branch** is what
-makes GitHub retarget the PRs above it onto the integration branch. Leave the
-branch alive and the PR on top merges into a branch that is already dead: the
-merge succeeds, the PR shows *Merged*, and the content never reaches the
-integration branch.
+integration branch. **Point the top PR at the integration branch yourself, while
+it is still open, and only then merge the one under it.** Both of the automatic
+outcomes are traps, in opposite directions.
+
+Leave the bottom branch alive and the PR on top merges into a branch that is
+already dead: the merge succeeds, the PR shows *Merged*, and the content never
+reaches the integration branch.
+
+Delete it and GitHub is *supposed* to retarget the PR on top. It does not always
+manage to. When it cannot, it **closes** that PR instead, and a closed PR whose
+base branch no longer exists is a dead end:
+
+```
+Cannot change the base branch of a closed pull request. (updatePullRequest)
+Could not open the pull request. (reopenPullRequest)
+```
+
+Retargeting first avoids both, because an open PR always accepts a new base.
 
 On 2026-09-11 in `dashdanilo/claude-spec-driven-template`, #45 was stacked on
 #44's branch. #44 was merged without deleting `fix/install-link-docs-and-scripts`,
 #45 was merged right after and landed in that dead branch, and nothing of it
 reached `main`. It had to be reapplied in #47.
+
+On 2026-09-25 in the same repo, the other half of the trap fired. #97 was stacked
+on #95's branch. #95 was merged **with** `--delete-branch`, exactly as this rule
+told you to, and GitHub closed #97 rather than retargeting it. Nothing was lost,
+because the branch survived: the commit was cherry-picked onto the updated `main`,
+revalidated, and reopened as #98. But the recovery is manual every time.
+
+If it already happened, do not try to reopen. Cherry-pick the top branch's commits
+onto the updated integration branch, verify them there, open a fresh PR, and
+comment on the closed one pointing at the replacement so the trail survives.
 
 Two checks catch this before the merge, and the second one catches its
 neighbour too:
