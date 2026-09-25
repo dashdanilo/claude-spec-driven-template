@@ -12,7 +12,11 @@
 # and hook/script test fixtures under a `tests/` directory
 # (`baseline/hooks/tests/*.test.sh`, `baseline/scripts/tests/*.test.sh`),
 # whose made-up `.claude/...` paths are input data for the thing under
-# test, not prose pointing an agent at something to read.
+# test, not prose pointing an agent at something to read. Also covers a
+# path component that is itself a glob metacharacter (a literal `*`
+# directory name): the two exemption checks above used to split a path on
+# `/` with an unquoted loop, which let that component glob-expand against
+# the script's own CWD instead of reaching `case` as a literal.
 #
 # Builds throwaway git repos in a mktemp dir (NEVER this checkout's own
 # files) and asserts on check-index.sh's stderr text and exit code, since
@@ -727,6 +731,143 @@ _assert_contains "same pointer outside tests/ is still reported (negative contro
   "$OUT_TESTDIR" "does-not-exist-nontests-fixture.md"
 
 _assert_eq "--strict exits 1 with only the negative control present" "$EXIT_TESTDIR" "1"
+
+# ---------------------------------------------------------------- repo K
+# Isolates `is_pre_harness_path`'s glob-expansion hazard. The old
+# implementation split a path on `/` with `IFS=/` and looped over the
+# result unquoted (`for part in $path`), which runs pathname expansion on
+# each token, not just word-splitting. A path with a literal `*` directory
+# component then expands against the script's own CWD (the repo root) and
+# gets checked against every non-hidden entry there instead of against its
+# own literal name. Repo root holds a real `stale.pre-harness/` directory
+# for that expansion to land on, and no entry named `tests`, so only
+# `is_pre_harness_path` can be tripped here. Positive control: the pointer
+# sits under a directory whose name is the single character `*`, which the
+# old code wrongly exempted as if it were a `*.pre-harness` copy. Negative
+# control: an identical pointer shape with no glob component in its path,
+# which must be reported regardless, so this assertion cannot pass just
+# because the whole scan broke.
+REPO_GLOB_PH="$TMPDIR_ROOT/repo-glob-preharness"
+mkdir -p "$REPO_GLOB_PH/.claude/rules" "$REPO_GLOB_PH/.claude/hooks/*" \
+  "$REPO_GLOB_PH/stale.pre-harness"
+
+git -C "$REPO_GLOB_PH" init -q -b test
+git -C "$REPO_GLOB_PH" config user.email "test@example.com"
+git -C "$REPO_GLOB_PH" config user.name "Test"
+
+cat > "$REPO_GLOB_PH/${DC}/rules/tracked-rule.md" <<'EOF'
+---
+paths: "**"
+---
+
+No dangling pointer here.
+EOF
+
+# Root-level decoy: a real, non-hidden directory ending in `.pre-harness`.
+# A bare `*` glob at the repo root would expand onto this, among other
+# entries, under the old unquoted split-and-loop.
+touch "$REPO_GLOB_PH/stale.pre-harness/.gitkeep"
+
+# Positive control: the pointer's own path has a directory component that
+# is literally `*`, not `*.pre-harness`. The old code wrongly exempted it
+# anyway, because the `*` token expanded against the CWD before ever
+# reaching `case`.
+cat > "$REPO_GLOB_PH/.claude/hooks/*/glob-fixture.sh" <<EOF
+#!/usr/bin/env bash
+TARGET="${DC}/rules/does-not-exist-glob-preharness-fixture.sh"
+EOF
+
+# Negative control: identical needle shape, no glob component anywhere in
+# the path.
+cat > "$REPO_GLOB_PH/.claude/hooks/glob-preharness-control.sh" <<EOF
+#!/usr/bin/env bash
+TARGET="${DC}/rules/does-not-exist-glob-preharness-outside.sh"
+EOF
+
+cat > "$REPO_GLOB_PH/CLAUDE.md" <<'EOF'
+# Test project
+
+## Rules
+
+- tracked-rule.md - a clean rule, no dangling pointer
+EOF
+
+git -C "$REPO_GLOB_PH" add CLAUDE.md .claude/rules .claude/hooks
+git -C "$REPO_GLOB_PH" commit -q -m "fixture"
+
+OUT_GLOB_PH="$TMPDIR_ROOT/out-glob-preharness.txt"
+(cd "$REPO_GLOB_PH" && bash "$SCRIPT" --strict) > "$OUT_GLOB_PH" 2>&1
+EXIT_GLOB_PH=$?
+
+_assert_contains "glob-expansion hazard: a literal \`*\` path component is not wrongly exempted as pre-harness" \
+  "$OUT_GLOB_PH" "does-not-exist-glob-preharness-fixture.sh"
+
+_assert_contains "glob-expansion hazard (pre-harness): negative control outside the glob component is still reported" \
+  "$OUT_GLOB_PH" "does-not-exist-glob-preharness-outside.sh"
+
+_assert_eq "--strict exits 1 with both pre-harness glob pointers present" "$EXIT_GLOB_PH" "1"
+
+# ---------------------------------------------------------------- repo L
+# Same defect, isolating `is_test_fixture_path` instead: root decoy is a
+# real `tests/` directory (no entry ending in `.pre-harness`), so only
+# `is_test_fixture_path`'s glob-expansion hazard can be tripped here. The
+# `*`-named directory sits directly under `.claude/hooks/`, not under any
+# path that already has a real `tests` component, so the fixture isolates
+# the defect rather than tripping the exemption for the ordinary reason.
+REPO_GLOB_TESTS="$TMPDIR_ROOT/repo-glob-tests"
+mkdir -p "$REPO_GLOB_TESTS/.claude/rules" "$REPO_GLOB_TESTS/.claude/hooks/*" \
+  "$REPO_GLOB_TESTS/tests"
+
+git -C "$REPO_GLOB_TESTS" init -q -b test
+git -C "$REPO_GLOB_TESTS" config user.email "test@example.com"
+git -C "$REPO_GLOB_TESTS" config user.name "Test"
+
+cat > "$REPO_GLOB_TESTS/${DC}/rules/tracked-rule.md" <<'EOF'
+---
+paths: "**"
+---
+
+No dangling pointer here.
+EOF
+
+# Root-level decoy: a real, non-hidden directory literally named `tests`.
+touch "$REPO_GLOB_TESTS/tests/.gitkeep"
+
+# Positive control: same shape as repo K, isolating is_test_fixture_path.
+cat > "$REPO_GLOB_TESTS/.claude/hooks/*/glob-fixture.sh" <<EOF
+#!/usr/bin/env bash
+TARGET="${DC}/rules/does-not-exist-glob-testfixture-fixture.sh"
+EOF
+
+# Negative control: identical needle shape, no glob component anywhere in
+# the path.
+cat > "$REPO_GLOB_TESTS/.claude/hooks/glob-testfixture-control.sh" <<EOF
+#!/usr/bin/env bash
+TARGET="${DC}/rules/does-not-exist-glob-testfixture-outside.sh"
+EOF
+
+cat > "$REPO_GLOB_TESTS/CLAUDE.md" <<'EOF'
+# Test project
+
+## Rules
+
+- tracked-rule.md - a clean rule, no dangling pointer
+EOF
+
+git -C "$REPO_GLOB_TESTS" add CLAUDE.md .claude/rules .claude/hooks
+git -C "$REPO_GLOB_TESTS" commit -q -m "fixture"
+
+OUT_GLOB_TESTS="$TMPDIR_ROOT/out-glob-tests.txt"
+(cd "$REPO_GLOB_TESTS" && bash "$SCRIPT" --strict) > "$OUT_GLOB_TESTS" 2>&1
+EXIT_GLOB_TESTS=$?
+
+_assert_contains "glob-expansion hazard: a literal \`*\` path component is not wrongly exempted as a tests/ fixture" \
+  "$OUT_GLOB_TESTS" "does-not-exist-glob-testfixture-fixture.sh"
+
+_assert_contains "glob-expansion hazard (tests/): negative control outside the glob component is still reported" \
+  "$OUT_GLOB_TESTS" "does-not-exist-glob-testfixture-outside.sh"
+
+_assert_eq "--strict exits 1 with both tests/ glob pointers present" "$EXIT_GLOB_TESTS" "1"
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"
