@@ -320,6 +320,18 @@ _run_bash_case "35: cp SRC1 SRC2 DIR (more than one source, DIR must be a direct
 _run_bash_case "36: cp SRC DEST, DEST does not exist as a directory on disk -> still a plain file destination, not blocked" \
   "$TMPDIR_ROOT" "cp ordinary.txt not-a-real-directory" 0
 
+# The trailing-slash half of dest_is_dir (`dest.endswith("/")`) has no case
+# of its own where it is the ONLY thing making the destination count as a
+# directory: case 33, above, ALSO exists on disk (secrets/ was mkdir'd),
+# so `os.path.isdir` alone already covers it -- removing the endswith check
+# would leave case 33 green. Here the destination directory does NOT exist
+# on disk at all: only the trailing "/" marks it as a directory, so the
+# source's basename gets appended and the joined result ends in ".env"
+# (matching `\.env$`, a `$`-anchored pattern) while the bare, un-joined
+# destination string does not.
+_run_bash_case "36b: cp x.env DIR/ (trailing slash, DIR does NOT exist on disk at all), joined result ends in .env -> blocked" \
+  "$TMPDIR_ROOT" "cp x.env newdir-does-not-exist/" 2
+
 # ===================================================================
 # F12 [round 2 blocker]: `sed -i -e SCRIPT` / `-f FILE` (the SEPARATED
 # form) reported SCRIPT/FILE itself as a write target whenever -e/-f
@@ -359,6 +371,35 @@ _run_bash_case "42: heredoc opener's OWN redirect target is critical-shaped, bod
   "$TMPDIR_ROOT" "cat <<'EOF' > .env
 ordinary body text
 EOF" 2
+
+# ===================================================================
+# F14 [round 3]: round 2's cd/pushd base tracking had no SCOPE. A `cd`
+# inside `(...)`, on either side of a `|`, or backgrounded with `&`, runs
+# in a CHILD process and never changes the PARENT shell's directory once
+# that construct ends. `secrets/` (created above, for the cp -t case)
+# stands in for a critical DIRECTORY here: without scoping, `(cd secrets
+# && ok) && echo x > ordinary.txt` reads the later relative target as
+# resolved INSIDE secrets/, matching `/secrets/` and blocking a write that,
+# run for real, lands as plain TMPDIR_ROOT/ordinary.txt.
+# ===================================================================
+
+_run_bash_case "43: [MANDATORY] (cd secrets && ok) && an ordinary write -> NOT blocked, subshell cd does not leak" \
+  "$TMPDIR_ROOT" "(cd secrets && echo ok) && echo x > ordinary.txt" 0
+
+_run_bash_case "44: (cd secrets); an ordinary write, after the subshell closes -> NOT blocked" \
+  "$TMPDIR_ROOT" "(cd secrets); echo x > ordinary.txt" 0
+
+_run_bash_case "45: [MANDATORY] cd secrets | cat; an ordinary write -> NOT blocked, pipeline stage cd does not leak" \
+  "$TMPDIR_ROOT" "cd secrets | cat; echo x > ordinary.txt" 0
+
+_run_bash_case "46: [MANDATORY] pushd secrets; popd; an ordinary write -> NOT blocked, popd un-does the pushd" \
+  "$TMPDIR_ROOT" "pushd secrets >/dev/null; popd >/dev/null; echo x > ordinary.txt" 0
+
+# --- control: a TOP-LEVEL cd, not inside any of the scopes above, still
+# carries forward exactly like round 2. ---
+
+_run_bash_case "47: [control] cd secrets; an ordinary-NAMED write (';', not '&&') -> blocked, top-level cd is unaffected by the scoping fix" \
+  "$TMPDIR_ROOT" "cd secrets; echo x > ordinary.txt" 2
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"

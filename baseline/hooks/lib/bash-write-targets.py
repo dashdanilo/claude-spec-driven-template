@@ -79,7 +79,20 @@
 #     word, and reads their target argument(s) off the token stream;
 #   - skips `[[ ... ]]` and `(( ... ))` entirely, so a shell string/numeric
 #     comparison that happens to contain a literal `>` is never mistaken for
-#     a redirect.
+#     a redirect;
+#   - scopes `cd`/`pushd`/`popd`'s effect on the base directory to where it
+#     actually reaches: a `(...)` subshell, either side of a `|` pipeline,
+#     or a backgrounded `cmd &` all run in a CHILD process, so a `cd` inside
+#     one of those never changes the PARENT shell's directory once that
+#     scope ends — verified against a real shell (`(cd /tmp && true) && pwd`
+#     prints the ORIGINAL directory, not `/tmp`). An earlier version tracked
+#     one flat base for the whole command, so `(cd <harness> && true) &&
+#     echo pwned > .claude/settings.json` read as if the subshell's `cd`
+#     had leaked, and blocked a write that, run for real, lands in the
+#     session's own repo — blocking a legitimate command is exactly the
+#     failure mode this parser exists to avoid, not just under-blocking.
+#     A resolvable `cd`/`pushd` at the TOP level (not inside any of those
+#     scopes) still carries forward normally, the same as before.
 #
 # One gap log-edit.sh used to declare as permanently accepted is now PARTLY
 # closed, because it is the exact shape that motivated pulling this parser
@@ -111,10 +124,13 @@
 #     "cd" segment and the heredoc's OPENER line both go through the main
 #     loop); a `cd` placed so that only the heredoc BODY's own open() calls
 #     are affected is not.
-#   - `popd` is not tracked at all (the directory stack it pops back to is
-#     not something this parser maintains), and `pushd`/`popd` used
-#     together to return to the ORIGINAL directory read as still having
-#     moved, same as any other cd this parser cannot fully model.
+#   - `popd` is tracked, but only as "unresolvable now" (the same as
+#     `cd -`), never as "back to wherever we actually were" — the directory
+#     STACK itself is not something this parser maintains, so `pushd X;
+#     popd; ...` cannot recover the true original directory, only stop
+#     trusting the one `pushd` set. That is enough to stop it from being
+#     mistaken for a write into X forever (the bug this note used to
+#     describe), without claiming to know where it really landed.
 #   - a command is split into segments at `; && || | & (newline)`, so a `;`
 #     or `&&` embedded inside a quoted argument (rare, but legal shell) can
 #     mis-split.
@@ -355,14 +371,28 @@ def tokenize(cmd):
 SEPARATORS = {"&&", "||", ";", ";;", "|", "&", "(", ")", "\n"}
 
 
-def split_segments(tokens):
-    segments = [[]]
+def split_segments_ordered(tokens):
+    # Like the old split_segments, but keeps the SEPARATOR between two
+    # segments instead of discarding it, as ("SEG", token_list) / ("SEP",
+    # operator_string) items in original order. The main loop needs to know
+    # WHICH separator produced each boundary — a bare split_segments cannot
+    # tell "(" (entering a subshell), ")" (leaving one) or "|" (a pipeline
+    # stage, always its own subshell) apart from "&&"/";"/newline (an
+    # ordinary sequential separator, where a `cd` DOES carry forward) — see
+    # extract_targets' own scope-stack for why that distinction matters.
+    items = []
+    cur = []
     for kind, val in tokens:
         if kind == "OP" and val in SEPARATORS:
-            segments.append([])
+            if cur:
+                items.append(("SEG", cur))
+                cur = []
+            items.append(("SEP", val))
         else:
-            segments[-1].append((kind, val))
-    return [s for s in segments if s]
+            cur.append((kind, val))
+    if cur:
+        items.append(("SEG", cur))
+    return items
 
 
 def find_command(seg):
@@ -391,13 +421,23 @@ def extract_targets(command, cwd):
     # command we are at — starts as the payload's own cwd, and is updated
     # in place by a resolvable `cd`/`pushd` argument encountered along the
     # way (see the "cd" dispatch below).
-    # base_unresolvable: True once a `cd`/`pushd` argument could not itself
-    # be resolved (a shell variable, `cd -`, a bare `pushd` swap) — every
-    # relative target from there on is unresolvable, UNTIL a later cd/pushd
-    # with a resolvable (in particular, absolute) argument re-establishes a
-    # known base regardless of the unresolvable one in between.
+    # base_unresolvable: True once a `cd`/`pushd`/`popd` argument could not
+    # itself be resolved (a shell variable, `cd -`, `popd`) — every relative
+    # target from there on is unresolvable, UNTIL a later cd/pushd with a
+    # resolvable (in particular, absolute) argument re-establishes a known
+    # base regardless of the unresolvable one in between.
     base_dir = [cwd]
     base_unresolvable = [False]
+    # scope_stack: a `cd`/`pushd`/`popd` inside `(...)`, or on either side
+    # of a `|`, or backgrounded with `&`, runs in a CHILD process — its
+    # effect on the working directory never reaches whatever comes after in
+    # THIS script, only the parent shell's own sequential commands
+    # (`&&`/`||`/`;`/newline) share one cwd. Confirmed against a real shell:
+    # `(cd /tmp && true) && pwd` prints the ORIGINAL directory, not /tmp.
+    # Each entry is a saved (base_dir_value, base_unresolvable_value) to
+    # restore on exit from that scope; see the main loop below for exactly
+    # when a push/pop happens.
+    scope_stack = []
 
     def handle(kind_label, raw):
         unresolvable, target = resolve_target(raw, base_dir[0], base_unresolvable[0])
@@ -445,8 +485,7 @@ def extract_targets(command, cwd):
             + stripped_command[m.end():]
         )
 
-    tokens = tokenize(stripped_command)
-    for seg in split_segments(tokens):
+    def process_segment(seg):
         # Arithmetic/test context: "((" / "))" (anywhere in the segment) or
         # a "[[" / "]]" / "[" / "]" test-command bracket ANYWHERE in the
         # segment mean a literal ">" here is a comparison, not a redirect.
@@ -459,7 +498,7 @@ def extract_targets(command, cwd):
             or (k == "WORD" and v in ("[[", "]]", "[", "]"))
             for k, v in seg
         ):
-            continue
+            return
 
         # --- redirects: every operator shape that writes a file (see header)
         for idx, (kind, val) in enumerate(seg):
@@ -476,11 +515,23 @@ def extract_targets(command, cwd):
 
         cmd_idx, cmd_word = find_command(seg)
         if cmd_word is None:
-            continue
+            return
         base = cmd_word.rstrip("/").split("/")[-1]
         words = [v for k, v in seg[cmd_idx + 1:] if k == "WORD"]
 
-        if base in ("cd", "pushd"):
+        if base == "popd":
+            # `popd` takes no directory operand at all (only +N/-N/-n, which
+            # rotate or trim the stack) — it returns to whatever was on top
+            # of the directory stack, which this parser does not maintain.
+            # Treated exactly like `cd -`: unresolvable, not "no effect".
+            # Combined with the scope isolation above, this is also what
+            # makes `pushd X; popd; echo pwned > y` stop being wrongly
+            # blocked: pushd resolves to X, popd immediately marks the base
+            # unresolvable again instead of leaving it pinned at X forever,
+            # so `y` is skipped rather than confidently checked against the
+            # wrong (and, worse, indefinitely stale) directory.
+            base_unresolvable[0] = True
+        elif base in ("cd", "pushd"):
             # Resolve cd's/pushd's OWN argument and use it as the new base
             # for every relative target from HERE ON in this same command —
             # see resolve_target's own base_unresolvable note for why this
@@ -647,6 +698,36 @@ def extract_targets(command, cwd):
             ci = words.index("-c")
             if ci + 1 < len(words):
                 handle_open_calls("Bash:python-c", words[ci + 1])
+
+    tokens = tokenize(stripped_command)
+    items = split_segments_ordered(tokens)
+    for idx, item in enumerate(items):
+        if item[0] == "SEP":
+            op = item[1]
+            if op == "(":
+                scope_stack.append((base_dir[0], base_unresolvable[0]))
+            elif op == ")":
+                if scope_stack:
+                    base_dir[0], base_unresolvable[0] = scope_stack.pop()
+                # else: an unbalanced ")" -- not expected for valid shell
+                # input; nothing to restore, state is left as is.
+            continue
+
+        seg = item[1]
+        # A pipeline stage (either side of a "|") or a backgrounded segment
+        # ("cmd &") runs in its own child process, exactly like "(...)" above,
+        # just without an explicit closing token to hang a pop off of: save
+        # the state before processing it, and ALWAYS restore it afterward,
+        # regardless of what happened inside.
+        prev_op = items[idx - 1][1] if idx > 0 and items[idx - 1][0] == "SEP" else None
+        next_op = items[idx + 1][1] if idx + 1 < len(items) and items[idx + 1][0] == "SEP" else None
+        isolated = prev_op == "|" or next_op in ("|", "&")
+        saved_state = (base_dir[0], base_unresolvable[0]) if isolated else None
+
+        process_segment(seg)
+
+        if isolated:
+            base_dir[0], base_unresolvable[0] = saved_state
 
     return out
 

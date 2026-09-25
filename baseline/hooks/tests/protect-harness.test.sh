@@ -639,6 +639,19 @@ _run_bash_case "67: cp SRC1 SRC2 DIR (more than one source, DIR must be a direct
 _run_bash_case "68: cp SRC DEST, DEST does not exist as a directory on disk -> still a plain file destination, not blocked" \
   "$REPO_B" "cp ordinary.txt $REPO_A/not-a-real-directory" 0
 
+# The trailing-slash half of dest_is_dir (`dest.endswith("/")`) has no case
+# of its own where it is the ONLY thing making the destination count as a
+# directory: case 64, above, ALSO exists on disk, so `os.path.isdir` alone
+# already covers it -- removing the endswith check would leave case 64
+# green (it never single-handedly proved this rule exists). Here the
+# destination directory (".claude", nested under a brand-new path) does
+# NOT exist on disk at all: only the trailing "/" marks it as a directory,
+# so the SOURCE's basename gets appended and the result matches a `$`-
+# anchored governance pattern (`.claude/settings.json$`) that the bare,
+# un-joined destination string does not.
+_run_bash_case "69b: cp SRC DIR/ (trailing slash, DIR does NOT exist on disk at all), joined result is governance-shaped -> blocked" \
+  "$REPO_B" "cp settings.json $REPO_A/brand-new-nonexistent-path/.claude/" 2
+
 # ===================================================================
 # F12 [round 2 blocker]: `sed -i -e SCRIPT` / `-f FILE` (the SEPARATED
 # form, one space, two words) reported SCRIPT/FILE itself as a write target
@@ -692,6 +705,43 @@ _run_bash_case "63: heredoc opener's OWN redirect target is governance-shaped, b
   "$REPO_B" "cat <<'EOF' > $REPO_A/.claude/settings.json
 ordinary body text
 EOF" 2
+
+# ===================================================================
+# F14 [round 3]: round 2's cd/pushd base tracking had no SCOPE. A `cd`
+# inside `(...)`, on either side of a `|`, or backgrounded with `&`, runs
+# in a CHILD process and never changes the PARENT shell's directory once
+# that construct ends -- confirmed against a real shell: `(cd /tmp && true)
+# && pwd` prints the ORIGINAL directory, never `/tmp`. The old flat
+# tracking read a subshell's `cd` as if it had leaked, so a write into the
+# SESSION's own tracked file, in a command shaped like `(cd <harness> &&
+# ...) && echo x > .claude/settings.json`, got blocked as if it were a
+# write into the harness -- the error direction is BLOCKING A LEGITIMATE
+# COMMAND, exactly the failure mode this parser exists to avoid, not a
+# bypass (a bypass direction was looked for and not found). Every case
+# here writes into REPO_B's own tracked .claude/settings.json, from a
+# cwd=REPO_B session, with a scoped `cd`/`pushd`/`popd` into REPO_A (the
+# harness checkout) that must NOT affect it.
+# ===================================================================
+
+_run_bash_case "69: [MANDATORY] (cd <harness> && ok) && a write in the session's OWN repo -> NOT blocked, subshell cd does not leak" \
+  "$REPO_B" "(cd $REPO_A && echo ok) && echo x > .claude/settings.json" 0
+
+_run_bash_case "70: (cd <harness>); a write in the session's OWN repo, after the subshell closes -> NOT blocked" \
+  "$REPO_B" "(cd $REPO_A); echo x > .claude/settings.json" 0
+
+_run_bash_case "71: [MANDATORY] cd <harness> | cat; a write in the session's OWN repo -> NOT blocked, pipeline stage cd does not leak" \
+  "$REPO_B" "cd $REPO_A | cat; echo x > .claude/settings.json" 0
+
+_run_bash_case "72: [MANDATORY] pushd <harness>; popd; a write in the session's OWN repo -> NOT blocked, popd un-does the pushd" \
+  "$REPO_B" "pushd $REPO_A >/dev/null; popd >/dev/null; echo x > .claude/settings.json" 0
+
+# --- controls: a TOP-LEVEL cd, not inside any of the scopes above, still
+# carries forward exactly like round 2 -- both the "&&"-joined form
+# (already covered by case 59) and the ";"-joined form, which the scoping
+# change above touches the same segment-walking code path for. ---
+
+_run_bash_case "73: [control] cd <harness>; a RELATIVE governance write (';', not '&&') -> still blocked, top-level cd is unaffected by the scoping fix" \
+  "$REPO_B" "cd $REPO_A; echo pwned > .claude/settings.json" 2
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"
