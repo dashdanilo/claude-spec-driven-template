@@ -227,14 +227,18 @@ if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/n
   GIT_AVAILABLE=1
 fi
 
+# Matched whole, with the separators pinned into the pattern, instead of
+# split into components with `IFS=/` and looped unquoted: an unquoted
+# `for part in $path` also runs pathname expansion on each token, and a
+# component containing `*`, `?` or `[...]` would glob-expand against this
+# script's CWD (the repo root) instead of reaching `case` as a literal.
+# That turns an unrelated file whose path happens to hold a bare `*`
+# component into a false exemption whenever the repo root holds anything
+# ending in `.pre-harness`, silently hiding whatever that file points at.
+# Quoting the subject and letting the pattern alone carry the globbing
+# avoids that entirely.
 is_pre_harness_path() {
-  local path="$1" part
-  local IFS=/
-  for part in $path; do
-    case "$part" in
-      *.pre-harness) return 0 ;;
-    esac
-  done
+  case "/$1/" in */*.pre-harness/*) return 0 ;; esac
   return 1
 }
 
@@ -243,14 +247,14 @@ is_pre_harness_path() {
 # whose `.claude/...`-shaped strings are fixture input for the thing under
 # test, not pointers an agent is meant to follow. See the longer rationale
 # above the exemption comment near GIT_AVAILABLE.
+#
+# Same whole-path match as `is_pre_harness_path` above, for the same reason:
+# a split-and-loop over `$path` with `IFS=/` would glob-expand an unquoted
+# component such as `*` against the CWD, so a path with a literal `*`
+# segment could wrongly exempt itself whenever the repo root happens to
+# contain a `tests` entry.
 is_test_fixture_path() {
-  local path="$1" part
-  local IFS=/
-  for part in $path; do
-    case "$part" in
-      tests) return 0 ;;
-    esac
-  done
+  case "/$1/" in */tests/*) return 0 ;; esac
   return 1
 }
 
