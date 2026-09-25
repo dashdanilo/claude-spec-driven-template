@@ -122,7 +122,7 @@ When every box is checked: dispatch `reviewer` to review the whole branch — it
 
 If `deviations.md` has any open `finding` (a production defect a test revealed, out of scope for this spec — `.claude/rules/harness/specs.md`), add a **"Findings outside scope"** section to the PR body listing each one in one line, so it does not stay invisible in a file nobody but this run reads. `finding` never blocks the PR; only `needs decision` does.
 
-Report the PR link.
+Then run "After opening a PR" in `.claude/rules/harness/git-workflow.md`: a `/orchestrate` run counts as autonomous delivery, so the host's PR auto-fix goes on without asking when the session has it, and is skipped silently otherwise. Report the PR link and whether PR auto-fix is on.
 
 ## Step 5 — Learn (the improve loop)
 
