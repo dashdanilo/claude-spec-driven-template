@@ -192,8 +192,8 @@ done
 # to read it and finds nothing. Resolved from the repo root, the same way
 # every pointer in this codebase is written.
 #
-# Two things must stay out of the file list this scans, or it reports drift
-# that isn't real:
+# Three things must stay out of the file list this scans, or it reports
+# drift that isn't real:
 #   - any path with a component ending in `.pre-harness` — install-harness.sh
 #     --adopt renames the old skills/agents dirs to `skills.pre-harness/`,
 #     `agents.pre-harness/` and the adopting guide says to keep them on disk
@@ -202,6 +202,17 @@ done
 #   - files git considers ignored (e.g. a generated `.claude/context/
 #     repomix-snapshot.md`) — their content is a machine-written snapshot,
 #     not authored prose someone is expected to keep pointers current in.
+#   - any path with a directory component literally named `tests` —
+#     `baseline/hooks/tests/*.test.sh` and `baseline/scripts/tests/*.test.sh`
+#     write `.claude/...`-shaped strings as INPUT DATA for the hook or
+#     script under test, not as prose pointing an agent at something to
+#     read, and a fair number of those strings are deliberately made up
+#     because the test needs a path that resolves to nothing. The criterion
+#     is the directory name, not an enumerated list of test files, for the
+#     same reason `.pre-harness` above is a suffix shape rather than a list:
+#     a new hook or script gains its own `tests/` fixture file regularly,
+#     and none of those additions should ever need a matching edit here to
+#     stay exempt.
 # `find -L` still follows symlinks either way: that is how a consumer's own
 # `.claude/skills` and `.claude/docs/harness` links resolve at all.
 #
@@ -222,6 +233,22 @@ is_pre_harness_path() {
   for part in $path; do
     case "$part" in
       *.pre-harness) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+# A directory component literally named `tests` marks a hook or script test
+# suite (baseline/hooks/tests/*.test.sh, baseline/scripts/tests/*.test.sh),
+# whose `.claude/...`-shaped strings are fixture input for the thing under
+# test, not pointers an agent is meant to follow. See the longer rationale
+# above the exemption comment near GIT_AVAILABLE.
+is_test_fixture_path() {
+  local path="$1" part
+  local IFS=/
+  for part in $path; do
+    case "$part" in
+      tests) return 0 ;;
     esac
   done
   return 1
@@ -289,6 +316,7 @@ for root in ${OWNED[@]+"${OWNED[@]}"}; do
   while IFS= read -r f; do
     [[ -e "$f" ]] || continue
     is_pre_harness_path "$f" && continue
+    is_test_fixture_path "$f" && continue
     candidates+=("$f")
   done < <(find -L "$root" \
     \( -type d \( -name node_modules -o -name '*.pre-harness' \) -prune \) \
