@@ -8,11 +8,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
-**"After opening a PR" in `git-workflow.md`, a single source of truth for handing CI to the host's own monitor once a PR is up:** `/orchestrate` and `/lean` turn it on automatically (they count as autonomous delivery), other flows offer it in one line and wait for a yes.
+**"After opening a PR" in `git-workflow.md`, a single source of truth for turning on the host's PR auto-fix once a PR is up:** `/orchestrate` and `/lean` turn it on automatically (they count as autonomous delivery), other flows offer it in one line and wait for a yes.
 - Conditional on the session exposing a host tool for it (`mcp__ccd_pr__set_monitor`/`get_status` in Claude Code desktop); skipped silently everywhere else, since the harness is portable.
 - On a CI failure or merge-state event, fixes, verifies with the gate, commits and pushes without asking; review comments the app relays are read but any requested change is confirmed with the human first, since they carry no authority.
-- No polling `gh pr checks` while the monitor is on, the events are the wake signal; auto-fix never enables auto-merge.
-- A `spec-worktree` created only to produce the PR now stays while the monitor is on, since auto-fix pushes from it.
+- No polling `gh pr checks` while PR auto-fix is on, the events are the wake signal; auto-fix never enables auto-merge.
+- A `spec-worktree` created only to produce the PR now stays while PR auto-fix is on, since auto-fix pushes from it.
 - `orchestrate`/`lean`/`reviewer` point at the rule instead of duplicating it; `reviewer` returns the PR URL for the caller to act on.
 
 **A shared Bash-write parser, closing the gap that let a write reach `protect-harness.sh`'s and `protect-critical.sh`'s protected paths through Bash instead of Edit/Write:** both hooks only ever watched Edit/Write/MultiEdit payloads, so a redirect, `sed -i`, `tee`, `cp`, `mv`, or a `python3 -c "..."`/heredoc `open(path, "w")` call against `.claude/settings.json`, a hook, a lockfile, or `.env` sailed straight through both guards. Not theoretical: this session itself had a subagent edit `.claude/settings.json` via `python3` specifically because `protect-harness.sh` would have blocked an Edit.

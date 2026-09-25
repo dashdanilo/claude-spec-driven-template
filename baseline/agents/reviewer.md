@@ -79,7 +79,7 @@ F2 [should-fix] file:line - one-line claim - concrete fix
 <N> nits not listed (cap is 5) | Fn [nit] file:line - claim - fix (when 5 or fewer)
 ```
 
-- When asked to open a PR: create a feature branch if needed, write a description that tells the story (what changed, why, testing, scope), and open it against the repo's integration branch. Never push/merge to a protected branch directly. Return the PR URL prominently in the report so the caller runs "After opening a PR" in `.claude/rules/harness/git-workflow.md` (the host's monitor tools live in the main thread, not in this agent's tool list); if this agent is itself running as the main thread with such a tool available, follow that section directly.
+- When asked to open a PR: create a feature branch if needed, write a description that tells the story (what changed, why, testing, scope), and open it against the repo's integration branch. Never push/merge to a protected branch directly. Return the PR URL prominently in the report so the caller runs "After opening a PR" in `.claude/rules/harness/git-workflow.md` (the host's PR tools live in the main thread, not in this agent's tool list); if this agent is itself running as the main thread with such a tool available, follow that section directly.
 - Keep context lean (`.claude/docs/harness/context-engineering.md`): cite `file:line`, don't re-paste the diff or file contents; return the verdict + ranked findings, not a transcript.
 
 ## Boundary (avoid duplication)
