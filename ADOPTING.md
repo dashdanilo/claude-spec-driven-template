@@ -533,10 +533,12 @@ if chosen and chosen.get("installPath"):
    hooks portáveis que **estiverem** registradas ali, nem todo repo registrou
    os mesmos. Os candidatos, conferidos no `install-harness.sh` deste
    harness, são dez: em `Bash`, `block-secrets.sh`, `protect-main.sh`,
-   `protect-unpushed.sh`, `protect-machine-config.sh` e `log-edit.sh`; em
-   `Edit|Write|MultiEdit|NotebookEdit`, `protect-harness.sh`,
-   `protect-machine-config.sh` e `log-edit.sh` (estes dois últimos
-   registrados nos dois matchers, por isso a soma dos nomes passa de dez);
+   `protect-unpushed.sh`, `protect-machine-config.sh`, `protect-harness.sh`
+   e `log-edit.sh`; em `Edit|Write|MultiEdit|NotebookEdit`,
+   `protect-harness.sh`, `protect-machine-config.sh` e `log-edit.sh` (estes
+   três registrados nos dois matchers, por isso a soma dos nomes passa de
+   dez: `protect-harness.sh` ganhou o matcher `Bash` para enxergar uma
+   escrita feita por comando, não só por Edit/Write);
    `log-agent.sh` (`SubagentStop`); e `check-handover.sh`, `check-index.sh`
    e `check-baseline.sh` (`SessionStart`); no njord-back, por exemplo,
    `log-edit.sh` e `check-baseline.sh` nunca estiveram commitados ali, não
