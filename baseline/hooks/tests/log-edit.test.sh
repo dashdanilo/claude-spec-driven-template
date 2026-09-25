@@ -165,6 +165,31 @@ _run_case "10: 2>/dev/null — stderr redirect, not logged" \
   "$(_bash_payload 'some-cmd 2>/dev/null')" \
   ""
 
+# `&>`, `>|`, `>&` (with a filename) and `2>` (with a real target, not
+# /dev/null) all write a file exactly like plain `>` — an earlier version
+# excluded all of them outright on the wrong theory that they are always
+# fd-duplication. `>&2`/`2>&1` (a BARE fd reference, no filename at all)
+# stay excluded, right below.
+_run_case "10b: &> writes a file, target inside repo — logged" \
+  "$(_bash_payload 'echo hi &> out.txt')" \
+  "main${TAB}Bash:redirect${TAB}out.txt${TAB}"
+
+_run_case "10c: >| (force-write) writes a file, target inside repo — logged" \
+  "$(_bash_payload 'echo hi >| out.txt')" \
+  "main${TAB}Bash:redirect${TAB}out.txt${TAB}"
+
+_run_case "10d: >& with a filename writes a file, target inside repo — logged" \
+  "$(_bash_payload 'echo hi >& out.txt')" \
+  "main${TAB}Bash:redirect${TAB}out.txt${TAB}"
+
+_run_case "10e: 2> with a real target creates/truncates it, target inside repo — logged" \
+  "$(_bash_payload 'echo hi 2> out.txt')" \
+  "main${TAB}Bash:redirect${TAB}out.txt${TAB}"
+
+_run_case "10f: >&2 — a BARE fd reference, no filename at all — not logged" \
+  "$(_bash_payload 'echo hi >&2')" \
+  ""
+
 _run_case "11: >/dev/null with no space — not logged" \
   "$(_bash_payload 'echo hi >/dev/null')" \
   ""
@@ -228,6 +253,18 @@ _run_case "21: redirect target is a variable — logged with path=?" \
 _run_case "22: mv target is a command substitution — logged with path=?" \
   "$(_bash_payload 'mv out.txt "$(echo sub)/report.txt"')" \
   "main${TAB}Bash:mv${TAB}?${TAB}"
+
+# A `cd` earlier in the SAME command means every relative target from there
+# on is resolved against a directory the command itself already left —
+# logged with path=?, not silently resolved against the (now stale) cwd.
+# Regression case: `cd <somewhere> && echo pwned > .claude/settings.json`
+# used to resolve the relative target against the ORIGINAL cwd and report a
+# concrete (wrong) path; the real write lands wherever the `cd` actually
+# went, which this parser does not (and, for an unresolvable cd target,
+# cannot) know.
+_run_case "22b: relative target after a cd in the same command — logged with path=?" \
+  "$(_bash_payload 'cd sub && echo pwned > out.txt')" \
+  "main${TAB}Bash:redirect${TAB}?${TAB}"
 
 # -------------------------------------------------------------- multiple targets
 _run_case "23: two write commands chained — one line per target" \

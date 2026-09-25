@@ -116,11 +116,21 @@ session_cwd="${payload_cwd:-$PWD}"
 # paths is judged by the SAME rule now — see below for why the earlier
 # two-group split (config blocked always, source blocked only cross-repo) was
 # wrong, not just differently organized.
+#
+# baseline/hooks/.*\.(sh|py)$ and .claude/hooks/.*\.(sh|py)$ (not just .sh):
+# lib/bash-write-targets.py lives under baseline/hooks/lib/ and is the ONE
+# implementation this hook, protect-critical.sh and log-edit.sh all import
+# to see a write performed through Bash. A .sh-only pattern left it outside
+# this hook's own governance surface, so a session in a DIFFERENT repo could
+# write `return []` at the top of its extract_targets() and silently
+# disarm the Bash branch of all three hooks, in every project linked to
+# that harness checkout, while the Edit branch stayed green and this hook
+# kept reporting itself as working.
 governance_patterns=(
   '(^|/)\.claude/settings\.json$'
   '(^|/)\.claude/settings\.local\.json$'
-  '(^|/)baseline/hooks/.*\.sh$'
-  '(^|/)\.claude/hooks/.*\.sh$'
+  '(^|/)baseline/hooks/.*\.(sh|py)$'
+  '(^|/)\.claude/hooks/.*\.(sh|py)$'
   '(^|/)baseline/rules/'
   '(^|/)\.claude/rules/'
 )
@@ -306,6 +316,18 @@ _check_path() {
 if [[ "$tool_name" == "Bash" ]]; then
   [[ -n "$command" ]] || exit 0
   LIB="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)/lib/bash-write-targets.py"
+  if [[ ! -f "$LIB" ]]; then
+    # Same posture as the missing-python case above: warn loudly and let
+    # this call through, rather than let a missing file turn into a SILENT
+    # no-op. "$PYTHON_BIN $LIB 2>/dev/null || echo ''" below would otherwise
+    # swallow the failure completely -- no warning, no exit code that says
+    # anything went wrong -- and the Bash branch of this guard would just
+    # stop protecting anything, with nothing in the transcript to explain
+    # why. Edit/Write is unaffected either way: this only disables the
+    # BASH branch for this one call.
+    echo "WARNING: protect-harness.sh: shared parser lib/bash-write-targets.py not found next to this hook -- the Bash write-detection branch is DISABLED for this call. Edit/Write is still protected." >&2
+    exit 0
+  fi
   targets=$(printf '%s' "$input" | "$PYTHON_BIN" "$LIB" 2>/dev/null || echo "")
   while IFS=$'\t' read -r kind target; do
     [[ -n "$kind" ]] || continue

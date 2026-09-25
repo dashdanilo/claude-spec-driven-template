@@ -144,6 +144,18 @@ for v in (d.get('tool_name') or '', d.get('file_path') or ti.get('file_path') or
 if [[ "$tool_name" == "Bash" ]]; then
   [[ -n "$command" ]] || exit 0
   LIB="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)/lib/bash-write-targets.py"
+  if [[ ! -f "$LIB" ]]; then
+    # Same posture as the missing-python case above: warn loudly and let
+    # this call through, rather than let a missing file turn into a SILENT
+    # no-op. "$PYTHON_BIN $LIB 2>/dev/null || echo ''" below would otherwise
+    # swallow the failure completely -- no warning, no exit code that says
+    # anything went wrong -- and the Bash branch of this guard would just
+    # stop protecting anything, with nothing in the transcript to explain
+    # why. Edit/Write is unaffected either way: this only disables the
+    # BASH branch for this one call.
+    echo "WARNING: protect-critical.sh: shared parser lib/bash-write-targets.py not found next to this hook -- the Bash write-detection branch is DISABLED for this call. Edit/Write is still protected." >&2
+    exit 0
+  fi
   targets=$(printf '%s' "$input" | "$PYTHON_BIN" "$LIB" 2>/dev/null || echo "")
   while IFS=$'\t' read -r kind target; do
     [[ -n "$kind" ]] || continue

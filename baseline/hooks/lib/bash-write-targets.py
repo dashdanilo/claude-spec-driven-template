@@ -58,10 +58,23 @@
 # character-level lexer that:
 #   - tracks single/double quote state, so a `>` inside a quoted string (a
 #     commit message, an echoed sentence) is text, never an operator;
-#   - recognizes the write-relevant redirect operators `>` and `>>`, and
-#     explicitly does NOT treat `2>`, `2>>`, `&>`, `&>>` or `>&` as file
-#     writes — those are stderr-to-fd or combined-stream redirects
-#     (`2>&1` chief among them), not "a new file appeared";
+#   - recognizes EVERY redirect operator that can write a file: `>`, `>>`,
+#     `>|` (force-write, bypasses noclobber), `&>`/`&>>` (stdout+stderr to a
+#     file, always a file, never an fd), `2>`/`2>>` (stderr alone — this
+#     STILL creates or truncates the target file even if nothing is ever
+#     written to stderr) and `>&` (write UNLESS the following word is a bare
+#     fd reference like `1`, `2` or `-`, e.g. `cmd >&2` — no file at all —
+#     as opposed to `cmd >& file`, a real write, treated by bash exactly
+#     like `&>`). An earlier version of this file excluded ALL of `2>`,
+#     `2>>`, `&>`, `&>>` and `>&` outright on the theory that they are
+#     "stderr-to-fd or combined-stream redirects, not a new file" — measured
+#     wrong: `echo pwned &> target`, `echo pwned >& target` and
+#     `echo pwned 2> target` all write `target` exactly like plain `>`,
+#     verified against a real shell before fixing this comment together with
+#     the code it used to justify. Only a BARE fd-duplication form
+#     (`2>&1`, `>&2`, `1>&-`) has no file target at all — that is the one
+#     shape still excluded, and only for `>&`'s own following word, not for
+#     the operator itself;
 #   - recognizes `sed -i`, `tee`, `cp`, `mv` as write commands by their first
 #     word, and reads their target argument(s) off the token stream;
 #   - skips `[[ ... ]]` and `(( ... ))` entirely, so a shell string/numeric
@@ -82,12 +95,35 @@
 # still reported, as unresolvable ("?"), same as any other target this
 # parser cannot pin to a literal path — never silently dropped.
 #
-# `cp`/`mv` targets are read as the LAST non-flag argument, which misses a
-# `-t <dir>`-style destination given before its sources; `sed -i` with
-# multiple trailing files reports only the last one; a command is split into
-# segments at `; && || | & (newline)`, so a `;` or `&&` embedded inside a
-# quoted argument (rare, but legal shell) can mis-split. Each of these
-# under-covers a shape rather than mis-reporting a common one.
+# Remaining declared gaps:
+#   - `OPEN_CALL_RE` does not understand nested parentheses in the first
+#     argument: `open(os.path.join('a', 'b.json'), 'w')` does not match the
+#     regex AT ALL (the inner `(...)`/`,` breaks its no-paren/no-comma `arg`
+#     group), so this call is silently invisible — not even reported as
+#     unresolvable ("?"), unlike every other unresolvable shape this file
+#     handles. Accepted rather than fixed with a real (nested-paren-aware)
+#     scanner, which this single regex is not equipped to become without
+#     turning into a small parser of its own.
+#   - the heredoc-stripping pass (above, before the main tokenizer runs) is
+#     NOT cd_seen-aware: a `cd` appearing before a heredoc is not tracked
+#     across that separate pass, only within the main segment loop below.
+#     `cd <harness> && python3 - <<'PY' ... PY` is covered (the "cd" segment
+#     and the heredoc's OPENER line both go through the main loop); a `cd`
+#     placed so that only the heredoc BODY's own open() calls are affected
+#     is not.
+#   - a command is split into segments at `; && || | & (newline)`, so a `;`
+#     or `&&` embedded inside a quoted argument (rare, but legal shell) can
+#     mis-split.
+#   - other interpreters and commands that can write a file are not
+#     recognized at all: `bash -c "..."`, `node -e`, `perl -pi`, `awk`
+#     (`> file` inside an awk program, or `print > "file"`), `dd of=`,
+#     `ln -sf` (creates/replaces a path). These used to be a pure
+#     observability gap when only log-edit.sh depended on this file; now
+#     that protect-harness.sh and protect-critical.sh use the same parser to
+#     DECIDE whether to block, each one is a live way to write a governed
+#     path through Bash and have neither guard see it, not just an
+#     undercount in a log nobody is blocked by. Left unaddressed for now,
+#     on purpose, not because the risk shrank.
 
 import sys
 import os
@@ -95,6 +131,18 @@ import json
 import re
 
 ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+
+# Every redirect operator that ALWAYS writes a file when followed by a WORD
+# (see the header for why `2>`/`2>>`/`&>`/`&>>`/`>|` are write shapes, not
+# just `>`/`>>`). `>&` is handled separately, right below the loop that uses
+# this set: it writes a file UNLESS its target is a bare fd reference.
+WRITE_REDIRECT_OPS = {">", ">>", ">|", "2>", "2>>", "&>", "&>>"}
+# A bare file-descriptor reference as the word following `>&` — a plain
+# number (`1`, `2`, `10`) or a lone `-` (closes the fd) — meaning `>&` here
+# duplicates a file descriptor and touches no file at all. Anything else
+# following `>&` (a filename) is a real write, handled by bash exactly like
+# `&>`.
+FD_REF_RE = re.compile(r"^-$|^[0-9]+$")
 
 # A write-mode `open(<arg>, <mode>)` call, anywhere in a code string. <arg> is
 # captured RAW (not required to be quoted) so a non-literal first argument
@@ -120,8 +168,25 @@ LITERAL_ARG_RE = re.compile(r"^(['\"])([^'\"]*)\1$")
 # `<<DELIM`, `<<-DELIM`, `<<'DELIM'`, `<<"DELIM"` through a line that is just
 # (optionally indented) the same delimiter. DOTALL so `.` can span the body's
 # newlines; the delimiter itself is a plain word, never re-expanded.
+#
+# `(?P<opener>...)[^\n]*` after the delimiter, not a bare `\r?\n` right after
+# it: the opening line can carry MORE after the delimiter word, most notably
+# a redirect (`python3 - <<'PY' > out.txt`). An earlier version required the
+# newline immediately after the delimiter, so a heredoc with anything
+# trailing its own opening line simply never matched HEREDOC_RE at all —
+# proven both ways: `python3 - <<'PY' > out.txt` with a governance-path
+# `open(..., "w")` in the body passed with exit 0 (the body was never
+# stripped, so it was never scanned either — a FALSE NEGATIVE in exactly the
+# case this parser exists for), and `cat <<'EOF' > notes.md` whose body only
+# MENTIONS a dangerous command as prose got blocked, because the unstripped
+# body fell through to the general tokenizer and one of its lines looked
+# like a real command (a FALSE POSITIVE that teaches an agent to route
+# around this guard). `opener` is kept out of the stripped text below
+# (unlike the body and the closing delimiter line, which are removed) so a
+# real redirect on the heredoc's own opening line is still seen by the
+# general tokenizer afterward.
 HEREDOC_RE = re.compile(
-    r"<<-?[ \t]*(?P<q>['\"]?)(?P<delim>[A-Za-z_][A-Za-z0-9_]*)(?P=q)\r?\n"
+    r"(?P<opener><<-?[ \t]*(?P<q>['\"]?)(?P<delim>[A-Za-z_][A-Za-z0-9_]*)(?P=q)[^\n]*)\r?\n"
     r"(?P<body>.*?)\r?\n[ \t]*(?P=delim)(?=\r?\n|$)",
     re.DOTALL,
 )
@@ -142,12 +207,34 @@ def resolve_absolute(path, cwd):
     return os.path.normpath(p)
 
 
-def resolve_target(raw, cwd):
+def _is_cwd_relative(raw):
+    # True for a target whose resolution actually depends on cwd: not
+    # absolute, and not `~`/`~/...` (those resolve against $HOME instead).
+    return not os.path.isabs(raw) and raw != "~" and not raw.startswith("~/")
+
+
+def resolve_target(raw, cwd, cd_seen=False):
     # Returns (is_unresolvable, absolute_path_or_None). absolute_path is
     # None only when is_unresolvable is False and raw is empty — callers
     # never see that case in practice since the tokenizer never emits an
     # empty WORD as a target.
+    #
+    # cd_seen: an earlier segment of this SAME command ran `cd`. A relative
+    # target from here on is judged against the WRONG base if resolved
+    # against the payload's cwd — the effective directory changed mid-
+    # command, and this parser does not track cd's own (also possibly
+    # unresolvable) argument to know the real one. This is not "no target",
+    # it is "the wrong verdict about which file": `cd <harness> && echo
+    # pwned > .claude/settings.json` resolved against the payload's cwd
+    # reads as an ordinary file in the SESSION's own repo and passes, while
+    # the write actually lands cross-repo in the harness checkout. Marking
+    # it unresolvable is the minimum fix: never silently resolve against a
+    # cwd the command itself already moved away from. An absolute target
+    # (or `~`) is unaffected — those never depended on cwd in the first
+    # place.
     if any(c in raw for c in ("$", "`", "*", "?")):
+        return True, None
+    if cd_seen and _is_cwd_relative(raw):
         return True, None
     return False, resolve_absolute(raw, cwd)
 
@@ -210,6 +297,8 @@ def tokenize(cmd):
                 op, ln = ("2>>" if fd == "2" else ">>"), 2
             elif cmd[i:i+2] == ">&":
                 op, ln = ">&", 2
+            elif cmd[i:i+2] == ">|":
+                op, ln = ">|", 2
             else:
                 op, ln = ("2>" if fd == "2" else ">"), 1
             tokens.append(("OP", op))
@@ -286,14 +375,25 @@ def find_command(seg):
 def extract_targets(command, cwd):
     # Returns a list of (kind_label, is_unresolvable, absolute_path_or_None).
     out = []
+    # A single-element cell (not a plain bool) so the nested functions below
+    # can both READ and, at the "cd" dispatch further down, WRITE the same
+    # flag without a `nonlocal` declaration in each one.
+    cd_seen = [False]
 
     def handle(kind_label, raw):
-        unresolvable, target = resolve_target(raw, cwd)
+        unresolvable, target = resolve_target(raw, cwd, cd_seen[0])
         out.append((kind_label, unresolvable, target))
 
     def handle_open_calls(kind_label, code):
         for unresolvable, path in extract_open_call_targets(code):
             if unresolvable:
+                out.append((kind_label, True, None))
+            elif cd_seen[0] and _is_cwd_relative(path):
+                # Same reasoning as resolve_target's own cd_seen check: an
+                # `open(...)` call inside a `python3 -c`/heredoc that runs
+                # AFTER an earlier `cd` in this same command is resolved
+                # against the wrong directory if joined with the payload's
+                # cwd, so it is reported unresolvable instead of guessed at.
                 out.append((kind_label, True, None))
             else:
                 out.append((kind_label, False, resolve_absolute(path, cwd)))
@@ -305,6 +405,14 @@ def extract_targets(command, cwd):
     # a shell redirect by the tokenizer below. Matches are found against the
     # ORIGINAL command and removed back-to-front, so earlier offsets stay
     # valid while later ones are being cut out.
+    #
+    # Only the BODY and the closing delimiter line are removed — the OPENER
+    # (`<<DELIM` through the end of its own line, e.g. `python3 - <<'PY' >
+    # out.txt`) is kept in stripped_command exactly where it was, so a
+    # redirect sitting on the heredoc's own opening line is still seen by
+    # the general tokenizer below. Dropping the opener too (an earlier
+    # version did) silently erased that redirect's target along with the
+    # heredoc syntax around it.
     stripped_command = command
     for m in reversed(list(HEREDOC_RE.finditer(command))):
         line_start = command.rfind("\n", 0, m.start())
@@ -312,7 +420,11 @@ def extract_targets(command, cwd):
         preceding = command[line_start:m.start()]
         if PYTHON_PRECEDES_RE.search(preceding):
             handle_open_calls("Bash:python-heredoc", m.group("body"))
-        stripped_command = stripped_command[:m.start()] + stripped_command[m.end():]
+        stripped_command = (
+            stripped_command[:m.start()]
+            + stripped_command[m.start():m.end("opener")]
+            + stripped_command[m.end():]
+        )
 
     tokens = tokenize(stripped_command)
     for seg in split_segments(tokens):
@@ -330,11 +442,18 @@ def extract_targets(command, cwd):
         ):
             continue
 
-        # --- redirects: > and >> only (see header for why not 2>/&>)
+        # --- redirects: every operator shape that writes a file (see header)
         for idx, (kind, val) in enumerate(seg):
-            if kind == "OP" and val in (">", ">>"):
+            if kind != "OP":
+                continue
+            if val in WRITE_REDIRECT_OPS:
                 if idx + 1 < len(seg) and seg[idx + 1][0] == "WORD":
                     handle("Bash:redirect", seg[idx + 1][1])
+            elif val == ">&":
+                if idx + 1 < len(seg) and seg[idx + 1][0] == "WORD":
+                    target = seg[idx + 1][1]
+                    if not FD_REF_RE.match(target):
+                        handle("Bash:redirect", target)
 
         cmd_idx, cmd_word = find_command(seg)
         if cmd_word is None:
@@ -342,20 +461,82 @@ def extract_targets(command, cwd):
         base = cmd_word.rstrip("/").split("/")[-1]
         words = [v for k, v in seg[cmd_idx + 1:] if k == "WORD"]
 
-        if base == "sed":
+        if base == "cd":
+            # Every relative target from HERE ON in this same command is
+            # resolved against a directory the command itself already left
+            # — see resolve_target's own cd_seen note for why that makes it
+            # unresolvable, not just "resolved against a slightly stale
+            # cwd". Deliberately does not try to resolve cd's OWN argument
+            # (itself may be unresolvable, e.g. `cd "$(some-thing)"`) and
+            # use that as the new base instead: silently trusting a second
+            # unresolvable value to fix the first one is how a guard ends
+            # up confidently wrong instead of honestly unsure.
+            cd_seen[0] = True
+        elif base == "sed":
             has_i = any(w == "-i" or w.startswith("-i") or w.startswith("--in-place") for w in words)
             if has_i:
+                # ALL non-flag FILE words, not just the last one:
+                # `sed -i s/a/b/ <governance-file> README.md` used to report
+                # only "README.md", missing the earlier file entirely. GNU
+                # sed's own rule for telling the SCRIPT apart from FILEs:
+                # if -e/--expression or -f/--file appears anywhere, every
+                # non-flag word is a file; otherwise the FIRST non-flag word
+                # is the script, and every non-flag word after it is a file.
+                # Not a guess -- this is literally how sed itself decides,
+                # so this is the one write-command here where "which word is
+                # the target" is fully knowable, not just accepted-inexact.
+                has_explicit_script = any(
+                    w in ("-e", "--expression", "-f", "--file")
+                    or w.startswith("--expression=")
+                    or w.startswith("--file=")
+                    or (w.startswith("-e") and w != "-e")
+                    or (w.startswith("-f") and w != "-f")
+                    for w in words
+                )
                 non_flag = [w for w in words if not w.startswith("-")]
-                if non_flag:
-                    handle("Bash:sed-i", non_flag[-1])
+                files = non_flag if has_explicit_script else non_flag[1:]
+                for w in files:
+                    handle("Bash:sed-i", w)
         elif base == "tee":
             for w in words:
                 if not w.startswith("-"):
                     handle("Bash:tee", w)
         elif base in ("cp", "mv"):
-            non_flag = [w for w in words if not w.startswith("-")]
-            if len(non_flag) >= 2:
-                handle("Bash:" + base, non_flag[-1])
+            # -t DIR / --target-directory=DIR / --target-directory DIR:
+            # every remaining positional word is a SOURCE being copied or
+            # moved INTO DIR, not a destination — the naive "last non-flag
+            # argument" would report the LAST SOURCE as if it were where
+            # the write lands, which is backwards. Report DIR joined with
+            # each source's own basename instead, one target per source, so
+            # `cp -t baseline/hooks src.sh` is seen as a write into
+            # baseline/hooks/src.sh, not as a (harmless) write to "src.sh".
+            target_dir = None
+            sources = []
+            skip_next = False
+            for w in words:
+                if skip_next:
+                    target_dir = w
+                    skip_next = False
+                    continue
+                if w in ("-t", "--target-directory"):
+                    skip_next = True
+                    continue
+                if w.startswith("--target-directory="):
+                    target_dir = w[len("--target-directory="):]
+                    continue
+                if w.startswith("-t") and w != "-t" and not w.startswith("--"):
+                    target_dir = w[2:]  # -tDIR, no space
+                    continue
+                if w.startswith("-"):
+                    continue
+                sources.append(w)
+            if target_dir is not None:
+                for src in sources:
+                    basename = src.rstrip("/").split("/")[-1]
+                    if basename:
+                        handle("Bash:" + base, target_dir.rstrip("/") + "/" + basename)
+            elif len(sources) >= 2:
+                handle("Bash:" + base, sources[-1])
         elif base in ("python3", "python") and "-c" in words:
             ci = words.index("-c")
             if ci + 1 < len(words):

@@ -212,6 +212,73 @@ _run_bash_case "21: Bash redirect target built from a shell variable is not bloc
 _run_bash_case "22: Bash command with two targets, one critical one ordinary, is blocked" \
   "$TMPDIR_ROOT" "cp foo.txt ordinary.txt && cp foo.txt pnpm-lock.yaml" 2
 
+# ===================================================================
+# F2: every redirect shape that actually writes a file, not just `>`/`>>`.
+# ===================================================================
+
+_run_bash_case "23: &> into .env is blocked" \
+  "$TMPDIR_ROOT" "echo pwned &> .env" 2
+
+_run_bash_case "24: >| (force-write) into .env is blocked" \
+  "$TMPDIR_ROOT" "echo pwned >| .env" 2
+
+_run_bash_case "25: >& (with a filename, not a bare fd) into .env is blocked" \
+  "$TMPDIR_ROOT" "echo pwned >& .env" 2
+
+_run_bash_case "26: 2> (stderr redirect, still creates/truncates the target) into .env is blocked" \
+  "$TMPDIR_ROOT" "echo pwned 2> .env" 2
+
+_run_bash_case "27: >&2 (bare fd reference, no file at all) is not treated as a write" \
+  "$TMPDIR_ROOT" "echo pwned >&2" 0
+
+# ===================================================================
+# F3: a heredoc's OPENING line can carry more than the delimiter (e.g. a
+# redirect); the body must still be scanned, and a body that only MENTIONS
+# a dangerous command as prose must not cause a false block.
+# ===================================================================
+
+_run_bash_case "28: python3 heredoc WITH a trailing redirect on its opener line still finds the critical write in the body" \
+  "$TMPDIR_ROOT" "python3 - <<'PY' > out.txt
+open('.env', 'w')
+PY" 2
+
+_run_bash_case "29: a heredoc body whose text merely CONTAINS a real write-command shape (cp ... .env) is not blocked; only the heredoc's own real redirect target (an ordinary file) matters" \
+  "$TMPDIR_ROOT" "cat <<'EOF' > notas.md
+cp x .env
+EOF" 0
+
+# ===================================================================
+# F7: if the shared parser file goes missing, the Bash branch must warn
+# loudly on stderr and pass (fail open), never silently do nothing.
+# ===================================================================
+
+_MISSING_LIB_DIR="$TMPDIR_ROOT/missing-lib-hooks"
+mkdir -p "$_MISSING_LIB_DIR"
+cp "$HOOK" "$_MISSING_LIB_DIR/protect-critical.sh"
+_missing_lib_payload="$("$PYTHON_BIN" -c 'import json; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": "echo hi > .env"}}))')"
+_missing_lib_stderr=$(cd "$TMPDIR_ROOT" && printf '%s' "$_missing_lib_payload" | bash "$_MISSING_LIB_DIR/protect-critical.sh" 2>&1 >/dev/null)
+_missing_lib_rc=$(cd "$TMPDIR_ROOT" && printf '%s' "$_missing_lib_payload" | bash "$_MISSING_LIB_DIR/protect-critical.sh" >/dev/null 2>&1; echo $?)
+
+if [[ "$_missing_lib_rc" == "0" && "$_missing_lib_stderr" == *"WARNING"* && "$_missing_lib_stderr" == *"bash-write-targets.py"* ]]; then
+  echo "PASS: 30: missing lib/bash-write-targets.py warns loudly on stderr and passes (exit $_missing_lib_rc)"
+  PASS_COUNT=$((PASS_COUNT + 1))
+else
+  echo "FAIL: 30: missing lib/bash-write-targets.py warns loudly on stderr and passes (exit $_missing_lib_rc, stderr: $_missing_lib_stderr)"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+
+# ===================================================================
+# F5: `sed -i` with a critical file that is NOT the last argument, and
+# `cp -t DIR`/`mv -t DIR`, whose destination is the -t FLAG's value, not
+# the last positional word (a source).
+# ===================================================================
+
+_run_bash_case "31: sed -i with the critical file NOT last -> still blocked" \
+  "$TMPDIR_ROOT" "sed -i s/a/b/ .env ordinary.txt" 2
+
+_run_bash_case "32: cp -t DIR, DIR is a critical directory -> blocked" \
+  "$TMPDIR_ROOT" "cp -t secrets ordinary.txt" 2
+
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"
 
