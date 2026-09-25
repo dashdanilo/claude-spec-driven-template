@@ -87,8 +87,9 @@ _init_repo() {
   git -C "$dir" init -q
   git -C "$dir" config user.email "test@example.com"
   git -C "$dir" config user.name "Test"
-  mkdir -p "$dir/baseline/hooks" "$dir/.claude/hooks" "$dir/.claude/rules/harness" "$dir/baseline/rules"
+  mkdir -p "$dir/baseline/hooks/lib" "$dir/.claude/hooks" "$dir/.claude/rules/harness" "$dir/baseline/rules"
   printf '#!/usr/bin/env bash\n' > "$dir/baseline/hooks/protect-main.sh"
+  printf '# fixture stand-in for the shared parser\n' > "$dir/baseline/hooks/lib/bash-write-targets.py"
   printf '#!/usr/bin/env bash\n' > "$dir/.claude/hooks/some-hook.sh"
   printf '# rule\n' > "$dir/.claude/rules/harness/delegation.md"
   printf '# rule\n' > "$dir/baseline/rules/git-workflow.md"
@@ -179,6 +180,41 @@ _run_case() {
 
   local payload
   payload="$(_make_payload "$file_path")"
+
+  local actual
+  actual=$(
+    cd "$cwd" || exit 99
+    [[ -n "$path_override" ]] && export PATH="$path_override"
+    printf '%s' "$payload" | bash "$HOOK" >/dev/null 2>&1
+    echo $?
+  )
+
+  if [[ "$actual" == "$expected" ]]; then
+    echo "PASS: $name (exit $actual)"
+    PASS_COUNT=$((PASS_COUNT + 1))
+  else
+    echo "FAIL: $name (expected $expected, got $actual)"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  fi
+}
+
+# --- Bash coverage: the same governance rule, reached through a Bash write
+# instead of Edit/Write. $2 is the payload's own "cwd" field AND the process
+# cwd the hook actually runs from — kept identical here so these cases
+# exercise the governance/cross-repo logic, not the payload-cwd-vs-process-
+# cwd fallback (that is covered by protect-unpushed.test.sh's own fixtures).
+
+_make_bash_payload() {
+  "$PYTHON_BIN" -c 'import json, sys; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}, "cwd": sys.argv[2]}))' "$1" "$2"
+}
+
+# $1 = name, $2 = cwd (also the payload cwd), $3 = command, $4 = expected
+# exit code, $5 = optional PATH override.
+_run_bash_case() {
+  local name="$1" cwd="$2" command_str="$3" expected="$4" path_override="${5:-}"
+
+  local payload
+  payload="$(_make_bash_payload "$command_str" "$cwd")"
 
   local actual
   actual=$(
@@ -316,6 +352,396 @@ _run_case "25: cross-repo, cwd is ALSO a harness checkout, target is a DIFFERENT
 
 _run_case "26: cross-repo, target gitignored in its own NON-harness repo -> blocked" \
   "$REPO_A" "$REPO_B/.claude/settings.local.json" 2
+
+# ===================================================================
+# Bash coverage: the exact same governance rule, reached through a write
+# performed via Bash (redirect, sed -i, tee, cp, mv, python3 -c, a python
+# heredoc) instead of Edit/Write. Before this hook learned about Bash, every
+# one of these sailed straight through it.
+# ===================================================================
+
+_run_bash_case "27: Bash redirect into governance file, SAME repo (tracked) -> passes" \
+  "$REPO_A" "echo hi > $REPO_A/.claude/settings.json" 0
+
+_run_bash_case "28: Bash redirect into governance file, cross-repo, target is a HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "echo hi > $REPO_A/.claude/settings.json" 2
+
+_run_bash_case "29: Bash sed -i into governance file, cross-repo HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "sed -i s/a/b/ $REPO_A/baseline/hooks/protect-main.sh" 2
+
+_run_bash_case "30: Bash tee into governance file, cross-repo HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "echo hi | tee $REPO_A/.claude/hooks/some-hook.sh" 2
+
+_run_bash_case "31: Bash cp into governance file, cross-repo HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "cp $REPO_B/.claude/settings.json $REPO_A/baseline/rules/git-workflow.md" 2
+
+_run_bash_case "32: Bash mv into governance file, cross-repo HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "mv $REPO_B/.claude/settings.json $REPO_A/.claude/rules/harness/delegation.md" 2
+
+# --- the mandatory case: this is the one that motivated pulling the Bash
+# write parser out into its own shared file. A `python3 -c "...open(path,
+# 'w')..."` (or the equivalent heredoc) writing into the harness's own
+# .claude/settings.json used to sail straight through this hook. ---
+
+_run_bash_case "33: [MANDATORY] python3 -c writing to .claude/settings.json, cross-repo HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "python3 -c \"import json; d=json.load(open('$REPO_A/.claude/settings.json')); json.dump(d, open('$REPO_A/.claude/settings.json','w'))\"" 2
+
+_run_bash_case "34: [MANDATORY] python3 heredoc writing to .claude/settings.json, cross-repo HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "python3 - <<'PY'
+import json
+d = json.load(open('$REPO_A/.claude/settings.json'))
+json.dump(d, open('$REPO_A/.claude/settings.json', 'w'))
+PY" 2
+
+# --- the other mandatory case: the SAME shapes, targeting an ordinary
+# repo-owned file instead of governance, must still pass ---
+
+_run_bash_case "35: [MANDATORY] python3 -c writing to a common repo file -> passes" \
+  "$REPO_B" "python3 -c \"open('$REPO_A/README.md','w').write('x')\"" 0
+
+_run_bash_case "36: python3 heredoc writing to a common repo file, same repo -> passes" \
+  "$REPO_A" "python3 - <<'PY'
+open('$REPO_A/README.md', 'w').write('x')
+PY" 0
+
+# --- a target this parser cannot resolve to a literal path must be SKIPPED,
+# never blocked — a guard that blocks on "could not tell" gets disabled
+# outright instead of fixed ---
+
+_run_bash_case "37: Bash redirect target built from a shell variable -> not blocked (unresolvable, skipped)" \
+  "$REPO_A" 'echo hi > "$SOME_UNSET_VAR"' 0
+
+# --- a command that writes to MULTIPLE targets: one governance (cross-repo
+# harness checkout), one ordinary -> blocked, because one match is enough ---
+
+_run_bash_case "38: Bash command with two targets, one governance one ordinary -> blocked" \
+  "$REPO_B" "cp $REPO_B/.claude/settings.json $REPO_B/ordinary.txt && cp $REPO_B/.claude/settings.json $REPO_A/.claude/settings.json" 2
+
+# --- session-side repo resolution must trust the payload's own "cwd", never
+# the hook process's own $PWD (see the header note — protect-unpushed.sh
+# once became a no-op from exactly this confusion). _run_bash_case always
+# keeps both identical on purpose (see its own comment), so this case is
+# built by hand: process cwd is REPO_A, but the payload says the session is
+# in REPO_B. A write into REPO_A's own settings.json (an absolute-path
+# target, so target resolution is not in question here) must be judged
+# CROSS-repo — blocked, because REPO_A is a harness checkout — only if the
+# session side is read from the payload's "cwd" and not from $PWD. ---
+
+_payload_cwd_mismatch="$("$PYTHON_BIN" -c 'import json, sys; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}, "cwd": sys.argv[2]}))' \
+  "python3 -c \"open('$REPO_A/.claude/settings.json','w').write('x')\"" "$REPO_B")"
+
+_actual_cwd_mismatch=$(
+  cd "$REPO_A" || exit 99
+  printf '%s' "$_payload_cwd_mismatch" | bash "$HOOK" >/dev/null 2>&1
+  echo $?
+)
+
+if [[ "$_actual_cwd_mismatch" == "2" ]]; then
+  echo "PASS: 39: session-side repo resolution reads the payload cwd, not the process \$PWD (exit $_actual_cwd_mismatch)"
+  PASS_COUNT=$((PASS_COUNT + 1))
+else
+  echo "FAIL: 39: session-side repo resolution reads the payload cwd, not the process \$PWD (expected 2, got $_actual_cwd_mismatch)"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+
+# --- an open() argument built from STRING CONCATENATION (a literal plus a
+# variable, `'x' + repo_a + '/.claude/settings.json'`) must never be
+# resolved to a path at all, even though the fragment text happens to spell
+# out a governance-looking suffix. A naive "starts and ends with a matching
+# quote" check is fooled by this: greedy backtracking finds the LAST quote
+# character in the whole expression and treats everything before it as one
+# literal, silently swallowing the embedded quotes and the "+" operators
+# along the way. Caught by dogfooding this very hook mid-task (a test
+# fixture heredoc containing exactly this shape tripped the live guard on
+# this session's own Bash call). Regression case for
+# lib/bash-write-targets.py's LITERAL_ARG_RE, exercised through the hook
+# since that is the observable behavior: block vs pass. ---
+
+_run_bash_case "40: python3 -c open() arg is string concatenation (literal + variable), not a literal -> not blocked (unresolvable, skipped)" \
+  "$REPO_A" "python3 -c \"open('x' + repo_a + '/.claude/settings.json', 'w')\"" 0
+
+# ===================================================================
+# F1: the shared parser itself, baseline/hooks/lib/bash-write-targets.py,
+# is part of the governance surface now. Before this fix, governance_patterns
+# only matched `.sh`, so a `.py` file under baseline/hooks/lib/ (or
+# .claude/hooks/lib/) could be edited from a DIFFERENT repo with no guard
+# ever seeing it — including editing the parser to always return no
+# targets, which would silently disarm the BASH branch of all three hooks
+# that import it, in every project linked to that harness checkout.
+# ===================================================================
+
+_run_case "41: baseline/hooks/lib/*.py passes, cwd in SAME repo as target" \
+  "$REPO_A" "$REPO_A/baseline/hooks/lib/bash-write-targets.py" 0
+
+_run_case "42: baseline/hooks/lib/*.py blocked, cwd in a DIFFERENT repo, target is a HARNESS CHECKOUT" \
+  "$REPO_B" "$REPO_A/baseline/hooks/lib/bash-write-targets.py" 2
+
+_run_bash_case "43: Bash write into baseline/hooks/lib/*.py, cross-repo HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "echo pwned > $REPO_A/baseline/hooks/lib/bash-write-targets.py" 2
+
+# ===================================================================
+# F2: every redirect shape that actually writes a file, not just `>`/`>>`.
+# `&>`/`>&`/`>|`/`2>` were previously excluded outright on the (measured
+# wrong) theory that they are always fd-duplication, never a real file.
+# ===================================================================
+
+_run_bash_case "44: &> into governance file, cross-repo HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "echo pwned &> $REPO_A/.claude/settings.json" 2
+
+_run_bash_case "45: >| (force-write) into governance file, cross-repo HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "echo pwned >| $REPO_A/.claude/settings.json" 2
+
+_run_bash_case "46: >& (with a filename, not a bare fd) into governance file, cross-repo HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "echo pwned >& $REPO_A/.claude/settings.json" 2
+
+_run_bash_case "47: 2> (stderr redirect, still creates/truncates the target) into governance file, cross-repo HARNESS CHECKOUT -> blocked" \
+  "$REPO_B" "echo pwned 2> $REPO_A/.claude/settings.json" 2
+
+_run_bash_case "48: >&2 (bare fd reference, no file at all) is NOT treated as a write, not blocked" \
+  "$REPO_B" "echo pwned >&2" 0
+
+# FD_REF_RE's exclusion cannot be proven through this hook's own BLOCK/PASS
+# decision the way every other case above is: doing so would need a bare fd
+# reference (a plain digit or "-") to coincidentally match a governance
+# pattern, and none of this repo's governance patterns are digit-shaped —
+# `_check_path` returns 0 for the literal string "2" or "-" whether it was
+# correctly excluded or wrongly treated as a write, so no mutation of
+# FD_REF_RE is observable via exit code here. What IS provable at this
+# layer is that the shared parser's raw output for a bare fd reference is
+# empty — no target at all — checked directly against
+# lib/bash-write-targets.py, same technique log-edit.test.sh's case 10f
+# already uses (and where the mutation-proof for this mechanic actually
+# lives, since log-edit's assertions inspect exact output lines rather than
+# a downstream block/pass decision).
+_LIB="$SCRIPT_DIR/../lib/bash-write-targets.py"
+_fdref_payload="$("$PYTHON_BIN" -c 'import json; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": "echo pwned >&2"}, "cwd": "/tmp"}))')"
+_fdref_out="$(printf '%s' "$_fdref_payload" | "$PYTHON_BIN" "$_LIB")"
+if [[ -z "$_fdref_out" ]]; then
+  echo "PASS: 48b: shared parser reports NO target at all for >&2 (bare fd reference)"
+  PASS_COUNT=$((PASS_COUNT + 1))
+else
+  echo "FAIL: 48b: shared parser reports NO target at all for >&2 (bare fd reference) (got: $_fdref_out)"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+
+# ===================================================================
+# F3: a heredoc's OPENING line can carry more than just the delimiter — most
+# notably a redirect. The regex used to require the newline immediately
+# after the delimiter, so a heredoc shaped like this never matched at all:
+# the body was never stripped, so it was never scanned (a FALSE NEGATIVE for
+# a python3-heredoc write into a governance path), and separately, a heredoc
+# whose body only MENTIONS a dangerous-looking line as prose got its
+# unstripped body fed to the general tokenizer, which misread a body line as
+# a real command (a FALSE POSITIVE against a legitimate write).
+# ===================================================================
+
+_run_bash_case "49: [MANDATORY-shaped] python3 heredoc WITH a trailing redirect on its opener line still finds the governance write in the body -> blocked" \
+  "$REPO_B" "python3 - <<'PY' > $REPO_B/out.txt
+open('$REPO_A/.claude/settings.json', 'w')
+PY" 2
+
+_run_bash_case "50: a heredoc body whose text merely CONTAINS a real write-command shape (cp ... a governance path) is not blocked; only the heredoc's own real redirect target (an ordinary file) matters" \
+  "$REPO_B" "cat <<'EOF' > notas.md
+cp x $REPO_A/.claude/settings.json
+EOF" 0
+
+# ===================================================================
+# F6: the PARSER's own cwd resolution (inside bash-write-targets.py's
+# main(), invoked as a subprocess by this hook) must read the PAYLOAD's
+# "cwd", never fall back to its own process os.getcwd() when the payload
+# HAS a cwd. _run_bash_case always keeps the payload cwd and the process
+# cwd identical on purpose, so it cannot catch a regression here — this
+# case, like 39, is built by hand with the two DELIBERATELY different, and
+# uses a RELATIVE target (unlike 39's absolute one) so the parser's own
+# join-with-cwd code path is actually exercised. Process cwd is REPO_A (a
+# harness checkout); the payload says the session is in REPO_B. A RELATIVE
+# write (`.claude/settings.json`, no leading slash) must resolve against
+# REPO_B (same repo as the session, tracked, passes) only if the parser
+# reads the payload's cwd — if it fell back to its own process cwd, the
+# same relative target would resolve into REPO_A instead, a cross-repo
+# write into a harness checkout, and block. ---
+
+_payload_relative_cwd_mismatch="$("$PYTHON_BIN" -c 'import json, sys; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}, "cwd": sys.argv[2]}))' \
+  "echo pwned > .claude/settings.json" "$REPO_B")"
+
+_actual_relative_cwd_mismatch=$(
+  cd "$REPO_A" || exit 99
+  printf '%s' "$_payload_relative_cwd_mismatch" | bash "$HOOK" >/dev/null 2>&1
+  echo $?
+)
+
+if [[ "$_actual_relative_cwd_mismatch" == "0" ]]; then
+  echo "PASS: 51: the parser's own cwd resolution reads the payload cwd for a RELATIVE target, not its process \$PWD (exit $_actual_relative_cwd_mismatch)"
+  PASS_COUNT=$((PASS_COUNT + 1))
+else
+  echo "FAIL: 51: the parser's own cwd resolution reads the payload cwd for a RELATIVE target, not its process \$PWD (expected 0, got $_actual_relative_cwd_mismatch)"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+
+# ===================================================================
+# F7: if the shared parser file goes missing, the Bash branch must warn
+# loudly on stderr and pass (fail open, same posture as the missing-python
+# case), never silently do nothing.
+# ===================================================================
+
+_MISSING_LIB_DIR="$TMPDIR_ROOT/missing-lib-hooks"
+mkdir -p "$_MISSING_LIB_DIR"
+cp "$HOOK" "$_MISSING_LIB_DIR/protect-harness.sh"
+# Deliberately no lib/ next to the copy.
+_missing_lib_payload="$("$PYTHON_BIN" -c 'import json; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": "echo hi > .env"}}))')"
+_missing_lib_stderr=$(cd "$REPO_A" && printf '%s' "$_missing_lib_payload" | bash "$_MISSING_LIB_DIR/protect-harness.sh" 2>&1 >/dev/null)
+_missing_lib_rc=$(cd "$REPO_A" && printf '%s' "$_missing_lib_payload" | bash "$_MISSING_LIB_DIR/protect-harness.sh" >/dev/null 2>&1; echo $?)
+
+if [[ "$_missing_lib_rc" == "0" && "$_missing_lib_stderr" == *"WARNING"* && "$_missing_lib_stderr" == *"bash-write-targets.py"* ]]; then
+  echo "PASS: 52: missing lib/bash-write-targets.py warns loudly on stderr and passes (exit $_missing_lib_rc)"
+  PASS_COUNT=$((PASS_COUNT + 1))
+else
+  echo "FAIL: 52: missing lib/bash-write-targets.py warns loudly on stderr and passes (exit $_missing_lib_rc, stderr: $_missing_lib_stderr)"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
+
+# ===================================================================
+# F5: `sed -i` with a governance file that is NOT the last argument, and
+# `cp -t DIR`/`mv -t DIR`, whose destination is the -t FLAG's value, not
+# the last positional word (a source).
+# ===================================================================
+
+_run_bash_case "53: sed -i with the governance file NOT last -> still blocked" \
+  "$REPO_B" "sed -i s/a/b/ $REPO_A/.claude/settings.json ordinary.txt" 2
+
+_run_bash_case "54: cp -t DIR, DIR is a governance directory -> blocked" \
+  "$REPO_B" "cp -t $REPO_A/baseline/rules ordinary.txt" 2
+
+_run_bash_case "55: cp SRC DEST (no -t), DEST last as usual -> unaffected, still blocked" \
+  "$REPO_B" "cp ordinary.txt $REPO_A/.claude/settings.json" 2
+
+# ===================================================================
+# F5 [round 2]: the COMMON form of "copy into a directory" -- no -t, just
+# `cp SRC DIR` or `cp SRC DIR/` -- used to report the bare DIR as the
+# target, and os.path.normpath then stripped any trailing slash before
+# that string ever reached the governance-pattern check, so a
+# no-trailing-`$` directory pattern stopped matching. The RARE `-t DIR`
+# form (round 1, above) was already protected; the common form was not.
+# ===================================================================
+
+_run_bash_case "64: [MANDATORY] cp SRC DIR/ (trailing slash, no -t), DIR is governed -> blocked" \
+  "$REPO_B" "cp ordinary.txt $REPO_A/.claude/rules/" 2
+
+_run_bash_case "65: [MANDATORY] mv SRC DIR (no trailing slash, DIR already exists on disk), DIR is governed -> blocked" \
+  "$REPO_B" "mv ordinary.txt $REPO_A/.claude/rules" 2
+
+_run_bash_case "66: cp SRC DIR/explicit.md (unchanged shape) -> still blocked" \
+  "$REPO_B" "cp ordinary.txt $REPO_A/baseline/rules/explicit.md" 2
+
+_run_bash_case "67: cp SRC1 SRC2 DIR (more than one source, DIR must be a directory by cp's own syntax) -> blocked" \
+  "$REPO_B" "cp a.txt b.txt $REPO_A/.claude/rules" 2
+
+_run_bash_case "68: cp SRC DEST, DEST does not exist as a directory on disk -> still a plain file destination, not blocked" \
+  "$REPO_B" "cp ordinary.txt $REPO_A/not-a-real-directory" 0
+
+# The trailing-slash half of dest_is_dir (`dest.endswith("/")`) has no case
+# of its own where it is the ONLY thing making the destination count as a
+# directory: case 64, above, ALSO exists on disk, so `os.path.isdir` alone
+# already covers it -- removing the endswith check would leave case 64
+# green (it never single-handedly proved this rule exists). Here the
+# destination directory (".claude", nested under a brand-new path) does
+# NOT exist on disk at all: only the trailing "/" marks it as a directory,
+# so the SOURCE's basename gets appended and the result matches a `$`-
+# anchored governance pattern (`.claude/settings.json$`) that the bare,
+# un-joined destination string does not.
+_run_bash_case "69b: cp SRC DIR/ (trailing slash, DIR does NOT exist on disk at all), joined result is governance-shaped -> blocked" \
+  "$REPO_B" "cp settings.json $REPO_A/brand-new-nonexistent-path/.claude/" 2
+
+# ===================================================================
+# F12 [round 2 blocker]: `sed -i -e SCRIPT` / `-f FILE` (the SEPARATED
+# form, one space, two words) reported SCRIPT/FILE itself as a write target
+# whenever -e/-f appeared ANYWHERE, because "has_explicit_script" only
+# checked presence, never consumed the flag's own next word. A routine
+# `sed -i -e /node_modules/d .gitignore` blocked with a message naming
+# "/node_modules/d" (the expression, never written to) as a critical/
+# governance match. -f is worse: that file is READ by sed, never written.
+# ===================================================================
+
+_run_bash_case "56: [MANDATORY] sed -i -e EXPR FILE, EXPR text shaped like a governance path -> not blocked (EXPR is a flag operand, not a file)" \
+  "$REPO_B" "sed -i -e $REPO_A/baseline/rules/d ordinary.txt" 0
+
+_run_bash_case "57: sed -i -f SCRIPT FILE, SCRIPT itself governance-shaped -> not blocked (SCRIPT is read, not written)" \
+  "$REPO_B" "sed -i -f $REPO_A/.claude/settings.json ordinary.txt" 0
+
+_run_bash_case "58: sed -i -e EXPR FILE, FILE is governance-shaped -> still blocked (the real file, not the expression)" \
+  "$REPO_B" "sed -i -e s/a/b/ $REPO_A/.claude/settings.json" 2
+
+# ===================================================================
+# F4 [round 2]: `cd`'s own literal argument is now RESOLVED and used as the
+# new base for every later relative target in the same command, instead of
+# only marking them unresolvable. `pushd` is tracked the same way. A
+# genuinely unresolvable cd argument (a shell variable) still marks later
+# relative targets unresolvable, same as round 1 -- it just no longer stops
+# there when the argument IS knowable.
+# ===================================================================
+
+_run_bash_case "59: [MANDATORY] cd <harness> && a RELATIVE governance write -> now actually BLOCKED, not just skipped" \
+  "$REPO_B" "cd $REPO_A && echo pwned > .claude/settings.json" 2
+
+_run_bash_case "60: pushd <harness> && a RELATIVE governance write -> blocked, same as cd" \
+  "$REPO_B" "pushd $REPO_A && echo pwned > .claude/settings.json" 2
+
+_run_bash_case "61: cd \"\$VAR\" (genuinely unresolvable) && a relative write -> still not blocked (unresolvable, skipped)" \
+  "$REPO_B" 'cd "$VAR" && echo pwned > .claude/settings.json' 0
+
+_run_bash_case "62: cd \"\$VAR\" then cd <harness> (absolute, recovers) && a relative write -> blocked" \
+  "$REPO_B" "cd \"\$VAR\" && cd $REPO_A && echo pwned > .claude/settings.json" 2
+
+# ===================================================================
+# F13: the half of F3 that keeps the heredoc's OPENER line (its own
+# trailing redirect) in the token stream instead of dropping it along with
+# the body. Here the REDIRECT itself is the governance-shaped target, with
+# an ordinary body -- the inverse of case 49, which has it the other way
+# around, so this fails on its own if the opener-preservation line is ever
+# reverted even though case 49 stays green.
+# ===================================================================
+
+_run_bash_case "63: heredoc opener's OWN redirect target is governance-shaped, body is ordinary -> blocked" \
+  "$REPO_B" "cat <<'EOF' > $REPO_A/.claude/settings.json
+ordinary body text
+EOF" 2
+
+# ===================================================================
+# F14 [round 3]: round 2's cd/pushd base tracking had no SCOPE. A `cd`
+# inside `(...)`, on either side of a `|`, or backgrounded with `&`, runs
+# in a CHILD process and never changes the PARENT shell's directory once
+# that construct ends -- confirmed against a real shell: `(cd /tmp && true)
+# && pwd` prints the ORIGINAL directory, never `/tmp`. The old flat
+# tracking read a subshell's `cd` as if it had leaked, so a write into the
+# SESSION's own tracked file, in a command shaped like `(cd <harness> &&
+# ...) && echo x > .claude/settings.json`, got blocked as if it were a
+# write into the harness -- the error direction is BLOCKING A LEGITIMATE
+# COMMAND, exactly the failure mode this parser exists to avoid, not a
+# bypass (a bypass direction was looked for and not found). Every case
+# here writes into REPO_B's own tracked .claude/settings.json, from a
+# cwd=REPO_B session, with a scoped `cd`/`pushd`/`popd` into REPO_A (the
+# harness checkout) that must NOT affect it.
+# ===================================================================
+
+_run_bash_case "69: [MANDATORY] (cd <harness> && ok) && a write in the session's OWN repo -> NOT blocked, subshell cd does not leak" \
+  "$REPO_B" "(cd $REPO_A && echo ok) && echo x > .claude/settings.json" 0
+
+_run_bash_case "70: (cd <harness>); a write in the session's OWN repo, after the subshell closes -> NOT blocked" \
+  "$REPO_B" "(cd $REPO_A); echo x > .claude/settings.json" 0
+
+_run_bash_case "71: [MANDATORY] cd <harness> | cat; a write in the session's OWN repo -> NOT blocked, pipeline stage cd does not leak" \
+  "$REPO_B" "cd $REPO_A | cat; echo x > .claude/settings.json" 0
+
+_run_bash_case "72: [MANDATORY] pushd <harness>; popd; a write in the session's OWN repo -> NOT blocked, popd un-does the pushd" \
+  "$REPO_B" "pushd $REPO_A >/dev/null; popd >/dev/null; echo x > .claude/settings.json" 0
+
+# --- controls: a TOP-LEVEL cd, not inside any of the scopes above, still
+# carries forward exactly like round 2 -- both the "&&"-joined form
+# (already covered by case 59) and the ";"-joined form, which the scoping
+# change above touches the same segment-walking code path for. ---
+
+_run_bash_case "73: [control] cd <harness>; a RELATIVE governance write (';', not '&&') -> still blocked, top-level cd is unaffected by the scoping fix" \
+  "$REPO_B" "cd $REPO_A; echo pwned > .claude/settings.json" 2
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"

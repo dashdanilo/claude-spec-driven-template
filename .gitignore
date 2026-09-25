@@ -32,6 +32,14 @@ dist/
 build/
 out/
 
+# Python bytecode cache (baseline/hooks/lib/bash-write-targets.py is loaded
+# via importlib by log-edit.sh, which writes this next to the source on
+# every run; it differs by interpreter version, so a machine running a
+# different python3 than whoever last wrote it would otherwise see it as an
+# uncommitted change under baseline/ on every session)
+__pycache__/
+*.pyc
+
 # Logs
 *.log
 .DS_Store

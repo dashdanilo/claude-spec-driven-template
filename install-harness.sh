@@ -617,9 +617,15 @@ scripts_dir = os.path.join(here, "baseline", "scripts")
 # unpushed commits, or a worktree's uncommitted changes, to `git branch -D`
 # or `git worktree remove` is a risk in any repo, not specific to this one.
 #
-# log-edit.sh is registered on BOTH matchers: Edit/Write/MultiEdit/
-# NotebookEdit (always has been) and now also Bash, so a write done through a
-# redirect, `sed -i`, `tee`, `cp` or `mv` is no longer invisible to it.
+# log-edit.sh and protect-harness.sh are both registered on BOTH matchers:
+# Edit/Write/MultiEdit/NotebookEdit (always has been) and now also Bash, so a
+# write done through a redirect, `sed -i`, `tee`, `cp`, `mv`, or a
+# `python3 -c`/heredoc `open(..., "w")` call is no longer invisible to
+# either — a session could otherwise write to the harness's own governance
+# surface, or a critical file this project owns, through Bash and have
+# neither guard see it. protect-critical.sh needs the same Bash coverage but
+# is not in this list: it is not portable (see above), so its Bash
+# registration lives in install.sh's own copy of settings.json instead.
 #
 # check-handover.sh is portable, unlike check-snapshot-on-session.sh: it
 # points at a session's OWN .claude/handovers/ (local, gitignored state any
@@ -630,7 +636,7 @@ WANT = {
     "SessionStart": [(None, [hooks_dir + "/check-handover.sh", scripts_dir + "/check-index.sh", scripts_dir + "/check-baseline.sh"])],
     "SubagentStop": [(None, [hooks_dir + "/log-agent.sh"])],
     "PreToolUse": [
-        ("Bash", [hooks_dir + "/block-secrets.sh", hooks_dir + "/protect-main.sh", hooks_dir + "/protect-unpushed.sh", hooks_dir + "/protect-machine-config.sh", hooks_dir + "/log-edit.sh"]),
+        ("Bash", [hooks_dir + "/block-secrets.sh", hooks_dir + "/protect-main.sh", hooks_dir + "/protect-unpushed.sh", hooks_dir + "/protect-machine-config.sh", hooks_dir + "/protect-harness.sh", hooks_dir + "/log-edit.sh"]),
         ("Edit|Write|MultiEdit|NotebookEdit", [hooks_dir + "/protect-harness.sh", hooks_dir + "/protect-machine-config.sh", hooks_dir + "/log-edit.sh"]),
     ],
 }

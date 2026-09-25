@@ -261,6 +261,19 @@ if ! $DRY_RUN; then
       cp "$SRC/baseline/hooks/$h" "$TARGET/.claude/hooks/$h" && log "  copy   .claude/hooks/$h"
     fi
   done
+  # protect-critical.sh and protect-harness.sh both import this at runtime
+  # (baseline/hooks/lib/bash-write-targets.py, resolved relative to their
+  # OWN directory) to detect a write performed via Bash, not just Edit/Write.
+  # Copied as its own step, not folded into REPO_HOOKS above: it is a
+  # library the two hooks share, not a hook Claude Code invokes directly, so
+  # it never appears in a settings.json hooks block for the KEEP-set rewrite
+  # below to find.
+  if [[ -e "$TARGET/.claude/hooks/lib/bash-write-targets.py" ]] && [[ "$FORCE" != true ]]; then
+    log "  skip   .claude/hooks/lib/bash-write-targets.py (already present)"
+  else
+    mkdir -p "$TARGET/.claude/hooks/lib"
+    cp "$SRC/baseline/hooks/lib/bash-write-targets.py" "$TARGET/.claude/hooks/lib/bash-write-targets.py" && log "  copy   .claude/hooks/lib/bash-write-targets.py"
+  fi
   for f in "${REPO_SCRIPTS[@]}"; do
     if [[ -e "$TARGET/.claude/scripts/$f" ]] && [[ "$FORCE" != true ]]; then
       log "  skip   .claude/scripts/$f (already present)"
@@ -268,7 +281,7 @@ if ! $DRY_RUN; then
       cp "$SRC/baseline/scripts/$f" "$TARGET/.claude/scripts/$f" && log "  copy   .claude/scripts/$f"
     fi
   done
-  find "$TARGET/.claude/hooks" "$TARGET/.claude/scripts" -name '*.sh' -type f -exec chmod +x {} + 2>/dev/null || true
+  find "$TARGET/.claude/hooks" "$TARGET/.claude/scripts" \( -name '*.sh' -o -name 'bash-write-targets.py' \) -type f -exec chmod +x {} + 2>/dev/null || true
 
   python3 - "$TARGET/.claude/settings.json" <<'PYEOF'
 import json, sys, os, collections

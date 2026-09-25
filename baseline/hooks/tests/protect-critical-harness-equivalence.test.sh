@@ -42,6 +42,14 @@
 #   gitignored cross-repo payload (harness-3) is untouched, since the
 #   gitignore check runs regardless of harness-checkout status.
 #
+#   Round 4: Bash coverage. Both hooks gained an almost-identical Bash
+#   dispatch block (unresolvable targets skipped, missing shared parser
+#   warns and passes). This has no oracle to compare against — the oracle
+#   predates Bash support entirely — so this round compares the two CURRENT
+#   hooks against EACH OTHER instead, on payloads picked so a fix applied to
+#   only one of them would fail here even though it would pass every other
+#   suite (each hook's own test file only ever runs that one hook).
+#
 # Run: bash baseline/hooks/tests/protect-critical-harness-equivalence.test.sh
 
 set -uo pipefail
@@ -290,6 +298,86 @@ _run_case_changed "harness-10: baseline/rules/**, cross repo (target not a harne
 
 _run_case_changed "harness-12: .claude/rules/**, cross repo (target not a harness checkout)" \
   "$REPO_B" "$REPO_A/.claude/rules/harness/delegation.md" 0 "$_round3_reason"
+
+# ==================================================================
+# Round 4: Bash coverage. protect-critical.sh:144-154 and
+# protect-harness.sh's own Bash dispatch block are the SAME code, typed
+# twice rather than shared (extracting a third .sh helper felt like more
+# surface than the duplication itself, given both already share the one
+# thing that actually needed sharing: lib/bash-write-targets.py). Nothing
+# forces them to STAY identical, though: a fix applied to one and forgotten
+# in the other would pass every existing suite, because each hook's own
+# test file only ever runs that ONE hook. These cases run the EXACT SAME
+# Bash payload through BOTH hooks and assert they still agree — not against
+# the oracle, which predates Bash support by two rounds and has no opinion
+# on it at all, but against EACH OTHER, on the mechanics that are supposed
+# to be identical: skip an unresolvable target rather than block on it, and
+# warn loudly and pass (never silently no-op) when the shared parser file
+# is missing.
+# ==================================================================
+
+_make_bash_payload() {
+  "$PYTHON_BIN" -c 'import json, sys; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}, "cwd": sys.argv[2]}))' "$1" "$2"
+}
+
+# $1 = name, $2 = cwd, $3 = command, $4 = expected exit code (same for both
+# hooks — this section is about the two hooks agreeing with EACH OTHER, not
+# about what any specific pattern should do).
+_run_bash_case_both() {
+  local name="$1" cwd="$2" command_str="$3" expected="$4"
+  local payload; payload="$(_make_bash_payload "$command_str" "$cwd")"
+  local crit_exit harn_exit
+  crit_exit="$(_run_hook "$CRITICAL_HOOK" "$cwd" "$payload")"
+  harn_exit="$(_run_hook "$HARNESS_HOOK" "$cwd" "$payload")"
+  if [[ "$crit_exit" == "$expected" && "$harn_exit" == "$expected" ]]; then
+    echo "PASS: $name (both $expected)"
+    PASS_COUNT=$((PASS_COUNT + 1))
+  else
+    echo "FAIL: $name (expected both $expected; protect-critical.sh gave $crit_exit, protect-harness.sh gave $harn_exit)"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+  fi
+}
+
+# A target with a shell variable in it, but shaped so that IF it were
+# resolved anyway (the mutation this proves against: the shared parser's
+# own unresolvable check reverted) the resulting text would still match a
+# real critical pattern -- `"$X.env"` resolves (if wrongly allowed to) to
+# something ending in literal ".env". A target that would not match ANY
+# pattern even when resolved (e.g. a bare variable name) cannot prove this:
+# skipping it or not is invisible to the exit code either way, which is
+# exactly the gap the previous version of this case had.
+_run_bash_case_both "bash-1: unresolvable target (shell variable), shaped to match a real pattern IF wrongly resolved, is skipped by BOTH hooks" \
+  "$TMPDIR_ROOT" 'echo hi > "$X.env"' 0
+
+# A write into TWO real files through `&>`, one shaped for EACH hook's own
+# pattern set (governance and critical patterns are disjoint, so no single
+# target matches both) -- if `&>` recognition were removed from the shared
+# parser, NEITHER target would ever be reported to either hook, and both
+# would pass; with it, each hook finds and blocks its own.
+_run_bash_case_both "bash-2: &> into a real governed/critical file (one target per hook) is recognized as a write and blocked by BOTH hooks" \
+  "$TMPDIR_ROOT" "echo hi &> .env && echo hi &> .claude/settings.json" 2
+
+# Missing lib/bash-write-targets.py: both hooks must warn on stderr and
+# pass, never silently no-op. Copies of each hook into a directory with no
+# lib/ next to them, same technique each hook's OWN suite already uses.
+_MISSING_LIB_BOTH_DIR="$TMPDIR_ROOT/missing-lib-both"
+mkdir -p "$_MISSING_LIB_BOTH_DIR"
+cp "$CRITICAL_HOOK" "$_MISSING_LIB_BOTH_DIR/protect-critical.sh"
+cp "$HARNESS_HOOK" "$_MISSING_LIB_BOTH_DIR/protect-harness.sh"
+_missing_both_payload="$("$PYTHON_BIN" -c 'import json; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": "echo hi > .env"}}))')"
+_missing_both_crit_stderr=$(cd "$TMPDIR_ROOT" && printf '%s' "$_missing_both_payload" | bash "$_MISSING_LIB_BOTH_DIR/protect-critical.sh" 2>&1 >/dev/null)
+_missing_both_crit_rc=$(cd "$TMPDIR_ROOT" && printf '%s' "$_missing_both_payload" | bash "$_MISSING_LIB_BOTH_DIR/protect-critical.sh" >/dev/null 2>&1; echo $?)
+_missing_both_harn_stderr=$(cd "$TMPDIR_ROOT" && printf '%s' "$_missing_both_payload" | bash "$_MISSING_LIB_BOTH_DIR/protect-harness.sh" 2>&1 >/dev/null)
+_missing_both_harn_rc=$(cd "$TMPDIR_ROOT" && printf '%s' "$_missing_both_payload" | bash "$_MISSING_LIB_BOTH_DIR/protect-harness.sh" >/dev/null 2>&1; echo $?)
+
+if [[ "$_missing_both_crit_rc" == "0" && "$_missing_both_harn_rc" == "0" \
+      && "$_missing_both_crit_stderr" == *"WARNING"* && "$_missing_both_harn_stderr" == *"WARNING"* ]]; then
+  echo "PASS: bash-3: missing lib/bash-write-targets.py warns and passes on BOTH hooks"
+  PASS_COUNT=$((PASS_COUNT + 1))
+else
+  echo "FAIL: bash-3: missing lib/bash-write-targets.py warns and passes on BOTH hooks (critical: rc=$_missing_both_crit_rc; harness: rc=$_missing_both_harn_rc)"
+  FAIL_COUNT=$((FAIL_COUNT + 1))
+fi
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"
