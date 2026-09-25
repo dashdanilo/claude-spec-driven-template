@@ -8,7 +8,11 @@
 # for instance). Neither is authored content whose stale cross-references
 # should ever surface. Also covers docs nested under a subdirectory
 # (`docs/harness/*.md`, reachable through a consumer's `.claude/docs/harness`
-# symlink), which a flat glob used to report as "listed but not on disk".
+# symlink), which a flat glob used to report as "listed but not on disk",
+# and hook/script test fixtures under a `tests/` directory
+# (`baseline/hooks/tests/*.test.sh`, `baseline/scripts/tests/*.test.sh`),
+# whose made-up `.claude/...` paths are input data for the thing under
+# test, not prose pointing an agent at something to read.
 #
 # Builds throwaway git repos in a mktemp dir (NEVER this checkout's own
 # files) and asserts on check-index.sh's stderr text and exit code, since
@@ -643,6 +647,86 @@ _assert_contains "agent pointer with no matching file at all is still reported (
   "$OUT_AGENT" "does-not-exist-agent-noext"
 
 _assert_eq "--strict exits 1 with the positive control present" "$EXIT_AGENT" "1"
+
+# ---------------------------------------------------------------- repo J
+# Hook and script test fixtures write `.claude/...`-shaped strings as INPUT
+# DATA for whatever they are testing, not as prose pointing an agent at
+# something to read, and several of those strings are deliberately made up
+# because the test needs a path that resolves to nothing. A file living
+# under a directory literally named `tests` (.claude/hooks/tests/*.test.sh,
+# .claude/scripts/tests/*.test.sh, mirroring baseline/hooks/tests and
+# baseline/scripts/tests in the real harness repo) must never have its
+# embedded pointers scanned. Positive control: a made-up pointer inside each
+# tests/ fixture, must not surface. Negative control: the identical
+# made-up pointer one directory up, outside tests/, so it is ordinary
+# content rather than a fixture, and must still be reported — otherwise the
+# exemption could just be disabling the pointer scan for hooks/scripts
+# wholesale and this test would never notice.
+REPO_TESTDIR="$TMPDIR_ROOT/repo-test-fixtures"
+mkdir -p "$REPO_TESTDIR/.claude/rules" "$REPO_TESTDIR/.claude/hooks/tests" \
+  "$REPO_TESTDIR/.claude/scripts/tests"
+
+git -C "$REPO_TESTDIR" init -q -b test
+git -C "$REPO_TESTDIR" config user.email "test@example.com"
+git -C "$REPO_TESTDIR" config user.name "Test"
+
+cat > "$REPO_TESTDIR/${DC}/rules/tracked-rule.md" <<'EOF'
+---
+paths: "**"
+---
+
+No dangling pointer here.
+EOF
+
+# Positive control: a hook test fixture, under .claude/hooks/tests/, using a
+# made-up pointer as input data for the hook it tests. Must NOT surface.
+cat > "$REPO_TESTDIR/.claude/hooks/tests/fake-hook.test.sh" <<EOF
+#!/usr/bin/env bash
+# Fixture path fed to the hook under test; deliberately does not resolve.
+TARGET="${DC}/rules/does-not-exist-hook-fixture.md"
+EOF
+
+# Positive control: same shape, under .claude/scripts/tests/, covering the
+# second tests/ location the fix must also exempt.
+cat > "$REPO_TESTDIR/.claude/scripts/tests/fake-script.test.sh" <<EOF
+#!/usr/bin/env bash
+TARGET="${DC}/rules/does-not-exist-script-fixture.md"
+EOF
+
+# Negative control: the identical broken pointer, one directory up from
+# tests/, so it is ordinary content rather than a test fixture. Must still
+# surface.
+cat > "$REPO_TESTDIR/.claude/hooks/not-a-test.sh" <<EOF
+#!/usr/bin/env bash
+TARGET="${DC}/rules/does-not-exist-nontests-fixture.md"
+EOF
+chmod +x "$REPO_TESTDIR/.claude/hooks/not-a-test.sh"
+
+cat > "$REPO_TESTDIR/CLAUDE.md" <<'EOF'
+# Test project
+
+## Rules
+
+- tracked-rule.md - a clean rule, no dangling pointer
+EOF
+
+git -C "$REPO_TESTDIR" add CLAUDE.md .claude/rules .claude/hooks .claude/scripts
+git -C "$REPO_TESTDIR" commit -q -m "fixture"
+
+OUT_TESTDIR="$TMPDIR_ROOT/out-test-fixtures.txt"
+(cd "$REPO_TESTDIR" && bash "$SCRIPT" --strict) > "$OUT_TESTDIR" 2>&1
+EXIT_TESTDIR=$?
+
+_assert_not_contains "hooks/tests fixture pointer is not reported" \
+  "$OUT_TESTDIR" "does-not-exist-hook-fixture.md"
+
+_assert_not_contains "scripts/tests fixture pointer is not reported" \
+  "$OUT_TESTDIR" "does-not-exist-script-fixture.md"
+
+_assert_contains "same pointer outside tests/ is still reported (negative control)" \
+  "$OUT_TESTDIR" "does-not-exist-nontests-fixture.md"
+
+_assert_eq "--strict exits 1 with only the negative control present" "$EXIT_TESTDIR" "1"
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"
