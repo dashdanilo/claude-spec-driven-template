@@ -283,17 +283,73 @@ _run_case "24: tee with two targets — one line per target" \
   "main${TAB}Bash:tee${TAB}sub/t1.txt${TAB}
 main${TAB}Bash:tee${TAB}sub/t2.txt${TAB}"
 
+# ------------------------------------------ redirect operands are not command args
+# A WORD immediately following a redirect operator is that redirect's OWN
+# operand (a target file, an input file, a heredoc delimiter, a here-string,
+# or a bare fd reference) — never one of the command's own positional
+# arguments. Before REDIRECT_OPERAND_OPS existed in bash-write-targets.py,
+# `tee`/`sed -i`'s own "positional words" list was built straight from the
+# token stream with no notion of this, so each shape below invented a
+# phantom write target that never actually gets written to. These cases are
+# the log-level proof that the fix holds; see that file's own
+# REDIRECT_OPERAND_OPS comment for the reasoning behind each operator.
+HEREDOC_TEE=$'tee sub/heredoc-tee.txt <<\'E2\'\nbody\nE2'
+_run_case "25: tee <file> <<'DELIM' — file logged, heredoc DELIMITER not logged" \
+  "$(_bash_payload "$HEREDOC_TEE")" \
+  "main${TAB}Bash:tee${TAB}sub/heredoc-tee.txt${TAB}"
+
+_run_case "26: tee <file> < <input> — only the tee target logged, input file is not" \
+  "$(_bash_payload 'tee sub/tee-target.txt < sub/tee-input.txt')" \
+  "main${TAB}Bash:tee${TAB}sub/tee-target.txt${TAB}"
+
+_run_case "27: tee <file> 2>&1 — only the tee target logged, bare fd ref is not" \
+  "$(_bash_payload 'tee sub/tee-target.txt 2>&1')" \
+  "main${TAB}Bash:tee${TAB}sub/tee-target.txt${TAB}"
+
+_run_case "28: here-string tee <file> <<< text — only the tee target logged, here-string text is not" \
+  "$(_bash_payload 'tee sub/tee-target.txt <<< hello')" \
+  "main${TAB}Bash:tee${TAB}sub/tee-target.txt${TAB}"
+
+_run_case "29: sed -i with an input redirect — only the real file logged, input file is not" \
+  "$(_bash_payload "sed -i 's/a/b/' sub/file.txt < sub/input.txt")" \
+  "main${TAB}Bash:sed-i${TAB}sub/file.txt${TAB}"
+
+# Negative controls — added explicitly rather than trusting the cases above
+# alone, since a test that only proves "the new bug is gone" without also
+# proving "the old correct behaviour survived" is worthless (a fix that
+# happens to also swallow legitimate targets would still turn this section
+# green).
+_run_case "30: tee a b, no pipe — still logs BOTH targets" \
+  "$(_bash_payload 'tee sub/t1.txt sub/t2.txt')" \
+  "main${TAB}Bash:tee${TAB}sub/t1.txt${TAB}
+main${TAB}Bash:tee${TAB}sub/t2.txt${TAB}"
+
+# A heredoc's OPENING line can carry a real redirect of its own (see
+# HEREDOC_RE's own comment in bash-write-targets.py) — the operand-filtering
+# fix above must not swallow it: the "PY" delimiter word right after `<<` is
+# correctly dropped as the heredoc's own operand, but the LATER `>` on that
+# same line is a completely different redirect and still gets its target.
+HEREDOC_REAL_REDIRECT=$'python3 - <<\'PY\' > sub/out.txt\nprint(1)\nPY'
+_run_case "31: heredoc opener carrying a REAL redirect — still logged" \
+  "$(_bash_payload "$HEREDOC_REAL_REDIRECT")" \
+  "main${TAB}Bash:redirect${TAB}sub/out.txt${TAB}"
+
+_run_case "32: redirect between command and its argument — redirect target once, tee target still logged" \
+  "$(_bash_payload 'tee > sub/out.txt sub/b.txt')" \
+  "main${TAB}Bash:redirect${TAB}sub/out.txt${TAB}
+main${TAB}Bash:tee${TAB}sub/b.txt${TAB}"
+
 # -------------------------------------------------------------- Edit/Write — no regression
-_run_case "25: Write, main thread — unchanged behaviour" \
+_run_case "33: Write, main thread — unchanged behaviour" \
   "$(_edit_payload "Write" "$REPO/written.txt" "main")" \
   "main${TAB}Write${TAB}written.txt${TAB}"
 
-_run_case "26: Edit, sub thread (agent_id present) — unchanged behaviour" \
+_run_case "34: Edit, sub thread (agent_id present) — unchanged behaviour" \
   "$(_edit_payload "Edit" "$REPO/edited.txt" "sub")" \
   "sub${TAB}Edit${TAB}edited.txt${TAB}implementer"
 
 # -------------------------------------------------------------- malformed payload
-_run_case "27: malformed JSON payload — exit 0, nothing written" \
+_run_case "35: malformed JSON payload — exit 0, nothing written" \
   "not json at all" \
   "" \
   "0"

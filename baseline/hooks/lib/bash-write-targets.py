@@ -164,6 +164,41 @@ WRITE_REDIRECT_OPS = {">", ">>", ">|", "2>", "2>>", "&>", "&>>"}
 # `&>`.
 FD_REF_RE = re.compile(r"^-$|^[0-9]+$")
 
+# Every redirect operator whose FOLLOWING word is that redirect's OWN
+# operand (a write target, an input file, a heredoc delimiter, a
+# here-string's text, or a bare fd reference) and therefore never one of
+# the command's own positional arguments. `tokenize()` has no notion of
+# this — it emits a redirect operator as an OP token and the word right
+# after it as a perfectly ordinary WORD token, indistinguishable from a
+# real argument at that level — so `process_segment` has to filter these
+# out itself before it decides what the command's own words are (see
+# `_command_words`, used right before `find_command`). Five invented write
+# targets, all reproduced against this parser before this set existed,
+# are exactly what that filtering fixes:
+#   - `tee b.md <<'E2' ... E2` reported the heredoc DELIMITER "E2" as a
+#     second tee argument: `<<` is an OP token, and the delimiter word
+#     right after it looked like a plain positional word.
+#   - `tee b.md < in.md` reported the INPUT file "in.md" as a tee write
+#     target, when `<` only ever feeds a file INTO the command.
+#   - `tee b.md 2>&1` reported the bare FD reference "1" — the operand of
+#     `>&`, already correctly excluded from Bash:redirect output by
+#     FD_REF_RE — as a second tee argument, because that exclusion never
+#     touched this SEPARATE words-for-the-command list.
+#   - `tee b.md <<< hello` reported the HERE-STRING text "hello" as a
+#     second tee argument. `<<<` never gets its own token: the tokenizer
+#     emits it as "<<" immediately followed by "<" (see tokenize's `<`
+#     branch, which only recognizes `<<`, never a three-character `<<<`),
+#     so the here-string word sits right after that trailing "<" — covered
+#     by this set's "<" member, with no dedicated "<<<" entry needed.
+#   - `sed -i s/a/b/ f.md < in.md` reported the input file "in.md"
+#     alongside the real file "f.md", the same class as the `tee ... < ...`
+#     case above.
+# WRITE_REDIRECT_OPS's own members all belong here too (their target is
+# exactly as much "not a positional argument" as any other redirect's target),
+# plus `>&` (write-or-fd-ref, see FD_REF_RE), plain input redirection `<`,
+# and heredoc `<<` (whose operand is a delimiter word, never a file).
+REDIRECT_OPERAND_OPS = WRITE_REDIRECT_OPS | {">&", "<", "<<"}
+
 # A write-mode `open(<arg>, <mode>)` call, anywhere in a code string. <arg> is
 # captured RAW (not required to be quoted) so a non-literal first argument
 # still matches and can be reported as unresolvable rather than missed
@@ -395,6 +430,33 @@ def split_segments_ordered(tokens):
     return items
 
 
+def _command_words(seg):
+    # seg, minus every WORD that is itself a redirect operator's OPERAND
+    # (see REDIRECT_OPERAND_OPS) rather than one of the command's own
+    # positional words. Used for BOTH find_command and the words list built
+    # from whatever follows the command word — a redirect can precede the
+    # command entirely (`> out.md tee b.md`, valid shell: the redirect
+    # attaches to the simple command as a whole, not to its position), so
+    # skipping the filter for find_command alone would let the redirect's
+    # own operand ("out.md") be misread as the command word itself.
+    filtered = []
+    i = 0
+    n = len(seg)
+    while i < n:
+        kind, val = seg[i]
+        filtered.append((kind, val))
+        if (
+            kind == "OP"
+            and val in REDIRECT_OPERAND_OPS
+            and i + 1 < n
+            and seg[i + 1][0] == "WORD"
+        ):
+            i += 2  # the following WORD is this redirect's own operand
+            continue
+        i += 1
+    return filtered
+
+
 def find_command(seg):
     # Returns (index, word) of the first WORD that is not a leading
     # VAR=value assignment (e.g. `FOO=bar sed -i ...`), or (None, None).
@@ -513,11 +575,19 @@ def extract_targets(command, cwd):
                     if not FD_REF_RE.match(target):
                         handle("Bash:redirect", target)
 
-        cmd_idx, cmd_word = find_command(seg)
+        # find_command/words both operate on the FILTERED segment, not the
+        # raw one the redirect scan above just used: the redirect scan
+        # needs to see every operand (including a bare fd reference like
+        # `2>&1`'s "1") to decide whether IT is a real write, but the
+        # command's own argument list must never see that same word twice —
+        # see REDIRECT_OPERAND_OPS and _command_words for why and for the
+        # five invented targets this stops.
+        cmd_seg = _command_words(seg)
+        cmd_idx, cmd_word = find_command(cmd_seg)
         if cmd_word is None:
             return
         base = cmd_word.rstrip("/").split("/")[-1]
-        words = [v for k, v in seg[cmd_idx + 1:] if k == "WORD"]
+        words = [v for k, v in cmd_seg[cmd_idx + 1:] if k == "WORD"]
 
         if base == "popd":
             # `popd` takes no directory operand at all (only +N/-N/-n, which

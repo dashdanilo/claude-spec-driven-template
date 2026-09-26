@@ -401,6 +401,23 @@ _run_bash_case "46: [MANDATORY] pushd secrets; popd; an ordinary write -> NOT bl
 _run_bash_case "47: [control] cd secrets; an ordinary-NAMED write (';', not '&&') -> blocked, top-level cd is unaffected by the scoping fix" \
   "$TMPDIR_ROOT" "cd secrets; echo x > ordinary.txt" 2
 
+# ===================================================================
+# F16: a WORD that is a redirect's own OPERAND (an INPUT file, never
+# written) used to be reported as a second WRITE target for the command it
+# follows (see bash-write-targets.py's own REDIRECT_OPERAND_OPS comment).
+# For this hook specifically that is not just an observability miscount —
+# it is a FALSE BLOCK: a command that only READS a critical-shaped file
+# (never writes it) used to be refused anyway, because the input file's
+# name landed in the same "files this command writes" list as the real,
+# ordinary target sitting right next to it.
+# ===================================================================
+
+_run_bash_case "48: [MANDATORY] sed -i with a critical-shaped INPUT redirect -> NOT blocked (.env is only read, ordinary.txt is the real write)" \
+  "$TMPDIR_ROOT" "sed -i s/a/b/ ordinary.txt < .env" 0
+
+_run_bash_case "49: [MANDATORY] tee with a critical-shaped INPUT redirect -> NOT blocked (.env is only read, ordinary.txt is the real write)" \
+  "$TMPDIR_ROOT" "tee ordinary.txt < .env" 0
+
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"
 
