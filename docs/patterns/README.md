@@ -1,79 +1,89 @@
 # docs/patterns/
 
-Living examples of "how we solved X in this project". A pattern is a small, real snippet showing how a specific problem was solved here, so future solutions can follow the same shape.
+Exemplos vivos de "como resolvemos X neste projeto". Um pattern é um trecho
+pequeno e real mostrando como um problema específico foi resolvido aqui, para
+que soluções futuras possam seguir a mesma forma.
 
-## Why patterns beat prose
+## Por que patterns são melhores que prosa
 
-Three paragraphs describing "we use functional patterns and prefer composition over inheritance" teach almost nothing. One 15-line snippet showing an actual composition in this codebase teaches everything.
+Três parágrafos descrevendo "usamos padrões funcionais e preferimos
+composição em vez de herança" ensinam quase nada. Um trecho de 15 linhas
+mostrando uma composição real neste codebase ensina tudo.
 
-Patterns are the highest-signal-per-token documentation you can write. Agents especially benefit from them: they show conventions in action, not in the abstract.
+Patterns são a documentação com maior sinal por token que você pode
+escrever. Agentes se beneficiam especialmente deles: mostram convenções em
+ação, não em abstrato.
 
-## Format for one pattern
+## Formato de um pattern
 
-Each pattern is a short markdown file:
+Cada pattern é um arquivo markdown curto:
 
 ```markdown
-# <Pattern name>
+# <Nome do pattern>
 
-**When to use:** <the situation this pattern addresses>
-**Where in the codebase:** <example paths>
-**Related:** <other patterns or docs>
+**Quando usar:** <a situação que este pattern resolve>
+**Onde no codebase:** <caminhos de exemplo>
+**Relacionado:** <outros patterns ou docs>
 
-## Problem
+## Problema
 
-One paragraph. What situation triggers this pattern.
+Um parágrafo. Que situação dispara este pattern.
 
-## Solution
+## Solução
 
-The pattern itself, shown as a real (or realistic) code snippet.
+O pattern em si, mostrado como um trecho de código real (ou realista).
 
 `​``ts
-// Actual code demonstrating the pattern
+// Código real demonstrando o pattern
 `​``
 
-## When NOT to use this
+## Quando NÃO usar isto
 
-Cases where this pattern is the wrong choice.
+Casos em que este pattern é a escolha errada.
 
-## Alternatives considered
+## Alternativas consideradas
 
-Briefly, other approaches and why this one won.
+Brevemente, outras abordagens e por que esta venceu.
 
-## References
+## Referências
 
-Files in the codebase that follow this pattern:
+Arquivos no codebase que seguem este pattern:
 
 - `src/path/file1.ts`
 - `src/path/file2.ts`
 ```
 
-## Suggested pattern topics
+## Tópicos de pattern sugeridos
 
-Only add patterns when you have a real, solved example. Some common candidates:
+Só adicione patterns quando você tiver um exemplo real e resolvido. Alguns candidatos comuns:
 
-- Error handling in server code
-- Loading state in UI
-- Form validation flow
-- API request wrapper
-- Feature flag check
-- Retry logic
-- Structured logging call site
-- Caching strategy for a specific data type
+- Tratamento de erro em código de servidor
+- Estado de carregamento na UI
+- Fluxo de validação de formulário
+- Wrapper de requisição de API
+- Verificação de feature flag
+- Lógica de retry
+- Ponto de chamada de logging estruturado
+- Estratégia de cache para um tipo de dado específico
 
 ## Anti-patterns
 
-You can also document anti-patterns: things that look tempting but are wrong here. Prefix with `anti-` in the filename:
+Você também pode documentar anti-patterns: coisas que parecem tentadoras mas
+são erradas aqui. Prefixe com `anti-` no nome do arquivo:
 
 - `anti-nested-useeffect.md`
 - `anti-any-in-typescript.md`
 
-## Integration with AI agents
+## Integração com agentes de IA
 
-The `explore` and `find-existing-first` skills read this folder before proposing solutions. When a user asks "how should I handle X?", agents check here first. Keep patterns current - outdated patterns actively mislead.
+As skills `explore` e `find-existing-first` leem esta pasta antes de propor
+soluções. Quando um usuário pergunta "como eu deveria lidar com X?", agentes
+verificam aqui primeiro. Mantenha os patterns atualizados: patterns
+desatualizados enganam ativamente.
 
-## Naming convention
+## Convenção de nomenclatura
 
-`kebab-case-noun.md`. Names should read as "this file describes X".
+`kebab-case-noun.md`. Os nomes devem se ler como "este arquivo descreve X".
 
-Good: `structured-logging.md`, `optimistic-updates.md`, `feature-flag-check.md`
-Bad: `logging.md` (too vague), `how-to-log.md` (verbose), `LoggingPattern.md` (wrong case)
+Bom: `structured-logging.md`, `optimistic-updates.md`, `feature-flag-check.md`
+Ruim: `logging.md` (muito vago), `how-to-log.md` (verboso), `LoggingPattern.md` (case errado)

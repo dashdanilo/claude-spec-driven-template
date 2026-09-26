@@ -1,167 +1,167 @@
 # LEARN.md
 
-A guided course through this repository's AI structure. Read [`README.md`](./README.md) first for the high-level overview. This file goes deeper.
+Um curso guiado pela estrutura de IA deste repositório. Leia [`README.md`](./README.md) primeiro para a visão geral. Este arquivo vai mais a fundo.
 
-## Table of contents
+## Sumário
 
-- [Chapter 1: The cost of context](#chapter-1-the-cost-of-context)
-- [Chapter 2: The five subsystems](#chapter-2-the-five-subsystems)
-- [Chapter 3: Layered instructions](#chapter-3-layered-instructions)
-- [Chapter 4: Skills vs rules vs agents](#chapter-4-skills-vs-rules-vs-agents)
-- [Chapter 5: Subagents and isolated context](#chapter-5-subagents-and-isolated-context)
-- [Chapter 6: Subagent memory](#chapter-6-subagent-memory)
-- [Chapter 7: Knowledge about libraries](#chapter-7-knowledge-about-libraries)
-- [Chapter 8: Spec-driven development](#chapter-8-spec-driven-development)
-- [Chapter 9: Architecture Decision Records](#chapter-9-architecture-decision-records)
-- [Chapter 10: Hooks and lifecycle events](#chapter-10-hooks-and-lifecycle-events)
-- [Chapter 11: Greenfield vs brownfield](#chapter-11-greenfield-vs-brownfield)
-- [Chapter 12: Common mistakes](#chapter-12-common-mistakes)
-
----
-
-## Chapter 1: The cost of context
-
-Every Claude Code session has an overhead before you type the first message: tool definitions, system prompt, and project-level instructions (`CLAUDE.md`) all load into the context window. This adds up to thousands of tokens.
-
-The implication: what loads always must be small. What is detailed must load on demand.
-
-This single insight drives the entire structure of this template:
-
-- `CLAUDE.md` root is short
-- Rules are scoped by path
-- Docs only load when a skill references them
-- Subagents work in isolated context windows
-
-Internalize this rule and the rest of the structure makes sense.
+- [Capítulo 1: O custo do contexto](#capítulo-1-o-custo-do-contexto)
+- [Capítulo 2: Os cinco subsistemas](#capítulo-2-os-cinco-subsistemas)
+- [Capítulo 3: Instruções em camadas](#capítulo-3-instruções-em-camadas)
+- [Capítulo 4: Skill vs rule vs agent](#capítulo-4-skill-vs-rule-vs-agent)
+- [Capítulo 5: Subagents e contexto isolado](#capítulo-5-subagents-e-contexto-isolado)
+- [Capítulo 6: Memória de subagent](#capítulo-6-memória-de-subagent)
+- [Capítulo 7: Conhecimento sobre bibliotecas](#capítulo-7-conhecimento-sobre-bibliotecas)
+- [Capítulo 8: Desenvolvimento guiado por spec](#capítulo-8-desenvolvimento-guiado-por-spec)
+- [Capítulo 9: Registros de Decisão de Arquitetura](#capítulo-9-registros-de-decisão-de-arquitetura)
+- [Capítulo 10: Hooks e eventos de ciclo de vida](#capítulo-10-hooks-e-eventos-de-ciclo-de-vida)
+- [Capítulo 11: Greenfield vs brownfield](#capítulo-11-greenfield-vs-brownfield)
+- [Capítulo 12: Erros comuns](#capítulo-12-erros-comuns)
 
 ---
 
-## Chapter 2: The five subsystems
+## Capítulo 1: O custo do contexto
 
-The `.claude/` directory has five distinct subsystems:
+Toda sessão do Claude Code tem um custo fixo antes de você digitar a primeira mensagem: definições de tool, system prompt e instruções de nível de projeto (`CLAUDE.md`) carregam na janela de contexto. Isso soma milhares de tokens.
 
-1. **Settings** (`settings.json`) define permissions and hook registrations
-2. **Skills** (`skills/`) are reusable workflows loaded by description match
-3. **Agents** (`agents/`) are specialists with isolated context
-4. **Rules** (`rules/`) are scoped conventions that auto-load by glob
-5. **Hooks** (`hooks/`) are scripts triggered by tool lifecycle events
+A implicação: o que carrega sempre precisa ser pequeno. O que é detalhado precisa carregar sob demanda.
 
-Plus a non-official but extremely useful directory: **Docs** (`docs/`), which holds knowledge consulted on demand.
+Essa única percepção conduz toda a estrutura deste template:
 
-Most projects use all six. Each has a different cost and trigger.
+- a raiz do `CLAUDE.md` é curta
+- rules têm escopo por path
+- docs só carregam quando uma skill os referencia
+- subagents trabalham em janelas de contexto isoladas
 
-| Subsystem | When it loads | Context cost |
+Internalize essa regra e o resto da estrutura faz sentido.
+
+---
+
+## Capítulo 2: Os cinco subsistemas
+
+O diretório `.claude/` tem cinco subsistemas distintos:
+
+1. **Settings** (`settings.json`) define permissões e registros de hook
+2. **Skills** (`skills/`) são workflows reusáveis carregados por match de descrição
+3. **Agents** (`agents/`) são especialistas com contexto isolado
+4. **Rules** (`rules/`) são convenções com escopo que carregam automaticamente por glob
+5. **Hooks** (`hooks/`) são scripts disparados por eventos do ciclo de vida das tools
+
+Mais um diretório não oficial mas extremamente útil: **Docs** (`docs/`), que guarda conhecimento consultado sob demanda.
+
+A maioria dos projetos usa todos os seis. Cada um tem um custo e um gatilho diferente.
+
+| Subsistema | Quando carrega | Custo de contexto |
 |---|---|---|
-| `settings.json` | Always, at session start | Minimal |
-| `skills/` | When description matches task | Loaded only when active |
-| `agents/` | When invoked or auto-delegated | Isolated, does not pollute main |
-| `rules/` | When path matches glob | Loaded when relevant |
-| `hooks/` | On lifecycle event | Zero |
-| `docs/` | When skill references explicitly | Zero until read |
+| `settings.json` | Sempre, no início da sessão | Mínimo |
+| `skills/` | Quando a descrição combina com a task | Carrega só quando ativa |
+| `agents/` | Quando invocado ou auto-delegado | Isolado, não poluí a principal |
+| `rules/` | Quando o path combina com o glob | Carrega quando relevante |
+| `hooks/` | Em evento do ciclo de vida | Zero |
+| `docs/` | Quando uma skill referencia explicitamente | Zero até ser lido |
 
 ---
 
-## Chapter 3: Layered instructions
+## Capítulo 3: Instruções em camadas
 
-There are four places where instructions can live, in order of how they load:
+Existem quatro lugares onde instruções podem viver, na ordem de como carregam:
 
-### Layer 0: `AGENTS.md`
+### Camada 0: `AGENTS.md`
 
-The shared source of truth. Read by all AI coding agents that support the AGENTS.md convention (Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot, and others). Contents:
+A fonte de verdade compartilhada. Lida por todos os agents de codificação de IA que suportam a convenção AGENTS.md (Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot, e outros). Conteúdo:
 
-- Tech stack (one line per item)
-- Build and test commands
-- Top-level directory map
-- Conventions that apply everywhere
-- Feature workflow
-- Non-negotiables
-- Pointers to where detailed info lives
+- Stack técnica (uma linha por item)
+- Comandos de build e test
+- Mapa de diretórios de nível superior
+- Convenções que se aplicam em todo lugar
+- Workflow de feature
+- Inegociáveis
+- Ponteiros para onde a informação detalhada vive
 
-What does NOT go here: tool-specific extras, long explanations, library docs, examples that span 20+ lines.
+O que NÃO vai aqui: extras específicos de ferramenta, explicações longas, docs de biblioteca, exemplos com mais de 20 linhas.
 
-### Layer 1: Root `CLAUDE.md` (as a stub)
+### Camada 1: `CLAUDE.md` da raiz (como stub)
 
-Loads at the start of every Claude Code session. In this template, `CLAUDE.md` is a **stub** that points to `AGENTS.md` for the shared content, and then adds only what is specific to Claude Code:
+Carrega no início de toda sessão do Claude Code. Neste template, `CLAUDE.md` é um **stub** que aponta para `AGENTS.md` em busca do conteúdo compartilhado, e depois só adiciona o que é específico do Claude Code:
 
-- Which skills, subagents, hooks, and rules ship in this project
-- Where nested CLAUDE.md files live
-- Where personal overrides go (`CLAUDE.local.md`)
+- Quais skills, subagents, hooks e rules este projeto entrega
+- Onde vivem os CLAUDE.md aninhados
+- Onde vão os overrides pessoais (`CLAUDE.local.md`)
 
-The stub pattern removes duplication: you update the stack in `AGENTS.md`, all agents see it, `CLAUDE.md` never falls out of sync because it does not own that content.
+O padrão de stub remove duplicação: você atualiza a stack em `AGENTS.md`, todos os agents veem isso, e o `CLAUDE.md` nunca sai de sincronia porque não é dono daquele conteúdo.
 
-### Layer 2: Nested `CLAUDE.md`
+### Camada 2: `CLAUDE.md` aninhado
 
-A `CLAUDE.md` placed inside a folder loads automatically when Claude navigates that folder. Invisible when Claude is elsewhere. **Nested CLAUDE.md files are NOT stubs** - they have full content, because they describe conventions specific to that folder that no other file owns.
+Um `CLAUDE.md` colocado dentro de uma pasta carrega automaticamente quando o Claude navega naquela pasta. Invisível quando o Claude está em outro lugar. **Arquivos CLAUDE.md aninhados NÃO são stubs**: eles têm conteúdo completo, porque descrevem convenções específicas daquela pasta que nenhum outro arquivo é dono.
 
-Use for conventions specific to that layer:
+Use para convenções específicas dessa camada:
 
-- "this folder is server-side, never import from client"
-- "files expected here: foo.ts, bar.ts, each with .test.ts"
-- "source of truth is spec at /specs/.../spec.md"
+- "esta pasta é server-side, nunca importe do client"
+- "arquivos esperados aqui: foo.ts, bar.ts, cada um com .test.ts"
+- "a fonte de verdade é a spec em /specs/.../spec.md"
 
-### Layer 3: Path-scoped rules
+### Camada 3: Rules com escopo de path
 
-In `baseline/rules/`, rules with `paths:` in frontmatter load only when the glob matches the file Claude is touching.
+Em `baseline/rules/`, rules com `paths:` no frontmatter carregam só quando o glob combina com o arquivo que o Claude está tocando.
 
 ```markdown
 ---
 paths: "**/*.{tsx,jsx}"
 ---
 
-# React conventions
+# Convenções de React
 
-- Named exports only
-- Props interface above the component
-- No default exports
+- Só exports nomeados
+- Interface de props acima do componente
+- Sem default exports
 ```
 
-When to choose nested CLAUDE.md vs rule?
+Quando escolher CLAUDE.md aninhado versus rule?
 
-- **Nested CLAUDE.md** when the convention is tied to a folder and lives next to the code
-- **Rule** when the convention applies across multiple folders by file type
+- **CLAUDE.md aninhado** quando a convenção está amarrada a uma pasta e vive ao lado do código
+- **Rule** quando a convenção se aplica a várias pastas por tipo de arquivo
 
 ---
 
-## Chapter 4: Skills vs rules vs agents
+## Capítulo 4: Skill vs rule vs agent
 
-Three things that look similar but do different jobs.
+Três coisas que parecem parecidas mas fazem trabalhos diferentes.
 
 ### Rule
 
-- **What:** scoped guidance text
-- **Trigger:** path matches glob
-- **Output:** Claude reads it as context
-- **Use when:** convention that must be remembered while editing certain files
+- **O que é:** texto de orientação com escopo
+- **Gatilho:** o path combina com o glob
+- **Saída:** o Claude lê como contexto
+- **Use quando:** for uma convenção que precisa ser lembrada ao editar certos arquivos
 
 ### Skill
 
-- **What:** reusable workflow
-- **Trigger:** description matches the task at hand
-- **Output:** Claude follows the workflow
-- **Use when:** repeated multi-step process across sessions
+- **O que é:** workflow reusável
+- **Gatilho:** a descrição combina com a task em questão
+- **Saída:** o Claude segue o workflow
+- **Use quando:** for um processo repetido, de vários passos, entre sessões
 
 ### Agent (subagent)
 
-- **What:** specialist with isolated context
-- **Trigger:** explicit invocation or auto-delegation via description
-- **Output:** returns a final summary; intermediate work stays isolated
-- **Use when:** deep investigation, review, or task that should not pollute main context
+- **O que é:** especialista com contexto isolado
+- **Gatilho:** invocação explícita ou auto-delegação via descrição
+- **Saída:** retorna um resumo final; o trabalho intermediário fica isolado
+- **Use quando:** for investigação profunda, review, ou task que não deve poluir o contexto principal
 
-A common mistake is using a rule for what should be a skill. If you find yourself writing "when you do X, follow these 7 steps" in a rule, it should be a skill.
+Um erro comum é usar uma rule para o que deveria ser uma skill. Se você se pegar escrevendo "quando fizer X, siga estes 7 passos" numa rule, isso deveria ser uma skill.
 
 ---
 
-## Chapter 5: Subagents and isolated context
+## Capítulo 5: Subagents e contexto isolado
 
-A subagent runs in its own fresh context window. The orchestrator hands it a prompt, the subagent works (reads files, runs tools, reasons), and only the final message returns to the orchestrator.
+Um subagent roda na própria janela de contexto, do zero. O orquestrador entrega um prompt, o subagent trabalha (lê arquivos, roda tools, raciocina), e só a mensagem final volta para o orquestrador.
 
-This is powerful because:
+Isso é poderoso porque:
 
-- Code review can read 50 files without polluting your session
-- Research on a library can explore docs without filling your context
-- Parallel subagents can run simultaneously (security audit + code review + performance check)
+- Code review pode ler 50 arquivos sem poluir sua sessão
+- Pesquisa sobre uma biblioteca pode explorar docs sem preencher seu contexto
+- Subagents paralelos podem rodar ao mesmo tempo (auditoria de segurança + code review + checagem de performance)
 
-The frontmatter:
+O frontmatter:
 
 ```markdown
 ---
@@ -174,330 +174,330 @@ memory: project
 You are a senior code reviewer...
 ```
 
-Key fields:
+Campos chave:
 
-- **`name`** is the identifier
-- **`description`** is the auto-delegation trigger; write it as a condition of use
-- **`tools`** restricts what the subagent can do (smaller = safer)
-- **`model`** picks the model tier; use `opus` for review/research, `sonnet` or `haiku` for execution
-- **`memory`** opts in to persistent memory (see next chapter)
+- **`name`** é o identificador
+- **`description`** é o gatilho de auto-delegação; escreva como uma condição de uso
+- **`tools`** restringe o que o subagent pode fazer (menor = mais seguro)
+- **`model`** escolhe o tier de modelo; use `opus` para review/pesquisa, `sonnet` ou `haiku` para execução
+- **`memory`** habilita memória persistente (veja o próximo capítulo)
 
-### The "Use PROACTIVELY" convention
+### A convenção "Use PROACTIVELY"
 
-Claude auto-delegates based on `description`. To push automatic delegation without you asking, the community convention is to write descriptions like:
+O Claude auto-delega com base na `description`. Para empurrar a delegação automática sem que você peça, a convenção da comunidade é escrever descrições como:
 
 - "Use PROACTIVELY after each task is implemented"
 - "Use immediately when reviewing code changes"
 - "Use when investigating an unfamiliar library"
 
-Without these phrases, Claude tends to wait for an explicit request.
+Sem essas frases, o Claude tende a esperar um pedido explícito.
 
 ---
 
-## Chapter 6: Subagent memory
+## Capítulo 6: Memória de subagent
 
-Introduced in Claude Code v2.1.33, the `memory:` frontmatter field gives a subagent a persistent directory:
+Introduzido no Claude Code v2.1.33, o campo de frontmatter `memory:` dá a um subagent um diretório persistente:
 
 ```markdown
 ---
-memory: user        # ~/.claude/agent-memory/<name>/ (personal, shared across every project)
-# OR
-memory: project     # .claude/agent-memory/<name>/ (versioned, shareable via version control)
-# OR
-memory: local       # .claude/agent-memory-local/<name>/ (project-specific, gitignored)
+memory: user        # ~/.claude/agent-memory/<name>/ (pessoal, compartilhado entre todo projeto)
+# OU
+memory: project     # .claude/agent-memory/<name>/ (versionado, compartilhável via controle de versão)
+# OU
+memory: local       # .claude/agent-memory-local/<name>/ (específico do projeto, no gitignore)
 ---
 ```
 
-The first 200 lines of `MEMORY.md` in that directory are auto-injected into the subagent's system prompt every invocation. The subagent has Read, Write, and Edit tools enabled to manage its own notes.
+As primeiras 200 linhas do `MEMORY.md` daquele diretório são injetadas automaticamente no system prompt do subagent a cada invocação. O subagent tem as tools Read, Write e Edit habilitadas para gerenciar as próprias notas.
 
-`memory: project` is the scope every baseline agent uses: the notebook lands in the feature branch's diff and is reviewed with the PR like any other file, so a teammate who never ran the agent still sees what it learned. Only `memory: local` is gitignored; reach for it when the notes are genuinely tied to one machine and would mislead a teammate.
+`memory: project` é o escopo que todo agent do baseline usa: o caderno cai no diff da branch de feature e é revisado com o PR como qualquer outro arquivo, então um colega que nunca rodou o agent ainda vê o que ele aprendeu. Só `memory: local` fica no gitignore; recorra a ele quando as notas forem de fato amarradas a uma máquina e enganariam um colega de time.
 
-This is real persistence. A `researcher` subagent that investigated five libraries last week will remember the gotchas this week.
+Isso é persistência real. Um subagent `researcher` que investigou cinco bibliotecas na semana passada vai lembrar as pegadinhas nesta semana.
 
-### The catch
+### A pegadinha
 
-Each subagent has its own memory. The `code-reviewer`'s `MEMORY.md` is invisible to the `security-auditor`. Knowledge does not flow between subagents.
+Cada subagent tem sua própria memória. O `MEMORY.md` do `code-reviewer` é invisível para o `security-auditor`. Conhecimento não flui entre subagents.
 
-If you need shared memory across subagents, look at plugins like `hindsight-memory`. For most cases, siloed memory is fine.
+Se você precisa de memória compartilhada entre subagents, olhe plugins como `hindsight-memory`. Para a maioria dos casos, memória isolada é suficiente.
 
-### When memory is gold
+### Quando memória vale ouro
 
-- A `researcher` that investigates many libraries (deep, accumulating expertise)
-- A `code-reviewer` that learns project-specific anti-patterns
-- A `security-auditor` that builds a catalog of past vulnerabilities
+- Um `researcher` que investiga muitas bibliotecas (acumula expertise profunda)
+- Um `code-reviewer` que aprende anti-patterns específicos do projeto
+- Um `security-auditor` que constrói um catálogo de vulnerabilidades passadas
 
-### When memory is noise
+### Quando memória é ruído
 
-- Subagents invoked once or rarely
-- Subagents whose context is fully captured in the spec or plan they read
-- Anything where stale memory would mislead more than help
+- Subagents invocados uma vez ou raramente
+- Subagents cujo contexto está totalmente capturado na spec ou no plan que leem
+- Qualquer caso em que memória desatualizada enganaria mais do que ajudaria
 
 ---
 
-## Chapter 7: Knowledge about libraries
+## Capítulo 7: Conhecimento sobre bibliotecas
 
-This is where most projects break down: they dump all library knowledge into `CLAUDE.md` and pay the context cost every session.
+É aqui que a maioria dos projetos quebra: eles despejam todo o conhecimento de biblioteca no `CLAUDE.md` e pagam o custo de contexto em toda sessão.
 
-The right answer: four layers, from cheap to detailed.
+A resposta certa: quatro camadas, do barato ao detalhado.
 
-### Layer 1: One-liner in `CLAUDE.md`
+### Camada 1: Uma linha no `CLAUDE.md`
 
 ```
 ## Tech stack
-- <Your framework> + <Your language>
-- <Your styling approach>
-- <Your package manager> + <Your test runner>
-- <Your database and ORM>
+- <Seu framework> + <Sua linguagem>
+- <Sua abordagem de estilo>
+- <Seu gerenciador de pacotes> + <Seu test runner>
+- <Seu banco de dados e ORM>
 ```
 
-Just the name and role. No details.
+Só o nome e o papel. Sem detalhes.
 
-### Layer 2: Convention rules in `baseline/rules/`
+### Camada 2: Rules de convenção em `baseline/rules/`
 
-For conventions tied to a library that apply across the codebase:
+Para convenções amarradas a uma biblioteca que se aplicam pelo codebase inteiro:
 
 ```markdown
 ---
 paths: "**/*.{tsx,jsx}"
 ---
 
-# UI framework conventions
-- Use design tokens, not arbitrary values
-- Follow the existing component patterns
+# Convenções do framework de UI
+- Use design tokens, não valores arbitrários
+- Siga os padrões de componente já existentes
 ```
 
-### Layer 3: Project-specific lib doc in `baseline/docs/libs/`
+### Camada 3: Doc de biblioteca específico do projeto em `baseline/docs/libs/`
 
-Not the official docs. The subset you use, with your gotchas:
+Não a doc oficial. O subconjunto que você usa, com suas pegadinhas:
 
 ```markdown
-# Payment provider
+# Provedor de pagamento
 
-## How we authenticate
-- Live keys stored in the orchestration layer, never in app code
-- Test keys in .env.local
+## Como autenticamos
+- Chaves de produção ficam na camada de orquestração, nunca no código da aplicação
+- Chaves de teste em .env.local
 
-## Endpoints we use
+## Endpoints que usamos
 - POST /v1/payment_intents
-- POST /v1/webhooks (signature verification required)
+- POST /v1/webhooks (verificação de assinatura exigida)
 
-## Gotchas
-- Idempotency keys required for retries
-- Test webhooks need a tunnel (e.g., ngrok)
+## Pegadinhas
+- Idempotency keys exigidas para retries
+- Webhooks de teste precisam de um túnel (ex.: ngrok)
 ```
 
-### Layer 4: Subagent memory for accumulating discoveries
+### Camada 4: Memória de subagent para acumular descobertas
 
-A `researcher` subagent with `memory: user` builds expertise across sessions.
+Um subagent `researcher` com `memory: user` constrói expertise entre sessões.
 
-### When to use which
+### Quando usar qual
 
-| You need to know... | Layer |
+| Você precisa saber... | Camada |
 |---|---|
-| What stack is this? | `CLAUDE.md` |
-| What naming convention applies to .tsx files? | `baseline/rules/` |
-| How do we use a specific external service? | `baseline/docs/libs/<name>.md` |
-| What gotchas have I hit with this lib before? | `researcher` subagent memory |
-| Full official API reference? | Context7 MCP, do not duplicate |
+| Qual é a stack? | `CLAUDE.md` |
+| Que convenção de nomenclatura se aplica a arquivos .tsx? | `baseline/rules/` |
+| Como usamos um serviço externo específico? | `baseline/docs/libs/<name>.md` |
+| Que pegadinhas já encontrei com essa lib antes? | memória do subagent `researcher` |
+| Referência completa da API oficial? | Context7 MCP, não duplique |
 
 ---
 
-## Chapter 8: Spec-driven development
+## Capítulo 8: Desenvolvimento guiado por spec
 
-The `specs/` folder follows a three-file pattern that separates WHAT, HOW at high level, and HOW at execution level. Each feature is a folder with `spec.md`, `plan.md`, and `tasks.md`.
+A pasta `specs/` segue um padrão de três arquivos que separa O QUÊ, O COMO em nível alto, e o COMO em nível de execução. Cada feature é uma pasta com `spec.md`, `plan.md` e `tasks.md`.
 
-### The three files
+### Os três arquivos
 
 ```
 specs/YYYY-MM-DD-feature-slug/
-├── spec.md      # WHAT + WHY (source of truth, imutable after approval)
-├── plan.md      # HOW at high level (architecture, tech, phases)
-└── tasks.md     # HOW at execution level (atomic checkboxes, TDD)
+├── spec.md      # O QUÊ + POR QUÊ (fonte de verdade, imutável após aprovação)
+├── plan.md      # O COMO em nível alto (arquitetura, tecnologia, fases)
+└── tasks.md     # O COMO em nível de execução (checkboxes atômicos, TDD)
 ```
 
-This mirrors what Kiro (Amazon), Spec Kit (GitHub), and Junie (JetBrains) all converged on. It works because the three files have different purposes, audiences, and update rates:
+Isso espelha para onde Kiro (Amazon), Spec Kit (GitHub) e Junie (JetBrains) convergiram. Funciona porque os três arquivos têm propósitos, audiências e frequências de atualização diferentes:
 
-| File | Answers | Update rate |
+| Arquivo | Responde | Frequência de atualização |
 |---|---|---|
-| `spec.md` | "What are we building? Why?" | Rare, only if the feature itself changes |
-| `plan.md` | "What's the technical approach? Which phases?" | Occasional, if the strategy shifts |
-| `tasks.md` | "Where did I stop? What's next?" | Constant, updated after each task |
+| `spec.md` | "O que estamos construindo? Por quê?" | Rara, só se a própria feature mudar |
+| `plan.md` | "Qual é a abordagem técnica? Quais fases?" | Ocasional, se a estratégia mudar |
+| `tasks.md` | "Onde eu parei? O que vem a seguir?" | Constante, atualizado depois de cada task |
 
-If you collapse them into one file, you lose the ability to answer "where did I stop?" quickly. `tasks.md` alone answers that: the first unchecked box.
+Se você colapsar os três num arquivo só, perde a capacidade de responder "onde eu parei?" rapidamente. O `tasks.md` sozinho responde isso: a primeira caixinha não marcada.
 
-### The flow
+### O fluxo
 
 ```
-1. Brainstorm in chat (skill: explore)
+1. Brainstorm no chat (skill: explore)
        ↓
-2. spec.md written and committed
+2. spec.md escrito e commitado
        ↓
-3. spec-reviewer subagent audits
+3. subagent spec-reviewer audita
        ↓
-4. plan.md filled: architecture, tech choices, phases
+4. plan.md preenchido: arquitetura, escolhas de tecnologia, fases
        ↓
-5. tasks.md filled: atomic checkboxes with TDD steps
+5. tasks.md preenchido: checkboxes atômicos com passos de TDD
        ↓
-6. Execute task by task (subagent-driven or manual)
+6. Executa task por task (guiado por subagent ou manual)
        ↓
-7. code-reviewer subagent auto-gates each phase
+7. subagent code-reviewer faz auto-gate em cada fase
        ↓
-8. Merge when all boxes are checked
+8. Faz merge quando todas as caixinhas estiverem marcadas
 ```
 
-Each step is a gate. The next does not happen until the current is approved.
+Cada passo é um gate. O próximo não acontece até o atual ser aprovado.
 
-### Why it works
+### Por que funciona
 
-The biggest source of rework in AI-assisted development is implicit decisions. The agent starts coding, makes an assumption, and the assumption silently shapes the design. Two days later you discover the assumption was wrong.
+A maior fonte de retrabalho em desenvolvimento assistido por IA é a decisão implícita. O agent começa a codificar, faz uma suposição, e a suposição molda o design em silêncio. Dois dias depois você descobre que a suposição estava errada.
 
-Spec-driven development surfaces every decision before code. Brainstorming asks questions. Spec writes them down. Plan turns them into architecture. Tasks turn architecture into atomic steps. Code follows tasks. When something goes wrong, you can trace back to the exact decision and fix it.
+Desenvolvimento guiado por spec traz cada decisão à superfície antes do código. O brainstorm faz perguntas. A spec as registra. O plan as transforma em arquitetura. As tasks transformam arquitetura em passos atômicos. O código segue as tasks. Quando algo dá errado, você consegue rastrear até a decisão exata e corrigir.
 
-### Where did I stop?
+### Onde eu parei?
 
-The most common question mid-feature. Open `tasks.md`. The first unchecked `- [ ]` is where you stopped. If you paused inside a task, the inline `Notes:` under that task tells you why.
+A pergunta mais comum no meio de uma feature. Abra o `tasks.md`. A primeira `- [ ]` não marcada é onde você parou. Se você pausou dentro de uma task, o `Notes:` inline sob aquela task conta por quê.
 
-Example:
+Exemplo:
 
 ```markdown
-- [x] Task 6: normalize phone number
-- [ ] Task 7: API route for lead submission
-   Notes: paused here. Zod v4 changed union types API,
-   need to confirm shape with team before continuing.
-- [ ] Task 8: retry queue
+- [x] Task 6: normalizar número de telefone
+- [ ] Task 7: rota de API para envio de lead
+   Notes: pausei aqui. O Zod v4 mudou a API de union types,
+   preciso confirmar o formato com o time antes de continuar.
+- [ ] Task 8: fila de retry
 ```
 
-You (or another agent) opens this file and knows: task 7, blocker is Zod v4, resume when confirmed.
+Você (ou outro agent) abre esse arquivo e sabe: task 7, o bloqueio é Zod v4, retomar quando confirmado.
 
-### Why it feels slow at first
+### Por que parece lento no início
 
-The spec + plan phase costs an hour or two before any code runs. The first three or four features feel slower than vibe-coding. The break-even is usually around the fifth feature, when the specs start catching design mistakes that would otherwise ship and be rewritten.
+A fase de spec + plan custa uma ou duas horas antes de qualquer código rodar. As primeiras três ou quatro features parecem mais lentas que codificar no impulso. O ponto de equilíbrio costuma ficar por volta da quinta feature, quando as specs começam a pegar erros de design que de outro jeito iriam ao ar e precisariam ser reescritos.
 
-### When NOT to use this flow
+### Quando NÃO usar esse fluxo
 
-- Trivial bug fixes (typos, label changes)
-- Mechanical refactors (rename, move, extract)
-- Throwaway prototypes (but if the prototype ships, run the flow before merging)
+- Correções de bug triviais (typos, mudanças de label)
+- Refatorações mecânicas (renomear, mover, extrair)
+- Prototypes descartáveis (mas se o prototype for ao ar, rode o fluxo antes do merge)
 
-### Two non-negotiables
+### Dois inegociáveis
 
-1. **Spec is source of truth.** When code and spec diverge, ask, do not assume.
-2. **Test before code.** Every task in `tasks.md` starts with a failing test, then minimal code, then refactor.
+1. **A spec é a fonte de verdade.** Quando código e spec discordam, pergunte, não assuma.
+2. **Teste antes do código.** Toda task em `tasks.md` começa com um teste que falha, depois o código mínimo, depois o refactor.
 
 ---
 
-## Chapter 9: Architecture Decision Records
+## Capítulo 9: Registros de Decisão de Arquitetura
 
-Specs describe what a feature does. ADRs describe why the system is shaped the way it is. Both are needed, and they answer different questions.
+Specs descrevem o que uma feature faz. ADRs descrevem por que o sistema tem a forma que tem. Os dois são necessários, e respondem perguntas diferentes.
 
-An ADR is a short, immutable document capturing a single significant decision:
+Um ADR é um documento curto e imutável que captura uma única decisão significativa:
 
-- The context that forced it
-- The options considered
-- The choice made
-- Consequences (positive, negative, accepted risks)
+- O contexto que a forçou
+- As opções consideradas
+- A escolha feita
+- Consequências (positivas, negativas, riscos aceitos)
 
-Once accepted, an ADR does not change. If the decision later shifts, a new ADR supersedes the old one. Both remain in the repo. The full history of reasoning is the value.
+Uma vez aceito, um ADR não muda. Se a decisão mudar depois, um ADR novo supera o antigo. Os dois permanecem no repo. O histórico completo do raciocínio é o valor.
 
-### Five concrete benefits
+### Cinco benefícios concretos
 
-**1. Preserves context that disappears.**
-Six months from now you'll look at a strange choice and wonder why. The ADR explains the constraints that shaped it - constraints that may no longer be obvious. Without it, someone "corrects" the decision and breaks something because they didn't know why it was that way.
+**1. Preserva contexto que desaparece.**
+Seis meses a partir de agora você vai olhar para uma escolha estranha e se perguntar por quê. O ADR explica as restrições que a moldaram, restrições que talvez não sejam mais óbvias. Sem ele, alguém "corrige" a decisão e quebra algo porque não sabia por que era daquele jeito.
 
-**2. Prevents re-litigation.**
-Someone asks "why aren't we using Redis?" Instead of debating from scratch, you point to ADR 0003 and get back to work. Discussion cost collapses.
+**2. Evita reabrir a mesma discussão.**
+Alguém pergunta "por que não estamos usando Redis?" Em vez de debater do zero, você aponta para o ADR 0003 e volta ao trabalho. O custo da discussão desaba.
 
-**3. Onboarding gets faster.**
-A new developer reads 10 ADRs and understands the architectural reasoning without interviewing everyone. That's often the difference between "productive in two weeks" and "productive in two months."
+**3. Onboarding fica mais rápido.**
+Um desenvolvedor novo lê 10 ADRs e entende o raciocínio arquitetural sem entrevistar todo mundo. Isso costuma ser a diferença entre "produtivo em duas semanas" e "produtivo em dois meses".
 
-**4. Traceability during failures.**
-When something breaks because of an old decision, the ADR shows the premises it was made under. You check whether the premises still hold. If not, that's your fix.
+**4. Rastreabilidade durante falhas.**
+Quando algo quebra por causa de uma decisão antiga, o ADR mostra as premissas sob as quais ela foi tomada. Você checa se as premissas ainda valem. Se não, esse é o seu conserto.
 
-**5. Writing the ADR exposes fragility.**
-Often you start writing and realize the decision doesn't hold up. Better to discover that now than in production.
+**5. Escrever o ADR expõe fragilidade.**
+Muitas vezes você começa a escrever e percebe que a decisão não se sustenta. Melhor descobrir isso agora do que em produção.
 
-### When to write one
+### Quando escrever um
 
-Yes, write an ADR when:
+Sim, escreva um ADR quando:
 
-- Choosing a core technology (framework, database, ORM, auth provider)
-- Changing the trust model or architecture
-- Setting a constraint that will shape future features
-- Deciding "we are NOT doing X" when X looks tempting
+- Escolher uma tecnologia central (framework, banco de dados, ORM, provedor de auth)
+- Mudar o modelo de confiança ou a arquitetura
+- Fixar uma restrição que vai moldar features futuras
+- Decidir "NÃO vamos fazer X" quando X parece tentador
 
-No, don't write one for:
+Não, não escreva um para:
 
-- Naming conventions (those go in `docs/CONVENTIONS.md` or `baseline/rules/`)
-- Trivial library choices (lodash, date-fns)
-- Anything reversible in a day
+- Convenções de nomenclatura (essas vão em `docs/CONVENTIONS.md` ou `baseline/rules/`)
+- Escolhas triviais de biblioteca (lodash, date-fns)
+- Qualquer coisa reversível num dia
 
-### Format
+### Formato
 
-The template ships at `docs/decisions/0001-example.md`. Structure:
+O template traz um em `docs/decisions/0001-example.md`. Estrutura:
 
 ```markdown
-# NNNN - Title
+# NNNN - Título
 
 **Status:** Proposed | Accepted | Superseded by NNNN
 **Date:** YYYY-MM-DD
-**Decider:** name or team
+**Decider:** nome ou time
 
 ## Context
-What forced the decision. Constraints, problem, trigger.
+O que forçou a decisão. Restrições, problema, gatilho.
 
 ## Options considered
-1. A - pros, cons
-2. B - pros, cons
+1. A - vantagens, desvantagens
+2. B - vantagens, desvantagens
 
 ## Decision
-We chose X because...
+Escolhemos X porque...
 
 ## Consequences
 ### Positive / Negative / Risks accepted
 
 ## Revisit when
-Conditions that would trigger reopening.
+Condições que reabririam essa decisão.
 ```
 
-Numbered sequentially (0001, 0002, ...) with short kebab-case slugs.
+Numerados em sequência (0001, 0002, ...) com slugs curtos em kebab-case.
 
-### Four ways to integrate ADRs with AI agents
+### Quatro formas de integrar ADRs com agents de IA
 
-**1. Read ADRs during exploration.**
-The `explore` skill in this template reads `docs/decisions/` before proposing options. Past decisions surface naturally. Add to your CLAUDE.md: "Before proposing architecture, check `docs/decisions/` for related ADRs."
+**1. Ler ADRs durante a exploração.**
+A skill `explore` deste template lê `docs/decisions/` antes de propor opções. Decisões passadas aparecem naturalmente. Adicione ao seu CLAUDE.md: "Antes de propor arquitetura, confira `docs/decisions/` por ADRs relacionados."
 
-**2. Enforce during code review.**
-Add to the `code-reviewer` subagent prompt: "Verify this change does not silently violate any accepted ADR in `docs/decisions/`." Failed check becomes a report item.
+**2. Reforçar durante code review.**
+Adicione ao prompt do subagent `code-reviewer`: "Verifique se esta mudança não viola em silêncio nenhum ADR aceito em `docs/decisions/`." Um check que falha se torna um item do relatório.
 
-**3. Cite in explanations.**
-The `researcher` subagent, when asked "why is X this way?", cites ADRs directly. Add to its prompt: "When explaining an existing design choice, look for an ADR that documents it and cite it by number."
+**3. Citar em explicações.**
+O subagent `researcher`, quando perguntado "por que X é desse jeito?", cita ADRs diretamente. Adicione ao prompt dele: "Ao explicar uma escolha de design já existente, procure um ADR que a documente e cite pelo número."
 
-**4. Propose new ADRs proactively.**
-When you find yourself explaining "why we did X" more than twice in Slack/PRs/reviews, that's the trigger. Ask an agent: "Turn this explanation into an ADR draft in `docs/decisions/`." Review, number it, commit.
+**4. Propor ADRs novos proativamente.**
+Quando você se pegar explicando "por que fizemos X" mais de duas vezes no Slack/PRs/reviews, esse é o gatilho. Peça a um agent: "Transforme esta explicação num draft de ADR em `docs/decisions/`." Revise, numere, commite.
 
-### One habit worth building
+### Um hábito que vale construir
 
-If a decision is contested in a PR and the code will change based on the discussion, write the ADR *first*, then approve the PR. This prevents "we agreed something in a chat that nobody documented" - the most common source of decision drift.
+Se uma decisão é contestada num PR e o código vai mudar com base na discussão, escreva o ADR *primeiro*, depois aprove o PR. Isso evita "combinamos algo num chat que ninguém documentou", a fonte mais comum de deriva de decisão.
 
 ---
 
-## Chapter 10: Hooks and lifecycle events
+## Capítulo 10: Hooks e eventos de ciclo de vida
 
-Hooks are deterministic scripts that run on tool lifecycle events. They do not load context, they cause side effects.
+Hooks são scripts determinísticos que rodam em eventos do ciclo de vida das tools. Eles não carregam contexto, causam efeitos colaterais.
 
-### Available events
+### Eventos disponíveis
 
-| Event | When it fires | Use for |
+| Evento | Quando dispara | Use para |
 |---|---|---|
-| `PreToolUse` | Before any tool runs | Block dangerous commands, validate input |
-| `PostToolUse` | After a tool completes | Auto-format, lint, notification |
-| `Stop` | When Claude finishes its turn | Desktop notification, metric logging |
-| `SessionStart` | At the start of a session | Inject extra context |
-| `Notification` | When Claude needs your input | Visual or sound alert |
+| `PreToolUse` | Antes de qualquer tool rodar | Bloquear comandos perigosos, validar input |
+| `PostToolUse` | Depois que uma tool termina | Auto-formatação, lint, notificação |
+| `Stop` | Quando o Claude termina o turno | Notificação de desktop, log de métrica |
+| `SessionStart` | No início de uma sessão | Injetar contexto extra |
+| `Notification` | Quando o Claude precisa do seu input | Alerta visual ou sonoro |
 
-### Anatomy
+### Anatomia
 
-A hook is any executable that reads JSON from stdin. Exit code 0 allows, non-zero blocks (for Pre events).
+Um hook é qualquer executável que lê JSON do stdin. Código de saída 0 libera, diferente de zero bloqueia (para eventos Pre).
 
 ```bash
 #!/usr/bin/env bash
@@ -512,7 +512,7 @@ fi
 exit 0
 ```
 
-Registered in `settings.json`:
+Registrado em `settings.json`:
 
 ```json
 {
@@ -529,140 +529,140 @@ Registered in `settings.json`:
 }
 ```
 
-### Good fits for hooks
+### Bons casos de uso para hooks
 
-- Blocking destructive commands (`rm -rf /`, `git push --force`)
-- Preventing secret leakage (reading `.env`, printing tokens)
-- Auto-formatting on file write
-- Desktop notification on long-running task completion
+- Bloquear comandos destrutivos (`rm -rf /`, `git push --force`)
+- Prevenir vazamento de secret (ler `.env`, imprimir tokens)
+- Auto-formatação ao escrever um arquivo
+- Notificação de desktop quando uma task longa termina
 
-### Bad fits for hooks
+### Casos de uso ruins para hooks
 
-- Loading context (use rules or docs)
-- Network calls (slow and unreliable)
-- Anything that depends on global state
+- Carregar contexto (use rules ou docs)
+- Chamadas de rede (lentas e não confiáveis)
+- Qualquer coisa que depende de estado global
 
 ---
 
-## Chapter 11: Greenfield vs brownfield
+## Capítulo 11: Greenfield vs brownfield
 
-The terms come from construction. **Greenfield** is empty land: you start from scratch, no constraints from prior work. **Brownfield** is land where buildings already exist: you have to reckon with what's there before you can build.
+Os termos vêm da construção civil. **Greenfield** é terreno vazio: você começa do zero, sem restrições de trabalho anterior. **Brownfield** é terreno onde já existem construções: você precisa lidar com o que já está lá antes de conseguir construir.
 
-In code:
+Em código:
 
-- A brand new repo on day one is greenfield
-- Almost every real project a month later is brownfield
-- Legacy codebases (years old, many hands, sparse docs) are extreme brownfield
+- Um repo novo no dia um é greenfield
+- Quase todo projeto real um mês depois é brownfield
+- Codebases legadas (anos de idade, muitas mãos, docs escassos) são brownfield extremo
 
-Why this matters for AI agents: models are trained mostly on code that gets presented in "here's how you build X from scratch" tutorials. When you ask a fresh session to add a feature, the default behavior is greenfield thinking - install a lib, create abstractions, write everything from zero. In brownfield, that produces parallel implementations of things that already exist, drift from established patterns, and slow, expensive rework.
+Por que isso importa para agents de IA: modelos são treinados majoritariamente em código apresentado em tutoriais do tipo "veja como construir X do zero". Quando você pede para uma sessão nova adicionar uma feature, o comportamento padrão é pensar em greenfield: instalar uma lib, criar abstrações, escrever tudo do zero. Em brownfield, isso produz implementações paralelas de coisas que já existem, desvio dos padrões estabelecidos, e retrabalho lento e caro.
 
-### The brownfield mindset
+### A mentalidade de brownfield
 
-Before any code, three questions:
+Antes de qualquer código, três perguntas:
 
-1. Does this already exist here?
-2. If not, what's the closest analog and how is it structured?
-3. Which conventions apply to the area I'll be touching?
+1. Isso já existe aqui?
+2. Se não, qual é o análogo mais próximo e como ele está estruturado?
+3. Quais convenções se aplicam à área que vou tocar?
 
-Skipping these turns every task into greenfield. Following them keeps the codebase coherent.
+Pular essas perguntas transforma toda task em greenfield. Segui-las mantém o codebase coerente.
 
-### How this template supports brownfield
+### Como este template dá suporte a brownfield
 
-Six mechanisms work together:
+Seis mecanismos trabalham juntos:
 
-**`analyze-codebase` skill (one-time)**
-When you adopt this template on an existing project, this skill scans the codebase, samples files, detects stack and conventions, and generates baseline docs (`CONSTITUTION.md`, `CONVENTIONS.md`, `architecture/overview.md`). It also generates a repo map, always, regardless of project size.
+**Skill `analyze-codebase` (uma vez só)**
+Quando você adota este template num projeto existente, essa skill escaneia o codebase, amostra arquivos, detecta stack e convenções, e gera docs de baseline (`CONSTITUTION.md`, `CONVENTIONS.md`, `architecture/overview.md`). Ela também gera um repo map, sempre, independente do tamanho do projeto.
 
 **Repo map (`.claude/context/repo-map.md`)**
-A small, deterministic map, directory tree with per-directory file counts, entry points, test locations, and the commands block lifted from `AGENTS.md`, generated by `baseline/scripts/repo-map.sh`. It grows with directory count, not file content, so it stays in the low thousands of tokens even on a 1000+ file repo (measured: `docs/decisions/0003-repo-map-over-snapshot.md`). This replaced an earlier design that packed the whole codebase into one file with Repomix; that approach landed in the megabytes on a real repo, far past anything readable as context, so it is now demoted to a separate, manual, opt-in export (see below) instead of the default.
+Um mapa pequeno e determinístico: árvore de diretórios com contagem de arquivos por pasta, entry points, locais de teste, e o bloco de comandos retirado do `AGENTS.md`, gerado por `baseline/scripts/repo-map.sh`. Ele cresce com a contagem de diretórios, não com o conteúdo dos arquivos, então fica na faixa de poucos milhares de tokens até num repo com mais de mil arquivos (medido em `docs/decisions/0003-repo-map-over-snapshot.md`). Isso substituiu um design anterior que empacotava o codebase inteiro num arquivo com o Repomix; essa abordagem chegava a megabytes num repo real, bem além de qualquer coisa legível como contexto, então agora está rebaixada a um export separado, manual e opt-in (veja abaixo) em vez de ser o padrão.
 
-**No staleness check on the repo map**
-Regenerating it is under a second, so the template just regenerates it every time instead of caching and classifying age. `baseline/scripts/check-snapshot.sh` still exists, but it now classifies the manual Repomix export, and its first check is a hard size budget (`too-large` above ~75k tokens), not staleness.
+**Sem check de defasagem no repo map**
+Regenerá-lo custa menos de um segundo, então o template simplesmente o regenera sempre em vez de fazer cache e classificar idade. `baseline/scripts/check-snapshot.sh` ainda existe, mas agora classifica o export manual do Repomix, e seu primeiro check é um orçamento rígido de tamanho (`too-large` acima de aproximadamente 75 mil tokens), não defasagem.
 
-**`codebase-explorer` subagent**
-Read-only. Generates the repo map fresh for panoramic questions, uses grep/glob for scoped ones. Reports what it read and what it found.
+**Subagent `codebase-explorer`**
+Somente leitura. Gera o repo map do zero para perguntas panorâmicas, usa grep/glob para perguntas específicas. Reporta o que leu e o que encontrou.
 
-**`SessionStart` hook**
-Warns you at the start of a session only if a Repomix export exists on disk and is over its size budget. Silent otherwise, including when no export exists at all, which is the common case now. Never blocks.
+**Hook de `SessionStart`**
+Avisa no início de uma sessão só se existir um export do Repomix no disco e ele estiver acima do orçamento de tamanho. Silencioso no resto, inclusive quando nenhum export existe, que é o caso comum agora. Nunca bloqueia.
 
-**`find-existing-first` skill**
-Fires immediately before creating any new file. Searches synonyms, checks patterns, reports findings. Only proceeds to creation if nothing exists.
+**Skill `find-existing-first`**
+Dispara imediatamente antes de criar qualquer arquivo novo. Procura sinônimos, confere padrões, reporta o que encontrou. Só segue para a criação se nada existir.
 
-### The workflow
+### O workflow
 
-Adopting the template on a brownfield project:
+Adotando o template num projeto brownfield:
 
 ```
-1. Clone the template into the project
-2. Run /skill analyze-codebase (generates baseline docs and repo map)
-3. Review the generated docs, fix TODOs, commit
-4. Optional: install Ponytail plugin for cross-tool YAGNI enforcement
-5. From now on, use /skill explore before /skill write-spec for new features
-6. Codebase-explorer runs silently when depth is needed, regenerating the repo map itself
+1. Clone o template no projeto
+2. Rode /skill analyze-codebase (gera docs de baseline e o repo map)
+3. Revise os docs gerados, resolva os TODOs, commite
+4. Opcional: instale o plugin Ponytail para reforço de YAGNI entre ferramentas
+5. A partir de agora, use /skill explore antes de /skill write-spec para features novas
+6. O codebase-explorer roda em silêncio quando profundidade é necessária, regenerando o repo map por conta própria
 ```
 
-You don't manage the repo map manually after step 2. The system takes care of it.
-If you also want a manual, single-file Repomix export for some other tool,
-`/skill refresh-snapshot` does that on request; it is separate and optional.
+Você não gerencia o repo map manualmente depois do passo 2. O sistema cuida disso.
+Se você também quiser um export manual, de arquivo único, do Repomix para alguma outra ferramenta,
+`/skill refresh-snapshot` faz isso quando pedido; é separado e opcional.
 
-### External tools that complement this
+### Ferramentas externas que complementam isso
 
-- **[Ponytail](https://github.com/DietrichGebert/ponytail)** - cross-tool plugin applying a YAGNI ladder before writing any code
-- **[Repomix](https://github.com/yamadashy/repomix)** - packs the codebase into one file; wired only into the manual `refresh-snapshot` skill, not into panoramic context (that is the built-in repo map)
-- **[OpenSpec](https://github.com/Fission-AI/OpenSpec)** - full spec-driven toolkit with `/opsx:explore` command, cross-tool (30+ agents). Compatible with the template's `specs/` location via config
-- **[Superpowers](https://github.com/obra/superpowers)** - Claude-only plugin with enforced brainstorm → spec → plan → TDD flow
+- **[Ponytail](https://github.com/DietrichGebert/ponytail)** - plugin entre ferramentas que aplica uma escada YAGNI antes de escrever qualquer código
+- **[Repomix](https://github.com/yamadashy/repomix)** - empacota o codebase num arquivo só; conectado apenas à skill manual `refresh-snapshot`, não ao contexto panorâmico (isso é o repo map nativo)
+- **[OpenSpec](https://github.com/Fission-AI/OpenSpec)** - toolkit completo de desenvolvimento guiado por spec com o comando `/opsx:explore`, entre ferramentas (mais de 30 agents). Compatível com a localização `specs/` do template via config
+- **[Superpowers](https://github.com/obra/superpowers)** - plugin exclusivo do Claude com fluxo reforçado de brainstorm, spec, plan, TDD
 
 ---
 
-## Chapter 12: Common mistakes
+## Capítulo 12: Erros comuns
 
-### 1. CLAUDE.md becomes a wiki
+### 1. O CLAUDE.md se torna uma wiki
 
-The symptom: `CLAUDE.md` grows past 200 lines with sections on every library and convention. The cost: every session pays for all of it, and content duplicates with `AGENTS.md`.
+O sintoma: `CLAUDE.md` passa de 200 linhas com seções sobre toda biblioteca e convenção. O custo: toda sessão paga por tudo isso, e o conteúdo duplica com o `AGENTS.md`.
 
-The fix: make `CLAUDE.md` a **stub** that points to `AGENTS.md` for shared content (stack, commands, conventions, structure), and keep it lean with only Claude-specific extras (which skills/agents/hooks ship in this project). Move detailed reference material to `baseline/docs/`, scope conventions to `baseline/rules/` with `paths:`, and put folder-specific guidance in nested `CLAUDE.md`.
+O conserto: faça do `CLAUDE.md` um **stub** que aponta para `AGENTS.md` para o conteúdo compartilhado (stack, comandos, convenções, estrutura), e mantenha-o magro, só com extras específicos do Claude (quais skills/agents/hooks este projeto entrega). Mova o material de referência detalhado para `baseline/docs/`, dê escopo a convenções em `baseline/rules/` com `paths:`, e coloque orientação específica de pasta em CLAUDE.md aninhado.
 
-### 2. Skills with vague descriptions
+### 2. Skills com descrições vagas
 
-The symptom: a skill exists but Claude never auto-invokes it.
+O sintoma: uma skill existe mas o Claude nunca a auto-invoca.
 
-The fix: the `description` is the trigger, not documentation. Write it as a condition: "Use when adding a new webhook handler" beats "Helps with webhook integrations".
+O conserto: a `description` é o gatilho, não documentação. Escreva-a como uma condição: "Use when adding a new webhook handler" vence "Helps with webhook integrations".
 
-### 3. Rules without `paths:`
+### 3. Rules sem `paths:`
 
-The symptom: a rule auto-loads in every session, becoming a hidden CLAUDE.md.
+O sintoma: uma rule carrega automaticamente em toda sessão, se tornando um CLAUDE.md escondido.
 
-The fix: always add `paths:` to scope rules. Otherwise they belong in `CLAUDE.md` (and probably should be shorter).
+O conserto: sempre adicione `paths:` para dar escopo a rules. Do contrário elas pertencem ao `CLAUDE.md` (e provavelmente deveriam ser mais curtas).
 
-### 4. Library docs duplicated from official sources
+### 4. Docs de biblioteca duplicados de fontes oficiais
 
-The symptom: `baseline/docs/libs/<lib>.md` is a copy of the official API reference. It goes stale fast.
+O sintoma: `baseline/docs/libs/<lib>.md` é uma cópia da referência oficial da API. Fica defasado rápido.
 
-The fix: `baseline/docs/libs/` should only contain the project-specific subset and gotchas. Use Context7 MCP for live official docs.
+O conserto: `baseline/docs/libs/` deve conter só o subconjunto específico do projeto e as pegadinhas. Use Context7 MCP para docs oficiais em tempo real.
 
-### 5. Spec gets ignored mid-implementation
+### 5. A spec é ignorada no meio da implementação
 
-The symptom: code drifts from spec, nobody notices until QA.
+O sintoma: o código se desvia da spec, ninguém percebe até o QA.
 
-The fix: when code and spec diverge, stop and ask which is right. The `code-reviewer` subagent auto-runs at each phase boundary to catch drift early.
+O conserto: quando código e spec discordam, pare e pergunte qual está certo. O subagent `code-reviewer` roda automaticamente em cada limite de fase para pegar o desvio cedo.
 
-### 6. Subagent memory becomes outdated
+### 6. A memória do subagent fica desatualizada
 
-The symptom: subagent gives advice based on a pattern that no longer exists in the codebase.
+O sintoma: o subagent dá conselho baseado num padrão que não existe mais no codebase.
 
-The fix: review `MEMORY.md` periodically (every month or two). After major refactors, clear it: `rm -rf .claude/agent-memory/<name>/`.
+O conserto: revise o `MEMORY.md` periodicamente (a cada um ou dois meses). Depois de grandes refactors, limpe: `rm -rf .claude/agent-memory/<name>/`.
 
-### 7. Subagent permissions too broad
+### 7. Permissões do subagent amplas demais
 
-The symptom: a `code-reviewer` accidentally edits files instead of reporting.
+O sintoma: um `code-reviewer` edita arquivos por acidente em vez de só reportar.
 
-The fix: scope the `tools:` field tightly. A reviewer needs `Read, Grep, Glob`, not `Edit`.
+O conserto: dê escopo estreito ao campo `tools:`. Um reviewer precisa de `Read, Grep, Glob`, não de `Edit`.
 
 ---
 
-## What to read next
+## O que ler a seguir
 
-- The [official Claude Code docs](https://code.claude.com/docs/en/claude-directory)
-- The [Superpowers repo](https://github.com/obra/superpowers) for spec-driven development
-- The [AGENTS.md convention](https://agents.md) for cross-tool guidance
-- Open this repo's [`CLAUDE.md`](./CLAUDE.md), [`AGENTS.md`](./AGENTS.md), and [`.claude/`](./.claude/) and read them as reference
+- A [documentação oficial do Claude Code](https://code.claude.com/docs/en/claude-directory)
+- O [repo do Superpowers](https://github.com/obra/superpowers) para desenvolvimento guiado por spec
+- A [convenção AGENTS.md](https://agents.md) para orientação entre ferramentas
+- Abra o [`CLAUDE.md`](./CLAUDE.md), o [`AGENTS.md`](./AGENTS.md) e o [`.claude/`](./.claude/) deste repo e leia-os como referência

@@ -1,62 +1,65 @@
 # docs/decisions/
 
-Architecture Decision Records (ADRs). An immutable history of significant decisions.
+Architecture Decision Records (ADRs). Um histórico imutável de decisões significativas.
 
-## What an ADR is
+## O que é uma ADR
 
-A short document that captures one decision:
+Um documento curto que registra uma decisão:
 
-- The context (what forced the decision)
-- Options considered
-- The choice
-- Consequences (positive, negative, risks)
+- O contexto (o que forçou a decisão)
+- Opções consideradas
+- A escolha
+- Consequências (positivas, negativas, riscos)
 
-Once accepted, an ADR does not change. If the decision later shifts, a new ADR supersedes it. Both stay in the repo - the history of reasoning is the value.
+Depois de aceita, uma ADR não muda. Se a decisão mudar depois, uma nova ADR a
+supersede. Ambas ficam no repositório: o histórico do raciocínio é o valor.
 
-## When to write one
+## Quando escrever uma
 
-Yes:
+Sim:
 
-- Choice of a core technology (framework, database, ORM)
-- Change in trust model or architecture
-- A constraint that will shape future features
-- "We are NOT doing X" when X looks tempting
+- Escolha de uma tecnologia central (framework, banco de dados, ORM)
+- Mudança no modelo de confiança ou na arquitetura
+- Uma restrição que vai moldar features futuras
+- "NÃO estamos fazendo X" quando X parece tentador
 
-No:
+Não:
 
-- Naming conventions (that goes in `CONVENTIONS.md` or `.claude/rules/`)
-- Small library choices (lodash, date-fns)
-- Anything easily reversible in a day
+- Convenções de nomenclatura (isso vai em `CONVENTIONS.md` ou `.claude/rules/`)
+- Escolhas pequenas de biblioteca (lodash, date-fns)
+- Qualquer coisa facilmente reversível em um dia
 
-## Naming and numbering
+## Nomenclatura e numeração
 
-`NNNN-slug-curto.md` where:
+`NNNN-slug-curto.md`, onde:
 
-- `NNNN` is a 4-digit sequential number (0001, 0002, ...)
-- `slug-curto` is kebab-case, max 5 words
+- `NNNN` é um número sequencial de 4 dígitos (0001, 0002, ...)
+- `slug-curto` é kebab-case, no máximo 5 palavras
 
-Examples:
+Exemplos:
 
 - `0001-use-postgres-not-mysql.md`
 - `0002-no-redis-for-mvp.md`
 - `0003-adopt-trpc-over-rest.md`
 
-See [`0001-example.md`](./0001-example.md) for the template.
+Veja [`0001-example.md`](./0001-example.md) para o template.
 
-## Integration with AI agents
+## Integração com agentes de IA
 
-ADRs become valuable context. Agents in this template use them:
+ADRs se tornam contexto valioso. Os agentes deste template as usam:
 
-- `explore` skill reads ADRs before proposing options - surfaces prior decisions
-- `code-reviewer` checks that changes don't silently violate accepted ADRs
-- `researcher` cites ADRs when explaining "why is it this way?"
+- a skill `explore` lê ADRs antes de propor opções, trazendo à tona decisões anteriores
+- `code-reviewer` verifica se mudanças não violam silenciosamente ADRs aceitas
+- `researcher` cita ADRs ao explicar "por que é assim?"
 
-To integrate well, ADRs must be:
+Para se integrar bem, ADRs precisam ser:
 
-- Concrete (specific decision, not vague direction)
-- Discoverable (short, clear title in the filename)
-- Reversible via new ADR, never by silent code change
+- Concretas (decisão específica, não direção vaga)
+- Descobríveis (título curto e claro no nome do arquivo)
+- Reversíveis via nova ADR, nunca por mudança silenciosa de código
 
-## When someone asks "why?" more than twice
+## Quando alguém perguntar "por quê?" mais de duas vezes
 
-If a question comes up more than twice in Slack/Discord/PR reviews - turn the answer into an ADR. That's the leading indicator of missing decision history.
+Se uma pergunta aparecer mais de duas vezes no Slack/Discord/reviews de PR,
+transforme a resposta numa ADR. Esse é o indicador principal de histórico de
+decisão faltando.

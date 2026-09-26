@@ -1,114 +1,114 @@
-# Superpowers and the spec-driven flow
+# Superpowers e o fluxo spec-driven
 
-> Last reviewed: YYYY-MM-DD
-> Reference: https://github.com/obra/superpowers
+> Última revisão: YYYY-MM-DD
+> Referência: https://github.com/obra/superpowers
 
-## What is Superpowers
+## O que é o Superpowers
 
-Superpowers is an official Claude Code plugin by Jesse Vincent (obra/superpowers). It installs a set of skills that **enforce** a structured development flow through quality gates.
+Superpowers é um plugin oficial do Claude Code feito por Jesse Vincent (obra/superpowers). Ele instala um conjunto de skills que **impõem** um fluxo de desenvolvimento estruturado através de quality gates.
 
-Core philosophy: AI agents respond to structure, not suggestions. "Always write tests first" in `CLAUDE.md` is a suggestion. A skill with enforcement is a gate.
+Filosofia central: agentes de IA respondem a estrutura, não a sugestões. "Sempre escreva testes primeiro" no `CLAUDE.md` é uma sugestão. Uma skill com enforcement é um gate.
 
-## Installation
+## Instalação
 
 ```bash
 # Inside Claude Code
 /plugin install superpowers@claude-plugins-official
 ```
 
-The `using-superpowers` skill auto-loads via a SessionStart hook after install.
+A skill `using-superpowers` carrega automaticamente via um hook SessionStart depois da instalação.
 
-## The canonical flow
+## O fluxo canônico
 
 ```
 Brainstorm  →  spec.md   →  plan.md + tasks.md   →  TDD execution  →  Code review  →  Ship
    (chat)      (commit)         (commit)             (subagents)         (agent)
 ```
 
-Each gate **blocks** the next until resolved.
+Cada gate **bloqueia** o próximo até ser resolvido.
 
 ### 1. Brainstorming
 
-When you describe a feature, the `brainstorming` skill activates automatically. Claude does NOT write code. Instead, it asks socratic questions until the feature is clear.
+Quando você descreve uma feature, a skill `brainstorming` ativa automaticamente. O Claude NÃO escreve código. Em vez disso, ele faz perguntas socráticas até a feature ficar clara.
 
-Output: a design document presented in chunks for you to approve.
+Saída: um documento de design apresentado em blocos para você aprovar.
 
 ### 2. Spec
 
-After the brainstorm is approved, it becomes `specs/<date>-<slug>/spec.md`. This is the **source of truth**. Any future divergence between code and spec is resolved by reading the spec, not the code.
+Depois que o brainstorm é aprovado, ele se torna `specs/<date>-<slug>/spec.md`. Esta é a **fonte da verdade**. Qualquer divergência futura entre código e spec é resolvida lendo a spec, não o código.
 
-### 3. Plan and tasks
+### 3. Plan e tasks
 
-The `writing-plans` skill (Superpowers) produces two files in this template:
+A skill `writing-plans` (Superpowers) produz dois arquivos neste template:
 
-- `plan.md` covers the high-level HOW: architecture, tech choices, phases
-- `tasks.md` covers the atomic execution: one checkbox per task, with:
-  - File path
-  - Exact commands
-  - Failing test to write first
-  - Minimal code to make it pass
+- `plan.md` cobre o COMO de alto nível: arquitetura, escolhas técnicas, fases
+- `tasks.md` cobre a execução atômica: um checkbox por tarefa, com:
+  - Caminho do arquivo
+  - Comandos exatos
+  - Teste que falha a ser escrito primeiro
+  - Código mínimo para fazê-lo passar
 
-Note: some older Superpowers versions generate a single `plan.md` with tasks inline. This template splits them for clarity. If you use Superpowers as-is, either configure it to split or manually extract the tasks into `tasks.md` after generation.
+Nota: algumas versões mais antigas do Superpowers geram um único `plan.md` com as tarefas embutidas. Este template os separa para maior clareza. Se você usa o Superpowers como vem, configure-o para separar ou extraia as tarefas manualmente para `tasks.md` depois da geração.
 
-### 4. Execution via subagent-driven-development
+### 4. Execução via subagent-driven-development
 
-The `subagent-driven-development` skill dispatches a subagent **per task**, with fresh context. Each subagent:
+A skill `subagent-driven-development` despacha um subagente **por tarefa**, com contexto novo. Cada subagente:
 
-1. Reads the spec (context)
-2. Reads its phase in the plan (architecture context)
-3. Reads its task in `tasks.md` (execution steps)
-4. Writes the failing test (red)
-5. Implements minimum to pass (green)
-6. Refactors if needed
-7. Reports back and marks the box in `tasks.md`
+1. Lê a spec (contexto)
+2. Lê sua fase no plano (contexto de arquitetura)
+3. Lê sua tarefa em `tasks.md` (passos de execução)
+4. Escreve o teste que falha (red)
+5. Implementa o mínimo para passar (green)
+6. Refatora se necessário
+7. Reporta de volta e marca a caixa em `tasks.md`
 
-### 5. Code review as gate
+### 5. Code review como gate
 
-At each phase boundary, the `code-reviewer` subagent (in `.claude/agents/`) runs automatically (no permission prompt) and reviews against:
+Em cada fronteira de fase, o subagente `code-reviewer` (em `.claude/agents/`) roda automaticamente (sem prompt de permissão) e revisa contra:
 
 - Spec
 - Plan
-- Conventions
+- Convenções
 
-CRITICAL issues **block** progress. Without resolution, the next task does not run.
+Problemas CRITICAL **bloqueiam** o progresso. Sem resolução, a próxima tarefa não roda.
 
-This is the phase-boundary cadence for working `tasks.md` by hand. When `/orchestrate` drives the same file, `code-reviewer` runs once per cluster instead — see `baseline/skills/orchestrate/SKILL.md` Step 3 item 4.
+Essa é a cadência de fronteira de fase para trabalhar o `tasks.md` na mão. Quando o `/orchestrate` dirige o mesmo arquivo, o `code-reviewer` roda uma vez por cluster em vez disso, veja `baseline/skills/orchestrate/SKILL.md` Step 3 item 4.
 
 ### 6. Ship
 
-The `finishing-a-development-branch` skill verifies everything passes, then presents options: merge, PR, keep branch, discard.
+A skill `finishing-a-development-branch` verifica que tudo passa, então apresenta opções: merge, PR, manter a branch, descartar.
 
-## How this template integrates
+## Como este template se integra
 
-- **`specs/`** follows the three-file format (spec.md + plan.md + tasks.md per feature)
-- **`.claude/agents/spec-reviewer.md`** complements brainstorming: audits the spec before it becomes a plan
-- **`.claude/agents/code-reviewer.md`** acts as the automatic gate between phases (between clusters, under `/orchestrate`)
-- **`src/<folder>/CLAUDE.md`** nested files provide conventions the code-reviewer uses
+- **`specs/`** segue o formato de três arquivos (spec.md + plan.md + tasks.md por feature)
+- **`.claude/agents/spec-reviewer.md`** complementa o brainstorming: audita a spec antes de ela se tornar um plano
+- **`.claude/agents/code-reviewer.md`** age como o gate automático entre fases (entre clusters, sob `/orchestrate`)
+- Arquivos aninhados **`src/<folder>/CLAUDE.md`** fornecem convenções que o code-reviewer usa
 
-## When NOT to use the full flow
+## Quando NÃO usar o fluxo completo
 
-- **Exploratory prototyping:** when you do not know what you want yet, prototype without specs. But the prototype does NOT become production code without running the flow first.
-- **Trivial bug fix:** typo, color tweak, label update.
-- **Mechanical refactor:** rename, move, extract function. No behavior change.
+- **Prototipagem exploratória:** quando você ainda não sabe o que quer, prototipe sem specs. Mas o prototype NÃO se torna código de produção sem passar pelo fluxo primeiro.
+- **Correção trivial de bug:** erro de digitação, ajuste de cor, atualização de label.
+- **Refactor mecânico:** renomear, mover, extrair função. Sem mudança de comportamento.
 
-For everything else: brainstorm, then spec, then plan, then execution.
+Para tudo o mais: brainstorm, depois spec, depois plan, depois execução.
 
-## Non-negotiable discipline
+## Disciplina inegociável
 
-Three things that, if you skip, the flow loses value:
+Três coisas que, se você pular, o fluxo perde valor:
 
-1. **Spec is source of truth.** Every "is this right?" question gets resolved by reading the spec. No exceptions.
-2. **Test before code.** Always. Red, green, refactor.
-3. **Task checkboxes are recovery.** If you get interrupted, they tell you where you stopped. Do not skip.
+1. **Spec é fonte da verdade.** Toda pergunta "isso está certo?" é resolvida lendo a spec. Sem exceções.
+2. **Teste antes de código.** Sempre. Red, green, refactor.
+3. **Checkboxes de tarefa são recuperação.** Se você for interrompido, eles dizem onde você parou. Não pule.
 
-## Common mistakes
+## Erros comuns
 
-- "Can I just implement and write the spec after?" No. The spec captures decisions that get lost in implementation.
-- "This task is too small for a spec." Probably it is a trivial fix. But if you are asking, it probably is not.
-- "The plan is huge." Sign the feature is too big. Break it into smaller features, each with its own spec.
+- "Posso só implementar e escrever a spec depois?" Não. A spec captura decisões que se perdem na implementação.
+- "Essa tarefa é pequena demais para uma spec." Provavelmente é uma correção trivial. Mas se você está perguntando, provavelmente não é.
+- "O plano ficou enorme." Sinal de que a feature está grande demais. Divida em features menores, cada uma com sua própria spec.
 
 ## Links
 
 - Plugin: https://github.com/obra/superpowers
-- Marketplace install: `/plugin install superpowers@claude-plugins-official`
-- Spec-driven tutorial: https://www.datacamp.com/tutorial/spec-driven-development-with-claude-code
+- Instalação via marketplace: `/plugin install superpowers@claude-plugins-official`
+- Tutorial de spec-driven: https://www.datacamp.com/tutorial/spec-driven-development-with-claude-code

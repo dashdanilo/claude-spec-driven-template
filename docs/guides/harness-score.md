@@ -1,129 +1,135 @@
-# Harness Score: measuring this repo's harness, and its two known blind spots
+# Harness Score: medindo o harness deste repositório, e seus dois pontos cegos conhecidos
 
-For anyone who wants to run [`harness-score`](https://github.com/paladini/harness-score)
-against this repo (or a project that linked this harness) and make sense of
-the number it prints.
+Para quem quer executar o [`harness-score`](https://github.com/paladini/harness-score)
+contra este repositório (ou um projeto que linkou este harness) e entender o
+número que ele imprime.
 
-## Prerequisites
+## Pré-requisitos
 
-Node.js on `PATH` (the CLI ships as an npm package; `npx` fetches it, nothing
-to install ahead of time). No account, no network access needed at scan time
-beyond the initial `npx` fetch, no configuration required to get a first
-score.
+Node.js no `PATH` (a CLI é distribuída como um pacote npm; `npx` a busca, nada
+para instalar antes). Nenhuma conta, nenhum acesso à rede necessário no
+momento do escaneamento além da busca inicial via `npx`, nenhuma configuração
+necessária para obter uma primeira pontuação.
 
-## What it measures
+## O que ele mede
 
-`harness-score` is a deterministic, zero-LLM, zero-network CLI. It walks a
-repository's filesystem, checks for concrete artifacts (a file exists, parses,
-matches a pattern), and reports a score out of 108 across six dimensions,
-mapped to a maturity level L0 (unharnessed) through L4 (self-correcting):
+O `harness-score` é uma CLI determinística, sem LLM, sem rede. Ele percorre o
+sistema de arquivos de um repositório, verifica artefatos concretos (um
+arquivo existe, faz parse, casa com um padrão), e reporta uma pontuação de 0
+a 108 em seis dimensões, mapeada para um nível de maturidade de L0 (sem
+harness) até L4 (auto-corretivo):
 
-| Dimension | Points | What it checks for |
+| Dimensão | Pontos | O que verifica |
 |---|---|---|
-| Context & Guides | 20 | `AGENTS.md` substance, scoped rules with frontmatter |
-| Skills & Commands | 17 | `SKILL.md` files, slash commands, subagent definitions |
-| Hooks & Guardrails | 14 | Gate hooks (block risky actions), feedback hooks (lint/format on edit) |
-| Sensors & Feedback | 20 | Test runner, linter, type checker, formatter, actual test files |
-| CI Feedback | 14 | A pipeline that runs tests/lint/types on every push, pre-commit installed |
-| Hygiene & Safety | 23 | `.gitignore`, no leaked secrets, license, lockfile, safe MCP config |
+| Context & Guides | 20 | Substância do `AGENTS.md`, regras escopadas com frontmatter |
+| Skills & Commands | 17 | Arquivos `SKILL.md`, slash commands, definições de subagente |
+| Hooks & Guardrails | 14 | Gate hooks (bloqueiam ações arriscadas), feedback hooks (lint/format ao editar) |
+| Sensors & Feedback | 20 | Test runner, linter, checador de tipos, formatador, arquivos de teste reais |
+| CI Feedback | 14 | Um pipeline que roda testes/lint/tipos em todo push, pre-commit instalado |
+| Hygiene & Safety | 23 | `.gitignore`, sem segredos vazados, licença, lockfile, configuração de MCP segura |
 
-Same repository, same commit: same score, every time. That is what lets it
-gate a CI job (see below), and it is also exactly why it cannot see a harness
-delivered by symlink: it has no judgment to apply, only a fixed set of path
-patterns to match against the files it actually walked.
+Mesmo repositório, mesmo commit: mesma pontuação, sempre. É isso que permite
+usá-lo como gate num job de CI (ver abaixo), e é exatamente por isso que ele
+não consegue ver um harness entregue por symlink: ele não tem julgamento a
+aplicar, só um conjunto fixo de padrões de caminho para casar contra os
+arquivos que de fato percorreu.
 
-## Running it
+## Executando
 
 ```bash
-# human-readable terminal report
+# relatório legível para humanos no terminal
 npx harness-score
 
-# machine-readable
+# legível por máquina
 npx harness-score --json
 
-# markdown report, to a file or stdout
+# relatório em markdown, para um arquivo ou stdout
 npx harness-score --md report.md
 npx harness-score --md -
 
-# CI gate: fail if the score maps below a given level
+# gate de CI: falha se a pontuação mapear para abaixo de um nível dado
 npx harness-score --min-level 2
 ```
 
-This repo pins a specific version in CI (`.github/workflows/test.yml`,
-`harness-score` job) rather than always fetching latest, and gates at
-`--min-level 2`, the level this repo's own harness holds today on a clean
-clone. Bump the pin deliberately, after reading the new version's
-CHANGELOG, not as a drive-by dependency update: the tool's own semver policy
-allows the maturity *model* (what earns points) to change in a minor version,
-so an unpinned bump can move this repo's score for reasons that have nothing
-to do with anything that changed here.
+Este repositório fixa uma versão específica no CI
+(`.github/workflows/test.yml`, job `harness-score`) em vez de sempre buscar a
+mais recente, e usa como gate `--min-level 2`, o nível que o próprio harness
+deste repositório mantém hoje num clone limpo. Atualize a versão fixada
+deliberadamente, depois de ler o CHANGELOG da nova versão, não como uma
+atualização de dependência de passagem: a própria política de semver da
+ferramenta permite que o *modelo* de maturidade (o que ganha pontos) mude numa
+versão minor, então uma atualização sem revisão pode mover a pontuação deste
+repositório por razões que não têm nada a ver com o que mudou aqui.
 
-## Two distortions you will hit on this template's own repos
+## Duas distorções que você vai encontrar nos próprios repositórios deste template
 
-Full mechanism and the source-level evidence for both:
+Mecanismo completo e a evidência no nível do código-fonte para ambas:
 [`docs/decisions/0002-harness-visibility.md`](../decisions/0002-harness-visibility.md).
-The short version, so you do not have to re-derive it:
+A versão curta, para você não precisar rededuzir:
 
-### 1. Skills & Commands understates every repo that links this harness
+### 1. Skills & Commands subestima todo repositório que linka este harness
 
-This harness is delivered by symlink (see the marketplace repo's ADRs 0001,
-0003, 0004, cited in full in ADR 0002 above). `harness-score`'s file walker
-de-duplicates by canonical realpath and keeps only the first-encountered
-physical directory for a given target, so:
+Este harness é entregue por symlink (ver as ADRs 0001, 0003, 0004 do
+repositório marketplace, citadas por completo na ADR 0002 acima). O varredor
+de arquivos do `harness-score` deduplica pelo realpath canônico e mantém só o
+primeiro diretório físico encontrado para um determinado destino, então:
 
-- A repo that links the harness with `install-harness.sh` (absolute,
-  per-item symlinks, deliberately uncommitted per ADR 0003) gets an
-  `outside-root-symlink` verdict, and the **entire scan** is marked
-  incomplete, not just the skills dimension.
-- Even this template's own repo, where `.claude/skills -> ../baseline/skills`
-  is a committed, relative, in-root symlink, still scores 0/17: the walker
-  attributes every file under it to the canonical `baseline/skills/...` path,
-  which none of the `SKL-*`/`AGT-*` checks recognize, since they look
-  specifically for a `.claude/skills/`, `.cursor/skills/`, or
-  `.agents/skills/` path segment.
+- Um repositório que linka o harness com `install-harness.sh` (symlinks
+  absolutos, por item, deliberadamente não commitados conforme a ADR 0003)
+  recebe um veredito `outside-root-symlink`, e **todo o escaneamento** é
+  marcado como incompleto, não só a dimensão de skills.
+- Mesmo o próprio repositório deste template, onde
+  `.claude/skills -> ../baseline/skills` é um symlink commitado, relativo e
+  na raiz, ainda pontua 0/17: o varredor atribui todo arquivo dentro dele ao
+  caminho canônico `baseline/skills/...`, que nenhuma das verificações
+  `SKL-*`/`AGT-*` reconhece, já que procuram especificamente por um segmento
+  de caminho `.claude/skills/`, `.cursor/skills/`, ou `.agents/skills/`.
 
-There is no config flag that fixes this (`.harness-score.json`'s `extends`,
-`rules`, and `extraRoots` keys do not remap paths; there is no
-`--follow-symlinks` flag). Treat a low or 0 Skills & Commands score on any
-repo using this harness as **expected**, not as a sign the harness is
-missing. To see what is actually linked in a given checkout, run
-`install-harness.sh --status` instead of trusting this dimension.
+Não existe flag de configuração que corrija isso (as chaves `extends`,
+`rules` e `extraRoots` do `.harness-score.json` não remapeiam caminhos; não
+existe flag `--follow-symlinks`). Trate uma pontuação baixa ou 0 em Skills &
+Commands em qualquer repositório que use este harness como **esperado**, não
+como um sinal de que o harness está faltando. Para ver o que de fato está
+linkado num determinado checkout, execute `install-harness.sh --status` em
+vez de confiar nesta dimensão.
 
-### 2. A stale nested worktree can inflate the score past what is real
+### 2. Um worktree aninhado e obsoleto pode inflar a pontuação além do real
 
-`njord-back` scored a misleading L4, 99/108, on 2026-09-23. The cause: a
-leftover `.claude/worktrees/<name>/` directory still held an old, fully
-vendored (real files, not symlinks) copy of 48 skills and 20 agents from
-before that repo adopted the symlink-based harness. `harness-score`'s path
-patterns are unanchored (they match `.claude/skills/<name>/SKILL.md`
-*anywhere* in the tree, not just at the repo root), so that stale, unrelated
-copy counted in full and pushed the score to L4 while the repo's actual,
-current, top-level harness setup was exactly as invisible as every other
-repo in this family (distortion #1, above).
+O `njord-back` pontuou um L4 enganoso, 99/108, em 2026-09-23. A causa: um
+diretório `.claude/worktrees/<name>/` sobrando ainda guardava uma cópia
+antiga, totalmente vendorizada (arquivos reais, não symlinks), de 48 skills e
+20 agentes, de antes desse repositório adotar o harness baseado em symlink. Os
+padrões de caminho do `harness-score` não têm âncora (eles casam
+`.claude/skills/<name>/SKILL.md` *em qualquer lugar* da árvore, não só na raiz
+do repositório), então essa cópia obsoleta e sem relação contou por completo
+e empurrou a pontuação para L4 enquanto a configuração real, atual, de nível
+superior do harness do repositório estava exatamente tão invisível quanto em
+todo outro repositório dessa família (distorção nº 1, acima).
 
-Before trusting a high score, check for anything under `.claude/worktrees/`,
-`node_modules/`, or any other nested checkout that might hold its own,
-possibly stale, copy of harness files. `harness-score` has no way to know
-which copy is "the real one."
+Antes de confiar numa pontuação alta, verifique se há qualquer coisa sob
+`.claude/worktrees/`, `node_modules/`, ou qualquer outro checkout aninhado que
+possa guardar sua própria cópia, possivelmente obsoleta, de arquivos do
+harness. O `harness-score` não tem como saber qual cópia é "a real".
 
-## Reading a result honestly
+## Lendo um resultado honestamente
 
-Given both distortions run in the same direction (skills/agents undercounted
-by symlinks, inflated by stale vendored copies), a score from this family of
-repos should always be read as:
+Dado que as duas distorções vão na mesma direção (skills/agentes
+subcontados por symlinks, inflados por cópias vendorizadas obsoletas), uma
+pontuação vinda dessa família de repositórios deveria sempre ser lida assim:
 
-- **Context, Hooks, Sensors, CI, Hygiene:** trustworthy as reported, these
-  dimensions check for files that are either genuinely committed or genuinely
-  absent, and none of them route through the symlink-canonicalization
-  behavior above.
-- **Skills & Commands:** a floor, not a ceiling, on a repo that links this
-  harness. 0/17 does not mean no skills exist; it means `harness-score`
-  could not see the ones that do.
-- **A surprisingly high score:** worth a manual check for a stale nested copy
-  before repeating it anywhere, per the `njord-back` example above.
+- **Context, Hooks, Sensors, CI, Hygiene:** confiáveis como reportadas, essas
+  dimensões verificam arquivos que estão genuinamente commitados ou
+  genuinamente ausentes, e nenhuma delas passa pelo comportamento de
+  canonicalização de symlink acima.
+- **Skills & Commands:** um piso, não um teto, num repositório que linka este
+  harness. 0/17 não significa que nenhuma skill existe; significa que o
+  `harness-score` não conseguiu ver as que existem.
+- **Uma pontuação surpreendentemente alta:** vale uma verificação manual por
+  uma cópia aninhada obsoleta antes de repeti-la em qualquer lugar, conforme
+  o exemplo do `njord-back` acima.
 
-## Next steps
+## Próximos passos
 
-- [`docs/decisions/0002-harness-visibility.md`](../decisions/0002-harness-visibility.md) - the full decision record, with source-level citations.
-- [`ADOPTING.md`](../../ADOPTING.md) - how a project links this harness (the mechanism that causes distortion #1).
-- [harness-score's own guide](https://paladini.github.io/harness-score/) - the maturity model and full check catalog, maintained upstream.
+- [`docs/decisions/0002-harness-visibility.md`](../decisions/0002-harness-visibility.md) - o registro completo da decisão, com citações no nível do código-fonte.
+- [`ADOPTING.md`](../../ADOPTING.md) - como um projeto linka este harness (o mecanismo que causa a distorção nº 1).
+- [o próprio guia do harness-score](https://paladini.github.io/harness-score/) - o modelo de maturidade e o catálogo completo de verificações, mantido upstream.

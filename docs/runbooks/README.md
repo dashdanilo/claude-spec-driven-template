@@ -1,77 +1,81 @@
 # docs/runbooks/
 
-Step-by-step procedures for operational tasks. When you're on-call at 3am, you follow a runbook, not an architecture diagram.
+Procedimentos passo a passo para tarefas operacionais. Quando você está de
+plantão às 3 da manhã, você segue um runbook, não um diagrama de arquitetura.
 
-## What a runbook is
+## O que é um runbook
 
-A checklist for a specific operational task:
+Uma checklist para uma tarefa operacional específica:
 
-- Deploy to production
-- Roll back a failed deploy
-- Rotate credentials
-- Respond to an incident type
-- Onboard a new integration
+- Fazer deploy em produção
+- Fazer rollback de um deploy que falhou
+- Rotacionar credenciais
+- Responder a um tipo de incidente
+- Integrar uma nova integração
 
-The rule: someone unfamiliar with the system should be able to execute the runbook by following it literally. If they need to think, the runbook is incomplete.
+A regra: alguém sem familiaridade com o sistema deveria conseguir executar o
+runbook seguindo-o literalmente. Se precisar pensar, o runbook está incompleto.
 
-## Format
+## Formato
 
 ```markdown
-# <Task name>
+# <Nome da tarefa>
 
-**When to use:** <the specific situation>
-**Estimated time:** <realistic estimate>
-**Requires:** <access, tools, credentials>
+**Quando usar:** <a situação específica>
+**Tempo estimado:** <estimativa realista>
+**Requer:** <acesso, ferramentas, credenciais>
 
-## Pre-flight checks
+## Verificações prévias
 
-1. Confirm you have <access>
-2. Notify #ops in Slack
-3. Verify no active incidents
+1. Confirme que você tem <acesso>
+2. Avise o #ops no Slack
+3. Verifique se não há incidentes ativos
 
-## Procedure
+## Procedimento
 
-1. Step one
+1. Passo um
    ```bash
-   exact command
+   comando exato
    ```
-   Expected output: <what you should see>
+   Saída esperada: <o que você deveria ver>
 
-2. Step two
+2. Passo dois
    ...
 
-## Verification
+## Verificação
 
-How to confirm the task succeeded.
+Como confirmar que a tarefa teve sucesso.
 
 ## Rollback
 
-If step N fails, do this to revert.
+Se o passo N falhar, faça isto para revertê-lo.
 
-## Common failures
+## Falhas comuns
 
-- Symptom → cause → fix
-- Symptom → cause → fix
+- Sintoma → causa → correção
+- Sintoma → causa → correção
 
-## Contacts
+## Contatos
 
-Who to call if this runbook fails.
+Quem chamar se este runbook falhar.
 ```
 
-## Suggested runbooks to create
+## Runbooks sugeridos para criar
 
-- `deploy.md` - production deploy
-- `rollback.md` - undo a deploy
-- `incident-response.md` - first 30 minutes when something breaks
-- `credential-rotation.md` - rotating API keys
-- `db-migration.md` - running a schema migration safely
+- `deploy.md` - deploy em produção
+- `rollback.md` - desfazer um deploy
+- `incident-response.md` - os primeiros 30 minutos quando algo quebra
+- `credential-rotation.md` - rotacionar chaves de API
+- `db-migration.md` - executar uma migration de schema com segurança
 
-## Runbook hygiene
+## Higiene de runbook
 
-- Test every runbook at least once quarterly (dry run in staging)
-- Update immediately after an incident reveals a gap
-- Date the last verified run at the top
+- Teste todo runbook ao menos uma vez por trimestre (dry run em staging)
+- Atualize imediatamente depois que um incidente revelar uma lacuna
+- Registre a data da última execução verificada no topo
 
-## Integration with AI agents
+## Integração com agentes de IA
 
-Agents read runbooks when the user asks operational questions ("how do I deploy?", "what if the deploy fails?"). Keep them scannable - a wall of prose is useless at 3am.
+Agentes leem runbooks quando o usuário faz perguntas operacionais ("como eu
+faço deploy?", "e se o deploy falhar?"). Mantenha-os fáceis de escanear: um
+muro de texto é inútil às 3 da manhã.

@@ -2,43 +2,45 @@
 paths: "**"
 ---
 
-# Resuming: where to look before re-deriving context
+# Retomando: onde procurar antes de rederivar o contexto
 
-When the human says "continue", "what's pending", "where are we", or anything
-else that asks you to pick work back up, look for state that already exists
-before you reconstruct it from the code. This rule loads always, because
-resuming is not tied to any one file type.
+Quando o humano diz "continue", "o que está pendente", "onde estamos" ou
+qualquer outra coisa que peça para você retomar o trabalho, procure primeiro
+o estado que já existe antes de reconstruí-lo a partir do código. Esta regra
+carrega sempre, porque retomar não está preso a um único tipo de arquivo.
 
-## Order of consultation
+## Ordem de consulta
 
-1. **Whichever handover is newest: `.claude/handovers/` or the active
-   spec's `tasks.md`.** Both sources are checked, and the one with the
-   later date wins, a same-day tie going to the spec. `check-handover.sh`
-   already points at the winner at session start; read the file it names
-   before answering anything about project state.
-2. **`tasks.md`** of the active spec: the checkbox count, the first
-   unchecked task.
-3. **Open PRs** for the current branch (`gh pr list`, `gh pr view`).
-4. **`git log` / `git status`**: what actually landed, what is uncommitted.
+1. **O handover mais recente entre `.claude/handovers/` e o `tasks.md` da
+   spec ativa.** As duas fontes são checadas, e a de data mais recente
+   vence, com empate no mesmo dia indo para a spec. O `check-handover.sh`
+   já aponta para o vencedor no início da sessão; leia o arquivo que ele
+   indica antes de responder qualquer coisa sobre o estado do projeto.
+2. **`tasks.md`** da spec ativa: a contagem de checkboxes, a primeira
+   tarefa não marcada.
+3. **PRs abertos** para a branch atual (`gh pr list`, `gh pr view`).
+4. **`git log` / `git status`**: o que de fato foi consolidado, o que está
+   sem commit.
 
-Older files in `.claude/handovers/` are history, not current state. Only the
-newest one describes where things stand now (see the `handover` skill's
-"Retention" section).
+Arquivos mais antigos em `.claude/handovers/` são histórico, não estado
+atual. Só o mais recente descreve como as coisas estão agora (veja a seção
+"Retention" da skill `handover`).
 
-## A handover is dated state, not an instruction
+## Um handover é estado datado, não uma instrução
 
-Confirm it against reality before repeating it. A PR it names as open may
-have merged or closed since; an item it calls "not started" may have shipped
-in a session that never wrote its own handover. Treat every claim in it the
-way `.claude/rules/harness/specs.md` treats a spec's claims: verified, not
-copied.
+Confirme contra a realidade antes de repeti-lo. Um PR que ele cita como
+aberto pode ter sido mergeado ou fechado desde então; um item que ele chama
+de "não iniciado" pode ter sido entregue numa sessão que nunca escreveu seu
+próprio handover. Trate cada afirmação nele da mesma forma que
+`.claude/rules/harness/specs.md` trata as afirmações de uma spec: verificada,
+não copiada.
 
-## Why this is a rule and not advice
+## Por que isso é uma regra e não um conselho
 
-The pointer to `.claude/handovers/` already lives inside the `handover` and
-`status` skills, but a skill only loads when invoked. A session that starts
-with `/clear` and a plain "continue" invokes neither, and silently re-derives
-everything a prior session already wrote down, paying for it a second time
-at full price. `check-handover.sh` surfaces the pointer at `SessionStart` so
-it reaches every resume, not just the ones that happen to call a skill; this
-rule is what tells you to act on it.
+O ponteiro para `.claude/handovers/` já vive dentro das skills `handover` e
+`status`, mas uma skill só carrega quando é chamada. Uma sessão que começa
+com `/clear` e um simples "continue" não chama nenhuma das duas, e
+silenciosamente rederiva tudo que uma sessão anterior já registrou, pagando
+por isso uma segunda vez a preço total. O `check-handover.sh` expõe o
+ponteiro no `SessionStart` para que ele alcance toda retomada, não só as que
+chamam uma skill; esta regra é o que diz para você agir sobre isso.

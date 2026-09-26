@@ -1,36 +1,36 @@
 # ECOSYSTEM.md
 
-> Shared schemas and contracts across surfaces of the system. Replace the examples below with your real entities.
+> Schemas e contratos compartilhados entre as superfícies do sistema. Substitua os exemplos abaixo pelas suas entidades reais.
 
-Source of truth for types that appear in more than one place: framework code, orchestration layer, external integrations, event payloads.
+Fonte de verdade para tipos que aparecem em mais de um lugar: código do framework, camada de orquestração, integrações externas, payloads de evento.
 
-Keep this file **dense and factual**. No history, no rationale. Only contracts.
+Mantenha este arquivo **denso e factual**. Sem histórico, sem justificativa. Só contratos.
 
-## Entities
+## Entidades
 
 ### ExampleEntity
 
-The canonical shape, mirrored in database, API payloads, and external services.
+A forma canônica, espelhada no banco de dados, nos payloads de API e em serviços externos.
 
-| Field | Type | Origin | Notes |
+| Campo | Tipo | Origem | Notas |
 |---|---|---|---|
-| `id` | uuid v4 | server-generated | never exposed to client before submit |
-| `name` | string | user input | required, min 2 chars |
-| `email` | string | user input | validated, normalized lowercase |
-| `created_at` | iso datetime | server | UTC |
+| `id` | uuid v4 | gerado pelo servidor | nunca exposto ao client antes do submit |
+| `name` | string | input do usuário | obrigatório, mínimo de 2 caracteres |
+| `email` | string | input do usuário | validado, normalizado para minúsculas |
+| `created_at` | iso datetime | servidor | UTC |
 
-Add or remove fields to match your actual entities.
+Adicione ou remova campos para combinar com suas entidades reais.
 
 ## Enums
 
-Define enums here so all surfaces agree:
+Defina enums aqui para que todas as superfícies concordem:
 
 - `status`: `pending` | `active` | `archived`
 - `tier`: `free` | `pro` | `enterprise`
 
-## Event payloads
+## Payloads de evento
 
-Shape of events that cross service boundaries:
+Formato dos eventos que cruzam fronteiras de serviço:
 
 ```jsonc
 {
@@ -42,17 +42,17 @@ Shape of events that cross service boundaries:
 }
 ```
 
-## Naming conventions
+## Convenções de nomenclatura
 
-- snake_case in JSON payloads (compatible with most external services)
-- camelCase in TypeScript internals
-- Conversion at the boundary: typically in `src/lib/<domain>/schema.ts`
+- snake_case nos payloads JSON (compatível com a maioria dos serviços externos)
+- camelCase nos internals de TypeScript
+- Conversão na fronteira: normalmente em `src/lib/<domain>/schema.ts`
 
-## Webhook contracts
+## Contratos de webhook
 
-- Inbound: `POST /api/webhook/<source>` with HMAC signature verification
-- Outbound: matching HMAC signature, retry with exponential backoff
+- Entrada: `POST /api/webhook/<source>` com verificação de assinatura HMAC
+- Saída: assinatura HMAC correspondente, retry com backoff exponencial
 
-## Versioning
+## Versionamento
 
-Any change to a schema in this file is a breaking change. Bump the version, update all consumers, and migrate. Do not change silently.
+Qualquer mudança num schema deste arquivo é uma breaking change. Suba a versão, atualize todos os consumidores, e migre. Não mude em silêncio.

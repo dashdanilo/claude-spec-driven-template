@@ -2,40 +2,40 @@
 paths: "specs/**"
 ---
 
-# Specs — claims must be verified, not copied
+# Specs — afirmações precisam ser verificadas, não copiadas
 
-## The rule
+## A regra
 
-- **Every claim about the current state of the system is verified against the code, the schema, or git — at the moment of writing.** Not copied from an existing doc, however well written.
-- **A spec written or edited by hand still goes through `spec-reviewer`.** `write-spec` invokes it automatically; a spec you typed yourself does not get that for free, and it is exactly the one nobody audited.
-- **A referenced "pending fix" is checked before it becomes a task.** Branches and closed PRs go stale in both directions.
+- **Toda afirmação sobre o estado atual do sistema é verificada contra o código, o schema ou o git, no momento em que é escrita.** Não copiada de um documento existente, não importa quão bem escrito.
+- **Uma spec escrita ou editada à mão ainda passa pelo `spec-reviewer`.** O `write-spec` o invoca automaticamente; uma spec que você digitou você mesmo não recebe isso de graça, e é justamente a que ninguém auditou.
+- **Um "fix pendente" referenciado é checado antes de se tornar uma tarefa.** Branches e PRs fechados ficam obsoletos nas duas direções.
 
-## Prose is a record, not a source
+## Prosa é um registro, não uma fonte
 
-An existing spec's narrative says what was true **when someone wrote it**. A dated header (`Onde paramos (2026-07-16)`) is a warning label, not an authority. The older and more confident the prose, the more it deserves a check — a well-written stale paragraph is more dangerous than a scrappy one, because it reads as settled.
+A narrativa de uma spec existente diz o que era verdade **quando alguém a escreveu**. Um cabeçalho datado (`Onde paramos (2026-07-16)`) é um selo de alerta, não uma autoridade. Quanto mais antiga e mais confiante a prosa, mais ela merece uma checagem — um parágrafo obsoleto bem escrito é mais perigoso que um tosco, porque ele lê como algo resolvido.
 
-This cuts both ways, and the second direction is the one people miss:
+Isso corta nos dois sentidos, e o segundo é o que as pessoas deixam passar:
 
-| direction | what you find | cost of not checking |
+| direção | o que você encontra | custo de não checar |
 |---|---|---|
-| work claimed done, actually pending | the checkboxes lied optimistically | you ship a gap |
-| **work claimed pending, actually done** | the debt was paid and nobody updated the doc | **you plan and execute work that already exists** |
+| trabalho dito como feito, na real pendente | os checkboxes mentiram de forma otimista | você entrega uma lacuna |
+| **trabalho dito como pendente, na real feito** | a dívida foi paga e ninguém atualizou o documento | **você planeja e executa um trabalho que já existe** |
 
-## The cheapest check for a "pending fix"
+## A checagem mais barata para um "fix pendente"
 
-When a doc says a fix is waiting on a branch or a closed PR:
+Quando um documento diz que um fix está esperando numa branch ou num PR fechado:
 
 ```bash
-git cherry-pick <sha>     # empty result = the content is already in your base
+git cherry-pick <sha>     # resultado vazio = o conteúdo já está na sua base
 ```
 
-**A cherry-pick that comes back empty is the tell.** It means the change was re-applied under a different commit or PR number, so searching for the original PR finds it closed and you conclude, wrongly, that the work is pending. Check the file, not the PR status.
+**Um cherry-pick que volta vazio é o sinal.** Ele significa que a mudança foi reaplicada sob um commit ou número de PR diferente, então buscar pelo PR original o encontra fechado e você conclui, erroneamente, que o trabalho está pendente. Cheque o arquivo, não o status do PR.
 
-Same idea without applying anything: `git log --oneline <base> -- <the file>` and read what actually landed.
+Mesma ideia sem aplicar nada: `git log --oneline <base> -- <the file>` e leia o que de fato foi consolidado.
 
-## Deviations go in `deviations.md`, not in the artifact they contaminated
+## Desvios vão em `deviations.md`, não no artefato que contaminaram
 
-Long or autonomous runs depart from the plan. That is not a failure — silently absorbing it is. When execution leaves what was agreed, append to `specs/<slug>/deviations.md`:
+Execuções longas ou autônomas se desviam do plano. Isso não é uma falha, absorver isso silenciosamente é. Quando a execução se afasta do que foi acordado, acrescente em `specs/<slug>/deviations.md`:
 
 ```markdown
 ## <date> — <one-line what changed>
@@ -46,16 +46,16 @@ Long or autonomous runs depart from the plan. That is not a failure — silently
 - **Status:** accepted | to revert | needs decision | finding
 ```
 
-Four things belong here: an **assumption** taken without confirmation, a **blocker** worked around, a **scope change** decided mid-flight, and work executed **outside the pipeline** (phases run straight from `plan.md`, edits made in the main thread — neither ever gets a checkbox ticked by anyone).
+Quatro coisas pertencem aqui: uma **suposição** (`assumption`) tomada sem confirmação, um **bloqueio** (`blocker`) contornado, uma **mudança de escopo** (`scope change`) decidida no meio da execução, e trabalho executado **fora do pipeline** (fases rodadas direto a partir do `plan.md`, edições feitas na thread principal — nenhuma das duas nunca ganha um checkbox marcado por ninguém).
 
-**`finding`** is a fifth, different in kind: a production defect a test revealed that is **out of scope** for this spec — the task didn't ask for it, the fix doesn't belong in this diff. Log it here anyway rather than losing it or scope-creeping the task to fix it. A `finding` **does not block** the run.
+**`finding`** é um quinto tipo, diferente por natureza: um defeito de produção que um teste revelou e que está **fora do escopo** desta spec, a tarefa não pediu por ele, o fix não pertence a este diff. Registre aqui mesmo assim, em vez de perdê-lo ou de fazer scope-creep na tarefa para corrigi-lo. Um `finding` **não bloqueia** a execução.
 
-Do not write them into `tasks.md`. Checkboxes are machine-readable and prose is not; a narrative wedged between boxes is read by humans and ignored by the next wave plan, which is the worst of both.
+Não os escreva em `tasks.md`. Checkboxes são legíveis por máquina e prosa não é; uma narrativa encaixada entre caixas é lida por humanos e ignorada pelo plano da próxima wave, o que é o peor dos dois mundos.
 
-`needs decision` is the only status that blocks. It is the one a `/handover` must surface and a reviewer must resolve. An open `finding` doesn't block, but it doesn't stay invisible either — it belongs in the PR body (`/orchestrate` Step 4) and in `/handover`'s open decisions, the same as `needs decision`.
+`needs decision` é o único status que bloqueia. É o que um `/handover` precisa expor e um reviewer precisa resolver. Um `finding` aberto não bloqueia, mas também não fica invisível, ele pertence ao corpo do PR (`/orchestrate` Step 4) e às decisões abertas do `/handover`, o mesmo que `needs decision`.
 
-## Why this is a rule
+## Por que isso é uma regra
 
-Measured, on this template's own work: a follow-ups spec was written from a three-week-old header that said two tests were failing. They had been fixed and merged under a different PR number. The spec, its task list, and a published PR description all carried the wrong premise — and the block was ranked priority 1, so it would have been the next thing built.
+Medido no próprio trabalho deste template: uma spec de follow-ups foi escrita a partir de um cabeçalho de três semanas atrás que dizia que dois testes estavam falhando. Eles já tinham sido corrigidos e mergeados sob um número de PR diferente. A spec, sua lista de tarefas e uma descrição de PR publicada carregavam todas a premissa errada — e o bloqueio estava classificado como prioridade 1, então seria a próxima coisa a ser construída.
 
-The defense already existed (`write-spec` hands the spec to `spec-reviewer` to verify claims against the codebase). It was skipped because the spec was written by hand. A guard that only fires on the happy path is not a guard.
+A defesa já existia (`write-spec` entrega a spec ao `spec-reviewer` para verificar as afirmações contra a base de código). Foi pulada porque a spec foi escrita à mão. Um guard que só dispara no caminho feliz não é um guard.

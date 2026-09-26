@@ -1,85 +1,85 @@
 # Constitution
 
-The DNA of this project. What it is, what it is not, and the non-negotiable principles that shape decisions.
+O DNA deste projeto. O que ele é, o que ele não é, e os princípios não negociáveis que orientam as decisões.
 
-Keep this file dense and stable. It should rarely change. When it does, that's a signal something fundamental shifted.
+Mantenha este arquivo denso e estável. Ele deve mudar raramente. Quando mudar, isso é um sinal de que algo fundamental mudou.
 
-## What this project is
+## O que este projeto é
 
-`claude-spec-driven-template` is a template repository for structuring AI-enabled projects around spec-driven development. It provides a reusable folder layout, agent configuration, skills, subagents, hooks, and workflow patterns that work across Claude Code, GitHub Copilot, and other AGENTS.md-compatible tools.
+`claude-spec-driven-template` é um repositório-template para estruturar projetos habilitados por IA em torno de desenvolvimento guiado por spec (spec-driven development). Ele fornece uma estrutura de pastas reutilizável, configuração de agentes, skills, subagentes, hooks e padrões de fluxo de trabalho que funcionam com Claude Code, GitHub Copilot e outras ferramentas compatíveis com AGENTS.md.
 
-The template is stack-agnostic: it does not assume any specific framework, database, or language. It ships as a structural and documentation foundation to be adopted, adapted, and used as the base of real projects.
+O template é agnóstico de stack: não assume nenhum framework, banco de dados ou linguagem específica. Ele é entregue como uma fundação estrutural e de documentação, para ser adotada, adaptada e usada como base de projetos reais.
 
-## What this project is NOT
+## O que este projeto NÃO é
 
-Explicit boundaries. Things this template should never become or try to be:
+Limites explícitos. Coisas que este template nunca deve se tornar ou tentar ser:
 
-- **Not an application.** There is no runtime, no server, no UI. Only documentation, configuration, and shell scripts.
-- **Not opinionated about tech stack.** No preference between Next.js and Remix, Postgres and MySQL, Tailwind and CSS Modules. Adopters bring their own stack.
-- **Not tied to one AI tool.** The template treats AGENTS.md as source of truth. Claude Code, Copilot, Codex, Cursor, and Gemini should all work equivalently when used with this template.
-- **Not a project management framework.** It provides spec-driven structure, but no ticket tracking, no reporting, no dashboards.
-- **Not a plugin.** It is a template repo, meant to be copied. Not installed, not depended upon.
-- **Not a course.** LEARN.md is a guided course through the structure, but the template does not aim to teach programming, testing, or product management from scratch.
+- **Não é uma aplicação.** Não há runtime, não há servidor, não há UI. Apenas documentação, configuração e scripts shell.
+- **Não tem opinião sobre stack de tecnologia.** Sem preferência entre Next.js e Remix, Postgres e MySQL, Tailwind e CSS Modules. Quem adota traz sua própria stack.
+- **Não está atrelado a uma única ferramenta de IA.** O template trata AGENTS.md como fonte da verdade. Claude Code, Copilot, Codex, Cursor e Gemini devem funcionar de forma equivalente ao usar este template.
+- **Não é um framework de gestão de projetos.** Ele fornece estrutura guiada por spec, mas nenhum rastreamento de tickets, nenhum relatório, nenhum dashboard.
+- **Não é um plugin.** É um repositório-template, feito para ser copiado. Não é instalado, não gera dependência.
+- **Não é um curso.** LEARN.md é um curso guiado pela estrutura, mas o template não tem o objetivo de ensinar programação, testes ou gestão de produto do zero.
 
-## Non-negotiable principles
+## Princípios não negociáveis
 
-These override convenience. If a proposed change violates one of these, the change gets rejected regardless of how convenient it would be.
+Estes princípios têm prioridade sobre conveniência. Se uma mudança proposta viola um deles, a mudança é rejeitada, independentemente de quão conveniente ela seria.
 
-1. **Stack agnosticism.** No file in the template may assume a specific framework, database, or vendor. Placeholders and examples only.
-2. **Cross-tool compatibility.** Every documented workflow must be executable by any AGENTS.md-compatible agent, not just Claude Code.
-3. **Documentation over code.** Structural decisions are documented in `docs/` and `LEARN.md`. Complex behaviors are described, not implemented.
-4. **Attribution preserved.** Contributions from the community keep their author attribution inline, in perpetuity.
-5. **Context economy.** What loads always must be small. What is detailed must load on demand. This principle drives the entire subsystem layering.
+1. **Agnosticismo de stack.** Nenhum arquivo do template pode assumir um framework, banco de dados ou fornecedor específico. Somente placeholders e exemplos.
+2. **Compatibilidade entre ferramentas.** Todo fluxo de trabalho documentado precisa ser executável por qualquer agente compatível com AGENTS.md, não só pelo Claude Code.
+3. **Documentação acima de código.** Decisões estruturais são documentadas em `docs/` e `LEARN.md`. Comportamentos complexos são descritos, não implementados.
+4. **Atribuição preservada.** Contribuições da comunidade mantêm a atribuição de autoria inline, permanentemente.
+5. **Economia de contexto.** O que carrega sempre precisa ser pequeno. O que é detalhado precisa carregar sob demanda. Este princípio orienta toda a estratificação do subsistema.
 
-## Domain vocabulary
+## Vocabulário do domínio
 
-Terms specific to this template and their exact meaning:
+Termos específicos deste template e seu significado exato:
 
-- **Template:** the repo you are reading now. Meant to be cloned or used via GitHub "Use this template" button.
-- **Adopter:** a developer or team using the template for their own project.
-- **Adoption:** the act of applying the template to an existing (brownfield) or new (greenfield) project.
-- **Nested CLAUDE.md:** a `CLAUDE.md` file inside `src/<folder>` that adds folder-scoped conventions.
-- **Stub:** a small file whose purpose is to point to another file for its real content. `CLAUDE.md` and `.github/copilot-instructions.md` at the root are stubs pointing to `AGENTS.md`.
-- **Source of truth:** the file that owns a piece of information. For project context, this is `AGENTS.md`. For a feature, this is `specs/<slug>/spec.md`.
-- **Too-large, fresh, stale-mild, stale-major:** the states classified by `.claude/scripts/check-snapshot.sh` for the optional, manual Repomix export. Too-large is checked first and independent of the other three (see ADR 0003).
-- **Repo map:** the deterministic, always-regenerated directory-tree-plus-metadata artifact (`baseline/scripts/repo-map.sh` → `.claude/context/repo-map.md`) that replaced the Repomix snapshot as panoramic context. See `docs/decisions/0003-repo-map-over-snapshot.md`.
+- **Template:** o repositório que você está lendo agora. Feito para ser clonado ou usado pelo botão "Use this template" do GitHub.
+- **Adotante (adopter):** um desenvolvedor ou time que usa o template no próprio projeto.
+- **Adoção:** o ato de aplicar o template a um projeto existente (brownfield) ou novo (greenfield).
+- **CLAUDE.md aninhado:** um arquivo `CLAUDE.md` dentro de `src/<pasta>` que adiciona convenções específicas daquela pasta.
+- **Stub:** um arquivo pequeno cujo propósito é apontar para outro arquivo onde está o conteúdo real. `CLAUDE.md` e `.github/copilot-instructions.md` na raiz são stubs que apontam para `AGENTS.md`.
+- **Fonte da verdade:** o arquivo que é dono de uma informação. Para contexto do projeto, é `AGENTS.md`. Para uma feature, é `specs/<slug>/spec.md`.
+- **Too-large, fresh, stale-mild, stale-major:** os estados classificados por `.claude/scripts/check-snapshot.sh` para a exportação Repomix opcional e manual. Too-large é verificado primeiro e independe dos outros três (ver ADR 0003).
+- **Repo map:** o artefato determinístico e sempre regerado de árvore de diretórios mais metadados (`baseline/scripts/repo-map.sh` → `.claude/context/repo-map.md`) que substituiu o snapshot Repomix como contexto panorâmico. Ver `docs/decisions/0003-repo-map-over-snapshot.md`.
 
-## Tech stack (of the template itself, not of adopters)
+## Stack de tecnologia (do template em si, não de quem adota)
 
-- **Documentation format:** Markdown
-- **Shell scripts:** Bash (POSIX-compatible where possible)
-- **Config format:** JSON (for `.claude/settings.json`)
-- **Diagram format:** Mermaid (rendered natively on GitHub)
-- **AI tools tested against:** Claude Code, GitHub Copilot
+- **Formato de documentação:** Markdown
+- **Scripts shell:** Bash (compatível com POSIX quando possível)
+- **Formato de configuração:** JSON (para `.claude/settings.json`)
+- **Formato de diagrama:** Mermaid (renderizado nativamente no GitHub)
+- **Ferramentas de IA testadas:** Claude Code, GitHub Copilot
 
-## Constraints and non-goals
+## Restrições e não objetivos
 
-Hard limits that shape design:
+Limites rígidos que orientam o design:
 
-- **Budget:** zero recurring cost. All required tools have free tiers.
-- **Runtime dependencies:** none. Adopters may install optional tools (Repomix, Ponytail, OpenSpec, Superpowers), but the template functions without them.
-- **Compliance:** no assumptions about GDPR, LGPD, HIPAA, or SOC2. Adopters bring their own compliance concerns.
-- **Explicit non-goals:**
-  - Do not evolve into a CLI tool
-  - Do not evolve into an npm package
-  - Do not require CI setup to be useful
-  - Do not require any account, API key, or SaaS subscription
+- **Orçamento:** custo recorrente zero. Todas as ferramentas necessárias têm camadas gratuitas.
+- **Dependências de runtime:** nenhuma. Quem adota pode instalar ferramentas opcionais (Repomix, Ponytail, OpenSpec, Superpowers), mas o template funciona sem elas.
+- **Compliance:** nenhuma suposição sobre GDPR, LGPD, HIPAA ou SOC2. Quem adota traz suas próprias exigências de compliance.
+- **Não objetivos explícitos:**
+  - Não evoluir para uma ferramenta CLI
+  - Não evoluir para um pacote npm
+  - Não exigir configuração de CI para ser útil
+  - Não exigir nenhuma conta, chave de API ou assinatura SaaS
 
-## Where the sources of truth live
+## Onde vivem as fontes da verdade
 
-- Cross-tool project context: `AGENTS.md`
-- Claude-specific context: `CLAUDE.md`
-- Copilot-specific context: `.github/copilot-instructions.md`
-- Feature specs: `specs/YYYY-MM-DD-<slug>/`
-- Architecture decisions: `docs/decisions/`
+- Contexto de projeto entre ferramentas: `AGENTS.md`
+- Contexto específico do Claude: `CLAUDE.md`
+- Contexto específico do Copilot: `.github/copilot-instructions.md`
+- Specs de features: `specs/YYYY-MM-DD-<slug>/`
+- Decisões de arquitetura: `docs/decisions/`
 - Runbooks: `docs/runbooks/`
-- Guides and tutorials: `docs/guides/`
-- Living examples of solutions: `docs/patterns/`
-- AI-only knowledge: `.claude/docs/`
-- Change history: `CHANGELOG.md`
+- Guias e tutoriais: `docs/guides/`
+- Exemplos vivos de soluções: `docs/patterns/`
+- Conhecimento só para IA: `.claude/docs/`
+- Histórico de mudanças: `CHANGELOG.md`
 
 ## Change log
 
-Updates to this file are rare. When they happen, note them:
+Atualizações a este arquivo são raras. Quando acontecerem, registre-as aqui:
 
-- 2026-07-04 - Initial constitution written alongside v0.1.0 release.
+- 2026-07-04 - Constitution inicial escrita junto com o lançamento v0.1.0.

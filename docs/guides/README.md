@@ -1,40 +1,43 @@
 # docs/guides/
 
-Onboarding, how-tos, and tutorials for humans working on this project.
+Onboarding, how-tos e tutoriais para humanos trabalhando neste projeto.
 
-## What goes here
+## O que vai aqui
 
-- Getting started (local setup, first PR)
-- Testing guide (how to write tests here, what to test)
-- Debugging guide (common issues, tools)
-- Contribution guide (if not in root `CONTRIBUTING.md`)
-- Feature-specific guides ("how to add a new API route")
+- Getting started (setup local, primeira PR)
+- Guia de testes (como escrever testes aqui, o que testar)
+- Guia de debugging (problemas comuns, ferramentas)
+- Guia de contribuição (se não estiver no `CONTRIBUTING.md` da raiz)
+- Guias específicos de feature ("como adicionar uma nova rota de API")
 
-## What does NOT go here
+## O que NÃO vai aqui
 
-- Operational procedures - those go in `docs/runbooks/`
-- Architectural context - that goes in `docs/architecture/`
-- Design decisions - those go in `docs/decisions/`
-- API reference - auto-generated or hosted separately
+- Procedimentos operacionais: vão em `docs/runbooks/`
+- Contexto arquitetural: vai em `docs/architecture/`
+- Decisões de design: vão em `docs/decisions/`
+- Referência de API: gerada automaticamente ou hospedada separadamente
 
-## Format
+## Formato
 
-Guides are more narrative than runbooks. They can be prose, tutorial-style. They explain "why" as well as "how".
+Guias são mais narrativos do que runbooks. Podem ser em prosa, em estilo
+tutorial. Eles explicam o "por quê" tanto quanto o "como".
 
-A good guide has:
+Um bom guia tem:
 
-- A clear audience (who this is for)
-- Prerequisites (what you should know first)
-- Concrete examples with real file paths
-- A "next steps" section pointing to related material
+- Um público-alvo claro (para quem é isso)
+- Pré-requisitos (o que você deveria saber antes)
+- Exemplos concretos com caminhos de arquivo reais
+- Uma seção de "próximos passos" apontando para material relacionado
 
-## Suggested guides to create
+## Guias sugeridos para criar
 
-- `getting-started.md` - clone, install, first successful run
-- `local-setup.md` - environment variables, database, external services
-- `testing.md` - test structure, conventions, how to write good tests
-- `adding-a-feature.md` - walkthrough of the spec-driven workflow with a small example
+- `getting-started.md` - clonar, instalar, primeira execução bem-sucedida
+- `local-setup.md` - variáveis de ambiente, banco de dados, serviços externos
+- `testing.md` - estrutura de testes, convenções, como escrever bons testes
+- `adding-a-feature.md` - passo a passo do fluxo guiado por spec com um exemplo pequeno
 
-## Integration with AI agents
+## Integração com agentes de IA
 
-Agents read guides when they need to help the user with a workflow they haven't done before. Well-written guides mean the agent gives accurate, project-specific answers instead of generic advice.
+Agentes leem guias quando precisam ajudar o usuário com um fluxo de trabalho
+que ainda não fizeram. Guias bem escritos significam que o agente dá
+respostas precisas e específicas do projeto em vez de conselhos genéricos.

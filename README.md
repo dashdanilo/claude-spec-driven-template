@@ -1,7 +1,7 @@
 # claude-spec-driven-template
 
-**A practical template repository for structuring AI-enabled projects**
-**with shared instructions, Claude-specific configuration, subagents, skills, hooks, and spec-driven development.**
+**Um template prático de repositório para estruturar projetos habilitados por IA**
+**com instruções compartilhadas, configuração específica do Claude, subagents, skills, hooks e desenvolvimento guiado por spec.**
 
 ![Status](https://img.shields.io/badge/status-active-2563eb?style=for-the-badge)
 ![Type](https://img.shields.io/badge/type-template-111827?style=for-the-badge)
@@ -14,167 +14,167 @@
 
 ---
 
-## Overview
+## Visão geral
 
-`claude-spec-driven-template` is a stack-agnostic template for structuring repositories around AI coding agents. It shows where each AI instruction file belongs, how the layers interact, and how to combine them with spec-driven development.
+`claude-spec-driven-template` é um template agnóstico de stack para estruturar repositórios em torno de agents de codificação de IA. Ele mostra onde cada arquivo de instrução de IA pertence, como as camadas interagem, e como combiná-las com desenvolvimento guiado por spec.
 
-This is not just a folder tree. It is a working reference whose own AI setup is part of the lesson.
+Isso não é só uma árvore de pastas. É uma referência funcional cuja própria configuração de IA é parte da lição.
 
-It combines:
+Ele combina:
 
-- shared agent instructions in [`AGENTS.md`](./AGENTS.md)
-- Claude-specific guidance in [`CLAUDE.md`](./CLAUDE.md)
-- Copilot-specific guidance in [`.github/copilot-instructions.md`](./.github/copilot-instructions.md)
-- shared schemas and contracts in [`ECOSYSTEM.md`](./ECOSYSTEM.md)
-- contributor workflow in [`CONTRIBUTING.md`](./CONTRIBUTING.md)
-- change history in [`CHANGELOG.md`](./CHANGELOG.md)
-- internal Claude config in [`.claude/`](./.claude/)
-- human-facing project docs in [`docs/`](./docs)
-- spec-driven features in [`specs/`](./specs)
-- nested CLAUDE.md examples in [`src/`](./src)
-- a guided course in [`LEARN.md`](./LEARN.md)
-- setup walkthrough in [`docs/guides/initial-setup.md`](./docs/guides/initial-setup.md)
+- instruções compartilhadas de agent em [`AGENTS.md`](./AGENTS.md)
+- orientação específica do Claude em [`CLAUDE.md`](./CLAUDE.md)
+- orientação específica do Copilot em [`.github/copilot-instructions.md`](./.github/copilot-instructions.md)
+- schemas e contratos compartilhados em [`ECOSYSTEM.md`](./ECOSYSTEM.md)
+- workflow de contribuição em [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- histórico de mudanças em [`CHANGELOG.md`](./CHANGELOG.md)
+- configuração interna do Claude em [`.claude/`](./.claude/)
+- documentação do projeto voltada a humanos em [`docs/`](./docs)
+- features guiadas por spec em [`specs/`](./specs)
+- exemplos de CLAUDE.md aninhado em [`src/`](./src)
+- um curso guiado em [`LEARN.md`](./LEARN.md)
+- passo a passo de setup em [`docs/guides/initial-setup.md`](./docs/guides/initial-setup.md)
 
 ---
 
-> **Adopting this on your own machine?** Start with [`ADOPTING.md`](./ADOPTING.md) (in Portuguese) — install, and which skill to reach for when. This file explains the structure; that one gets you running.
+> **Vai adotar isso na sua própria máquina?** Comece por [`ADOPTING.md`](./ADOPTING.md) (em português) — instalação, e qual skill usar em cada momento. Este arquivo explica a estrutura; aquele te deixa rodando.
 
-## Start here
+## Comece aqui
 
-| you want to | read |
+| você quer | leia |
 |---|---|
-| **install it and use it** | [`ADOPTING.md`](./ADOPTING.md) — the two commands, and which skill for which moment (pt-BR) |
-| **understand the ideas** | [`LEARN.md`](./LEARN.md) — the guided course |
-| **know where an instruction goes** | [`docs/reference/where-does-it-go.md`](./docs/reference/where-does-it-go.md) |
-| **see how the layers fit** | [`docs/reference/layers.md`](./docs/reference/layers.md) |
-| **adopt it on an existing codebase** | [`docs/guides/brownfield.md`](./docs/guides/brownfield.md) |
-| **run the feature pipeline** | [`docs/workflows/feature-pipeline.md`](./docs/workflows/feature-pipeline.md) |
+| **instalar e usar** | [`ADOPTING.md`](./ADOPTING.md) — os dois comandos, e qual skill para qual momento (pt-BR) |
+| **entender as ideias** | [`LEARN.md`](./LEARN.md) — o curso guiado |
+| **saber onde uma instrução vai** | [`docs/reference/where-does-it-go.md`](./docs/reference/where-does-it-go.md) |
+| **ver como as camadas se encaixam** | [`docs/reference/layers.md`](./docs/reference/layers.md) |
+| **adotar num codebase existente** | [`docs/guides/brownfield.md`](./docs/guides/brownfield.md) |
+| **rodar o pipeline de feature** | [`docs/workflows/feature-pipeline.md`](./docs/workflows/feature-pipeline.md) |
 
-## What it is betting on
+## Em que ele está apostando
 
-1. **Instruction files have distinct jobs.** Not everything belongs in `CLAUDE.md`.
-2. **Context cost is the constraint.** What loads always must be small; what is detailed loads on demand.
-3. **Specs are versioned beside the code** and are the source of truth when they disagree.
-4. **Agents, skills, rules and hooks are different tools.** A hook runs whatever the model decides; a rule only persuades.
-5. **A guard nobody can see failing decays.** So the harness measures itself — see [`baseline/docs/harness-baseline.md`](./baseline/docs/harness-baseline.md).
+1. **Arquivos de instrução têm papéis distintos.** Nem tudo pertence ao `CLAUDE.md`.
+2. **O custo de contexto é a restrição.** O que carrega sempre precisa ser pequeno; o que é detalhado carrega sob demanda.
+3. **Specs são versionadas ao lado do código** e são a fonte de verdade quando discordam.
+4. **Agents, skills, rules e hooks são ferramentas diferentes.** Um hook roda o que o modelo decidir; uma rule só persuade.
+5. **Uma guarda que ninguém vê falhar decai.** Por isso o harness se mede, veja [`baseline/docs/harness-baseline.md`](./baseline/docs/harness-baseline.md).
 
-## Project structure
+## Estrutura do projeto
 
 ```
-├─ baseline/          THE HARNESS — symlinked into projects, never committed
-│  ├─ agents/           8 subagents (7 reviewers/explorers + implementer)
-│  ├─ skills/          23 skills, a /name each, loaded on demand
-│  ├─ rules/            path-scoped conventions, auto-loaded
-│  ├─ hooks/            guardrails that run whatever the model decides
+├─ baseline/          O HARNESS — linkado por symlink nos projetos, nunca commitado
+│  ├─ agents/           8 subagents (7 revisores/exploradores + implementer)
+│  ├─ skills/          23 skills, um /nome cada, carregadas sob demanda
+│  ├─ rules/            convenções com escopo de path, carregadas automaticamente
+│  ├─ hooks/            guardas que rodam o que o modelo decidir
 │  ├─ scripts/          check-index · check-baseline · spec-worktree · repo-map · check-snapshot
-│  └─ docs/             AI-only: dispatching · context-engineering · harness-baseline
+│  └─ docs/             só para IA: dispatching · context-engineering · harness-baseline
 │
-├─ .claude/           THIS repo's own config — links back into baseline/
-├─ install-harness.sh Link the harness into a project you choose
-├─ install.sh         Set up a project's own context (copied, committed)
+├─ .claude/           config própria deste repo — linka de volta para baseline/
+├─ install-harness.sh Linka o harness num projeto que você escolher
+├─ install.sh         Configura o contexto próprio de um projeto (copiado, commitado)
 │
 ├─ specs/             spec.md · plan.md · tasks.md · lessons.md · deviations.md
-├─ docs/              human-facing: reference · guides · workflows · decisions
-└─ src/example-module/CLAUDE.md   nested instructions, loaded per folder
+├─ docs/              voltado a humanos: reference · guides · workflows · decisions
+└─ src/example-module/CLAUDE.md   instruções aninhadas, carregadas por pasta
 ```
 
-**Two directories, two jobs.** `baseline/` is the harness — symlinked into the
-projects you pick, never committed there. `.claude/` is this repository's own
-configuration, which links back into `baseline/` so the harness can use itself.
-A project that adopts it ends up with the same shape.
+**Duas pastas, dois papéis.** `baseline/` é o harness — linkado por symlink nos
+projetos que você escolher, nunca commitado lá. `.claude/` é a configuração
+própria deste repositório, que linka de volta para `baseline/` para o harness
+poder se usar. Um projeto que adota isso termina com a mesma forma.
 
-Every agent, skill, rule and hook is listed with its purpose in
-[`CLAUDE.md`](./CLAUDE.md), which is also what `check-index.sh` validates on
-every session start.
+Todo agent, skill, rule e hook está listado com seu propósito em
+[`CLAUDE.md`](./CLAUDE.md), que é também o que o `check-index.sh` valida em
+todo início de sessão.
 
-## Using this template
+## Usando este template
 
-> **The fastest path is [`ADOPTING.md`](./ADOPTING.md)** — install it and know which
-> skill to reach for. It is in Portuguese; this file explains the structure, that
-> one gets you running.
+> **O caminho mais rápido é [`ADOPTING.md`](./ADOPTING.md)** — instale e saiba qual
+> skill usar. Está em português; este arquivo explica a estrutura, aquele te
+> deixa rodando.
 
-### The two commands, and why there are two
+### Os dois comandos, e por que existem dois
 
 ```bash
 git clone https://github.com/dashdanilo/claude-spec-driven-template ~/Sites/harness
 
 cd ~/Sites/some-project
-~/Sites/harness/install.sh           # the project's own CONTEXT — committed
-~/Sites/harness/install-harness.sh   # the METHOD — symlinked, never committed
+~/Sites/harness/install.sh           # o CONTEXTO próprio do projeto — commitado
+~/Sites/harness/install-harness.sh   # o MÉTODO — symlink, nunca commitado
 ```
 
-**Context** is what the repository owns and shares with its team: `AGENTS.md`,
-`CLAUDE.md`, `docs/`, `specs/`, and the guards a teammate must have whether or
-not they installed anything. It is copied, and it is different in every repo.
+**Contexto** é o que o repositório possui e compartilha com o time: `AGENTS.md`,
+`CLAUDE.md`, `docs/`, `specs/`, e as guardas que um colega de time precisa ter,
+tenha instalado algo ou não. É copiado, e é diferente em cada repo.
 
-**Method** is how *you* work: the skills, agents and rules. It is symlinked from
-your clone, so `git pull` there updates every project you linked, at once.
-Skills and agents are linked one item at a time, so a skill or agent a repo
-versions itself keeps loading next to the harness's; the cost is that one the
-harness adds or renames needs the installer re-run, and the session-start check
-names it. The
-links go into `.git/info/exclude`, so a teammate cloning the repo sees nothing
-and CI sees nothing — **opting in is invisible to everyone else, and opting out
-costs nothing.**
+**Método** é como *você* trabalha: as skills, agents e rules. É linkado por
+symlink a partir do seu clone, então um `git pull` lá atualiza todo projeto que
+você linkou, de uma vez. Skills e agents são linkados um item por vez, então
+uma skill ou agent que um repo versiona por conta própria continua carregando
+ao lado dos do harness; o custo é que uma que o harness adicionar ou renomear
+precisa rodar o instalador de novo, e o check de início de sessão avisa. Os
+links vão para `.git/info/exclude`, então um colega clonando o repo não vê nada
+e o CI não vê nada — **entrar é invisível para todo o resto, e sair não custa
+nada.**
 
-On a platform that will not create symlinks (Git Bash on Windows without
-Developer Mode), the installer copies instead, marks the copy and says so, and
-the session-start check tells you when that copy has fallen behind.
+Numa plataforma que não cria symlinks (Git Bash no Windows sem o Modo de
+Desenvolvedor), o instalador copia em vez disso, marca a cópia e avisa, e o
+check de início de sessão te avisa quando essa cópia ficar defasada.
 
-`--adopt` sets aside a harness a repo already copied, `--unlink` puts it back,
-`--status` says what is linked here.
+`--adopt` põe de lado um harness que um repo já copiou, `--unlink` devolve,
+`--status` diz o que está linkado aqui.
 
-Two more scripts, `script/setup` and `script/test`, are optional and yours to
-write — the harness calls them when they exist (`spec-worktree` runs
-`script/setup`, `verify-before-done` runs `script/test` as the gate) and is a
-no-op without them. See [`docs/guides/script-setup-and-test.md`](./docs/guides/script-setup-and-test.md).
+Mais dois scripts, `script/setup` e `script/test`, são opcionais e seus para
+escrever — o harness os chama quando existem (`spec-worktree` roda
+`script/setup`, `verify-before-done` roda `script/test` como o gate) e não faz
+nada sem eles. Veja [`docs/guides/script-setup-and-test.md`](./docs/guides/script-setup-and-test.md).
 
-### Quick start
+### Início rápido
 
-For a step-by-step walkthrough (both new projects and existing codebases), read [`docs/guides/initial-setup.md`](./docs/guides/initial-setup.md).
+Para um passo a passo (tanto para projetos novos quanto para codebases existentes), leia [`docs/guides/initial-setup.md`](./docs/guides/initial-setup.md).
 
-### Option 1: Use as a GitHub template
+### Opção 1: usar como template do GitHub
 
-1. Click "Use this template" at the top of the GitHub page
-2. Create your new repository
-3. Follow [`docs/guides/initial-setup.md`](./docs/guides/initial-setup.md) Path 1 (New project)
+1. Clique em "Use this template" no topo da página do GitHub
+2. Crie seu novo repositório
+3. Siga [`docs/guides/initial-setup.md`](./docs/guides/initial-setup.md), Caminho 1 (projeto novo)
 
-### Option 2: Adopt on an existing project (brownfield)
+### Opção 2: adotar num projeto existente (brownfield)
 
-Follow [`docs/guides/initial-setup.md`](./docs/guides/initial-setup.md) Path 2. Uses the `analyze-codebase` skill to generate a documentation baseline from your existing code.
+Siga [`docs/guides/initial-setup.md`](./docs/guides/initial-setup.md), Caminho 2. Usa a skill `analyze-codebase` para gerar uma base de documentação a partir do seu código existente.
 
-### Option 3: Adopt incrementally
+### Opção 3: adotar de forma incremental
 
-You do not need everything at once. Three adoption levels:
+Você não precisa de tudo de uma vez. Três níveis de adoção:
 
-**Minimal:** copy `AGENTS.md`, `CLAUDE.md` (stub), `.gitignore`, `.claudeignore`. Start there.
+**Mínimo:** copie `AGENTS.md`, `CLAUDE.md` (stub), `.gitignore`, `.claudeignore`. Comece por aí.
 
-**Practical:** add `.claude/settings.json`, `baseline/agents/code-reviewer.md`, and one or two skills. Add `specs/` when you have your first non-trivial feature.
+**Prático:** adicione `.claude/settings.json`, `baseline/agents/code-reviewer.md`, e uma ou duas skills. Adicione `specs/` quando tiver sua primeira feature não trivial.
 
-**Full:** adopt the complete structure. Use this when you have a team and want consistent AI workflows across people.
+**Completo:** adote a estrutura completa. Use isso quando tiver um time e quiser workflows de IA consistentes entre as pessoas.
 
-### Option 4: Install Superpowers alongside
+### Opção 4: instalar o Superpowers junto
 
-The spec-driven workflow in this template is compatible with the [Superpowers plugin](https://github.com/obra/superpowers):
+O workflow guiado por spec deste template é compatível com o [plugin Superpowers](https://github.com/obra/superpowers):
 
 ```bash
-# Inside Claude Code
+# Dentro do Claude Code
 /plugin install superpowers@claude-plugins-official
 ```
 
-Superpowers ships brainstorming, writing-plans, subagent-driven-development, TDD, and code-review skills that enforce the spec-driven flow.
+O Superpowers traz skills de brainstorming, writing-plans, subagent-driven-development, TDD e code-review que reforçam o fluxo guiado por spec.
 
 ---
 
-## Attributions
+## Atribuições
 
-The template includes contributions from the broader Claude Code community:
+O template inclui contribuições da comunidade mais ampla do Claude Code:
 
-- **[documenting-domains](baseline/skills/documenting-domains/SKILL.md)** skill by [douglasgomes98](https://github.com/douglasgomes98) - creates durable local domain documentation
-- **[postmortem](baseline/skills/postmortem/SKILL.md)** skill adapted from [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) (MIT) - blameless postmortem after an incident
+- skill **[documenting-domains](baseline/skills/documenting-domains/SKILL.md)** de [douglasgomes98](https://github.com/douglasgomes98) - cria documentação local durável de domínio
+- skill **[postmortem](baseline/skills/postmortem/SKILL.md)** adaptada de [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) (MIT) - postmortem sem culpados após um incidente
 
-Original attribution is preserved inline in each file. When you fork this template, keep the attribution intact if you keep the file.
+A atribuição original é preservada inline em cada arquivo. Ao fazer fork deste template, mantenha a atribuição intacta se mantiver o arquivo.
 
-## License
+## Licença
 
 [MIT](./LICENSE)

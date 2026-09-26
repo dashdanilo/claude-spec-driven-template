@@ -1,46 +1,46 @@
-# Dispatching subagents
+# Despachando subagentes
 
-*What* to delegate is `.claude/rules/harness/delegation.md`. *What context* to pass is `.claude/docs/harness/context-engineering.md`. This doc is **how** — parallelism, background, re-review, memory.
+*O quê* delegar está em `.claude/rules/harness/delegation.md`. *Que contexto* passar está em `.claude/docs/harness/context-engineering.md`. Este documento é o **como**, paralelismo, background, re-review, memória.
 
-AI-only. Portable: no stack assumptions.
+Só para IA. Portável: sem suposições de stack.
 
-## Decide whether to dispatch at all
+## Decida se vale a pena fazer dispatch
 
-Before the shape, the prior question. Dispatching is not free and it is not always better.
+Antes da forma, a pergunta anterior. Fazer dispatch não é gratuito e nem sempre é melhor.
 
-| the work is | do this | why |
+| se o trabalho é | faça isto | por quê |
 |---|---|---|
-| a codebase sweep, a search, research | **always dispatch** | the sub-agent reads widely and returns only the distillate; the breadth never enters your window |
-| many tasks, or a run past ~30 minutes | **dispatch, grouped into a few cohesive clusters** | your window fills before the corrections start, which is where the work actually is |
-| small and self-contained | **inline** | a round trip costs more than the edit, and the specialist re-reads what you already have |
-| genuinely parallelisable, disjoint files | **dispatch** | this is the only case where speed is the reason |
+| uma varredura na base de código, uma busca, pesquisa | **sempre faça dispatch** | o subagente lê amplamente e retorna só o destilado; a amplitude nunca entra na sua janela |
+| muitas tarefas, ou uma execução acima de ~30 minutos | **dispatch, agrupado em alguns clusters coesos** | sua janela se enche antes de começarem as correções, que é onde o trabalho de fato está |
+| pequeno e autocontido | **inline** | uma ida e volta custa mais do que a própria edição, e o especialista relê o que você já tem |
+| genuinamente paralelizável, arquivos disjuntos | **dispatch** | este é o único caso em que velocidade é o motivo |
 
-## How finely to slice, and why it is not "as fine as possible"
+## O quão fino cortar, e por que não é "o mais fino possível"
 
-Measured on an 18-task epic, one run per architecture, by [Tech Leads Club](https://agent-skills.techleads.club/tlc-spec-driven/):
+Medido num épico de 18 tarefas, uma execução por arquitetura, pelo [Tech Leads Club](https://agent-skills.techleads.club/tlc-spec-driven/):
 
-| how you slice | tokens | time | quality | main thread used |
+| como você corta | tokens | tempo | qualidade | thread principal usada |
 |---|---|---|---|---|
-| inline, no dispatch | 9M | 19m | 0.93 | **74%** |
-| **~3 cohesive clusters** | 10.5M | 18m | **0.95** | **26%** |
-| one per phase (7) | 15M | 35m | 0.90 | 24% |
-| **one per task (18)** | **25M** | **43m** | **0.81** | 32% |
+| inline, sem dispatch | 9M | 19m | 0.93 | **74%** |
+| **~3 clusters coesos** | 10.5M | 18m | **0.95** | **26%** |
+| um por fase (7) | 15M | 35m | 0.90 | 24% |
+| **um por tarefa (18)** | **25M** | **43m** | **0.81** | 32% |
 
-Three readings, and only the first is intuitive.
+Três leituras, e só a primeira é intuitiva.
 
-**Granularity destroys quality.** Every dispatch starts from zero, re-reads the files, and loses the whole. One agent per task is the worst row on every axis, including against not dispatching at all.
+**Granularidade destrói qualidade.** Todo dispatch começa do zero, relê os arquivos e perde o todo. Um agente por tarefa é a pior linha em todos os eixos, inclusive contra não fazer dispatch nenhum.
 
-**More workers can leave the main thread fatter.** Eighteen workers used *more* of it than seven, because every worker's summary lands there. Fan-out has a cost on the side you were trying to protect — which is why a cluster is told to report once, not once per task.
+**Mais workers pode deixar a thread principal mais gorda.** Dezoito workers usaram *mais* dela do que sete, porque o resumo de cada worker chega lá. Fan-out tem um custo justamente no lado que você estava tentando proteger, e é por isso que um cluster é instruído a reportar uma vez, não uma vez por tarefa.
 
-**The win is context budget, not speed.** Eighteen minutes against nineteen is no speed-up. What was bought is finishing at 26% instead of 74%, so the correction rounds are cheap instead of degrading. At 18 tasks the token cost is a wash; past that, the inline row inflates and clustering starts winning outright.
+**O ganho é orçamento de contexto, não velocidade.** Dezoito minutos contra dezenove não é um ganho de velocidade. O que foi comprado foi terminar em 26% em vez de 74%, então as rodadas de correção saem baratas em vez de degradar. Em 18 tarefas o custo em tokens é neutro; além disso, a linha inline infla e o clustering começa a vencer de forma clara.
 
-The industry disagreement dissolves here. Anthropic reports sub-agents costing more but answering better on long-running work; Cognition reports them fragmenting context and being dangerous. Both are true at different granularities, and granularity is the variable.
+O desacordo do setor se dissolve aqui. A Anthropic reporta subagentes custando mais mas respondendo melhor em trabalho de longa duração; a Cognition reporta eles fragmentando contexto e sendo perigosos. As duas coisas são verdade em granularidades diferentes, e granularidade é a variável.
 
-**Treat the shape as established and the number as a hypothesis.** It is one epic, one codebase, one run per cell, and its authors call 0.93 vs 0.95 statistically the same. Size by **tasks per specialist** (5-7), not by a fixed cluster count: three clusters of 20 tasks would blow each window. See `harness-baseline.md`.
+**Trate a forma como estabelecida e o número como uma hipótese.** É um épico, uma base de código, uma execução por célula, e os próprios autores chamam 0,93 vs 0,95 de estatisticamente iguais. Dimensione por **tarefas por especialista** (5-7), não por um número fixo de clusters: três clusters de 20 tarefas explodiriam cada janela. Veja `harness-baseline.md`.
 
-## Pick the shape before the mechanics
+## Escolha a forma antes da mecânica
 
-Six shapes cover almost every dispatch you will plan. Choose the shape from the *work*, then apply the mechanics below. Picking the wrong shape is more expensive than any mechanic can fix: a fan-out over dependent tasks wastes every parallel run, and a pipeline over independent ones wastes wall-clock.
+Seis formas cobrem quase todo dispatch que você vai planejar. Escolha a forma a partir do *trabalho*, depois aplique a mecânica abaixo. Escolher a forma errada custa mais do que qualquer mecânica consegue corrigir: um fan-out sobre tarefas dependentes desperdiça toda execução paralela, e um pipeline sobre tarefas independentes desperdiça tempo de relógio.
 
 ### 1. Pipeline
 
@@ -48,11 +48,11 @@ Six shapes cover almost every dispatch you will plan. Choose the shape from the 
 [A] → [B] → [C] → [D]
 ```
 
-Each stage consumes the previous stage's output.
+Cada estágio consome a saída do estágio anterior.
 
-- **Fits when** each step depends strongly on the artifact before it.
-- **Watch out:** one slow stage delays everything behind it. Design stages to be as independent as they can be.
-- **With sub-agents:** natural. One dispatch per stage; you pass each result into the next prompt. The cost is that every handoff goes through you.
+- **Se encaixa quando** cada passo depende fortemente do artefato anterior.
+- **Cuidado:** um estágio lento atrasa tudo depois dele. Desenhe os estágios para serem o mais independentes possível.
+- **Com subagentes:** natural. Um dispatch por estágio; você passa cada resultado para o próximo prompt. O custo é que toda transição passa por você.
 
 ### 2. Fan-out / Fan-in
 
@@ -62,24 +62,24 @@ Each stage consumes the previous stage's output.
         └→ [C] ─┘
 ```
 
-Same input, several independent angles, then one merge.
+Mesma entrada, várias lentes independentes, depois um merge.
 
-- **Fits when** the same artifact needs different lenses (correctness, security, tests, performance).
-- **Watch out:** the **merge** decides the quality. A lazy merge throws away everything the parallel runs found.
-- **With sub-agents:** dispatch all of them **in one message** — this is the shape where that rule pays most. Do the merge yourself, or give it its own dispatch when it is heavy.
-- **The synthesizer handles all three outcomes explicitly**, not just the happy path: **all returned** merges normally; **partial** (some branches came back, one died or timed out) still merges what arrived, and names which branch is missing rather than silently presenting a full-coverage merge; **zero returned** is not a merge with nothing in it, it is a reported failure, same as a dispatch failure elsewhere in this doc. A merge that cannot tell the reader which of the three happened is worse than no merge.
+- **Se encaixa quando** o mesmo artefato precisa de lentes diferentes (correção, segurança, testes, performance).
+- **Cuidado:** o **merge** decide a qualidade. Um merge malfeito descarta tudo que as execuções paralelas encontraram.
+- **Com subagentes:** faça dispatch de todos **numa mensagem só**, esta é a forma em que essa regra mais compensa. Faça o merge você mesmo, ou dê a ele seu próprio dispatch quando for pesado.
+- **O sintetizador trata os três resultados explicitamente**, não só o caminho feliz: **tudo retornou** mergeia normalmente; **parcial** (algumas branches voltaram, uma morreu ou deu timeout) ainda mergeia o que chegou, e nomeia qual branch está faltando em vez de silenciosamente apresentar um merge de cobertura completa; **zero retornou** não é um merge sem nada dentro, é uma falha reportada, igual a uma falha de dispatch em qualquer outro ponto deste documento. Um merge que não consegue dizer ao leitor qual dos três aconteceu é pior do que nenhum merge.
 
-### 3. Expert pool
+### 3. Pool de especialistas
 
 ```
 [router] → { [A] | [B] | [C] }
 ```
 
-A router picks the one specialist the input needs.
+Um router escolhe o único especialista de que a entrada precisa.
 
-- **Fits when** the input type decides the handling.
-- **Watch out:** the router's classification accuracy *is* the pattern. Everything downstream inherits its mistake.
-- **With sub-agents:** ideal. You call only the specialist you need and nothing sits idle.
+- **Se encaixa quando** o tipo de entrada decide o tratamento.
+- **Cuidado:** a precisão de classificação do router *é* o padrão. Tudo abaixo herda o erro dele.
+- **Com subagentes:** ideal. Você chama só o especialista de que precisa e nada fica parado.
 
 ### 4. Producer-Reviewer
 
@@ -87,10 +87,10 @@ A router picks the one specialist the input needs.
 [produce] → [review] → (findings) → [produce again]
 ```
 
-- **Fits when** quality matters and there is an objective criterion to check against.
-- **Watch out:** **cap the retries at 2-3.** Without a cap this loops forever, and each turn costs a full pass.
-- **Escalate on a plateau, not just on the cap.** If the score or the open-findings count is not improving round over round (round 2 leaves the same count open as round 1, or new findings appear as fast as old ones close), that is a sign the fix is treating a symptom rather than the cause. Stop at that point even if rounds remain under the 2-3 cap, and escalate to a human with the open ledger rather than spending the remaining round on the same approach.
-- **With sub-agents:** two dispatches per round, feeding the reviewer's findings into the producer's next prompt. Same loop the gate already runs. Prefer continuing the live reviewer for round 2 (see below) instead of dispatching a fresh one.
+- **Se encaixa quando** qualidade importa e existe um critério objetivo para checar contra.
+- **Cuidado:** **limite as tentativas a 2-3.** Sem um limite isso entra em loop infinito, e cada volta custa uma passada completa.
+- **Escale num platô, não só no limite.** Se a pontuação ou a contagem de findings abertos não está melhorando rodada a rodada (a rodada 2 deixa a mesma quantidade aberta que a rodada 1, ou novos findings aparecem tão rápido quanto os antigos fecham), isso é sinal de que a correção está tratando um sintoma e não a causa. Pare nesse ponto mesmo que ainda restem rodadas dentro do limite de 2-3, e escale para um humano com o ledger aberto em vez de gastar a rodada restante na mesma abordagem.
+- **Com subagentes:** dois dispatches por rodada, alimentando os findings do reviewer no próximo prompt do producer. O mesmo loop que o gate já roda. Prefira continuar o reviewer vivo na rodada 2 (veja abaixo) em vez de fazer dispatch de um novo.
 
 ### 5. Supervisor
 
@@ -100,41 +100,41 @@ A router picks the one specialist the input needs.
           └→ [worker C]
 ```
 
-- **Fits when** the workload is variable or only knowable at runtime — a migration where you learn the real shape as you go.
-- **Differs from fan-out:** fan-out fixes the split up front; the supervisor adjusts mid-flight.
-- **Watch out:** the supervisor becomes the bottleneck if the delegated unit is too small. Delegate in chunks big enough to be worth the round-trip.
-- **With sub-agents:** the main thread is the supervisor. Keep the assignment state in the shared task list, not in your context — that is what stops the supervisor from bloating.
+- **Se encaixa quando** a carga de trabalho é variável ou só é conhecível em tempo de execução, uma migração em que você aprende a forma real conforme avança.
+- **Difere do fan-out:** o fan-out fixa a divisão de antemão; o supervisor ajusta no meio da execução.
+- **Cuidado:** o supervisor se torna o bottleneck se a unidade delegada for pequena demais. Delegue em blocos grandes o suficiente para valer a ida e volta.
+- **Com subagentes:** a thread principal é o supervisor. Mantenha o estado das atribuições na lista de tarefas compartilhada, não no seu contexto, é isso que impede o supervisor de inchar.
 
-### 6. Hierarchical delegation
+### 6. Delegação hierárquica
 
 ```
 [coordinator] → [lead A] → [worker A1] [worker A2]
               → [lead B] → [worker B1]
 ```
 
-- **Fits when** the problem decomposes hierarchically on its own.
-- **Watch out:** **beyond two levels, latency and context loss dominate.** Keep it to two.
-- **With sub-agents:** possible (a dispatched agent may dispatch its own), but prefer flattening to one level plus a merge. Depth buys less than it costs.
+- **Se encaixa quando** o problema se decompõe hierarquicamente por conta própria.
+- **Cuidado:** **acima de dois níveis, latência e perda de contexto dominam.** Mantenha em dois.
+- **Com subagentes:** possível (um agente despachado pode despachar o seu próprio), mas prefira achatar para um nível mais um merge. Profundidade compra menos do que custa.
 
-### Composites are the norm
+### Composições são a norma
 
-| Composite | Shape | Example |
+| Composição | Forma | Exemplo |
 |---|---|---|
-| Fan-out + Producer-Reviewer | parallel production, each output reviewed | several modules built in parallel, each reviewed on its own |
-| Pipeline + Fan-out | sequential stages with one parallel stage inside | analyze (serial) → implement (parallel) → integration test (serial) |
-| Supervisor + Expert pool | supervisor classifies, then calls the right specialist | triage a backlog, route each item to its layer |
+| Fan-out + Producer-Reviewer | produção paralela, cada saída revisada | vários módulos construídos em paralelo, cada um revisado por conta própria |
+| Pipeline + Fan-out | estágios sequenciais com um estágio paralelo dentro | analisar (serial) → implementar (paralelo) → teste de integração (serial) |
+| Supervisor + Pool de especialistas | supervisor classifica, depois chama o especialista certo | triagem de um backlog, roteando cada item para sua camada |
 
-### A mode this harness does not have
+### Um modo que este harness não tem
 
-There is a second execution mode — **agent teams** — where members are independent instances that message each other directly and self-coordinate through a shared task list. It changes the answer for fan-out and producer-reviewer, because one member's discovery can redirect another mid-flight instead of after both have finished.
+Existe um segundo modo de execução, **agent teams**, em que os membros são instâncias independentes que trocam mensagens diretamente entre si e se autocoordenam através de uma lista de tarefas compartilhada. Ele muda a resposta para fan-out e producer-reviewer, porque a descoberta de um membro pode redirecionar outro no meio da execução em vez de só depois que ambos terminarem.
 
-It is **not available here** (no team-creation tool), so every row above is written for sub-agents. If it ever is, the rule of thumb is one question: *does one worker's discovery change what another should be doing?* Yes → team. No → sub-agents, and the communication would be pure overhead.
+Ele **não está disponível aqui** (sem tool de criação de team), então toda linha acima foi escrita para subagentes. Se algum dia estiver, a regra prática é uma pergunta: *a descoberta de um worker muda o que outro deveria estar fazendo?* Sim → team. Não → subagentes, e a comunicação seria puro overhead.
 
-> Pattern catalogue adapted from [revfactory/harness](https://github.com/revfactory/harness) (Apache-2.0), rewritten for sub-agent execution.
+> Catálogo de padrões adaptado de [revfactory/harness](https://github.com/revfactory/harness) (Apache-2.0), reescrito para execução com subagentes.
 
-## Parallel means one message, several dispatches
+## Paralelo significa uma mensagem, vários dispatches
 
-Independent work runs **concurrently only when the dispatches go out in a single message**. Several agent calls in one message run at the same time; one call per message runs one after another, no matter how independent the tasks are.
+Trabalho independente roda **concorrentemente só quando os dispatches saem numa única mensagem**. Várias chamadas de agente numa mensagem rodam ao mesmo tempo; uma chamada por mensagem roda uma depois da outra, não importa quão independentes as tarefas sejam.
 
 ```
 Wave with 3 independent tasks
@@ -142,58 +142,58 @@ Wave with 3 independent tasks
   ❌ three messages, one Agent each                                  ← sequential, 3× the wall-clock
 ```
 
-This is the single most-missed mechanic. On a real project, **54 of 54 dispatches went out one per message** — the wave plan existed on paper and never once fanned out. The overlap that did happen came from background dispatches accidentally outliving each other, peaking at 3.
+Essa é a mecânica mais esquecida de todas. Num projeto real, **54 de 54 dispatches saíram um por mensagem**, o plano de wave existia no papel e nunca fez fan-out de fato. A sobreposição que aconteceu veio de dispatches em background que acidentalmente sobreviveram um ao outro, chegando a 3 no pico.
 
-Before dispatching a wave, ask: *are these tasks touching disjoint files?* If yes, they belong in one message. If no, they belong in different waves (see document ownership in `.claude/docs/harness/principles.md`).
+Antes de despachar uma wave, pergunte: *essas tarefas tocam arquivos disjuntos?* Se sim, elas pertencem a uma mensagem. Se não, pertencem a waves diferentes (veja document ownership em `.claude/docs/harness/principles.md`).
 
-**Verification agents are not exempt from disjointness.** `tester`, `code-reviewer` and `reviewer` write only their own deliverable — a test file, a report, a PR description — never a tracked file that belongs to someone else, and never a tracked file at all for a mutation check (mutate a copy in scratchpad/tmp with the import redirected, instead). Measured: a `tester` and a `code-reviewer` dispatched together, in the same tree — the reviewer mutated a helper file in place to check whether an assertion killed it, the tester ran the suite in that same window, hit a red gate against a modified production file plus a stray `.bak`, and correctly refused to revert something it did not own. The file-disjointness rule above was written for whoever authors the deliverable; it did not anticipate that verification writes too.
+**Agentes de verificação não estão isentos de disjunção.** `tester`, `code-reviewer` e `reviewer` escrevem só o próprio entregável, um arquivo de teste, um relatório, uma descrição de PR, nunca um arquivo rastreado que pertence a outra pessoa, e nunca um arquivo rastreado para um mutation check (mute uma cópia em scratchpad/tmp com o import redirecionado, em vez disso). Medido: um `tester` e um `code-reviewer` despachados juntos, na mesma árvore, o reviewer mutou um arquivo helper no lugar para checar se uma asserção o matava, o tester rodou a suíte naquela mesma janela, bateu num gate vermelho contra um arquivo de produção modificado mais um `.bak` perdido, e corretamente se recusou a revertar algo que não era dele. A regra de disjunção de arquivos acima foi escrita para quem autora o entregável; ela não previu que verificação também escreve.
 
-## Background is for long work you collect this turn
+## Background é para trabalho longo que você coleta neste turno
 
-- **Use background** for a long, self-contained run you will collect before the turn ends.
-- **Never background a gate.** The gate's whole job is to block; a gate you do not wait for blocks nothing.
-- **Collect what you launch, in the turn that launched it.** On a real project, two background dispatches were only collected **16 days** after being launched — the session was suspended and resumed, and the agents picked up where they left off. They worked for about 40 minutes each; the other 16 days were a session that never closed. Nothing leaked, but nobody was waiting for that result either, which means it was not a gate on anything.
+- **Use background** para uma execução longa e autocontida que você vai coletar antes do turno terminar.
+- **Nunca coloque um gate em background.** O trabalho todo de um gate é bloquear; um gate que você não espera não bloqueia nada.
+- **Colete o que você lança, no turno em que lançou.** Num projeto real, dois dispatches em background só foram coletados **16 dias** depois de lançados, a sessão foi suspensa e retomada, e os agentes continuaram de onde tinham parado. Eles trabalharam por cerca de 40 minutos cada; os outros 16 dias foram uma sessão que nunca fechou. Nada vazou, mas também não havia ninguém esperando por aquele resultado, o que significa que ele não era gate de nada.
 
-If you launch background work, say in the same message what you will do with the result and when.
+Se você lançar trabalho em background, diga na mesma mensagem o que você vai fazer com o resultado e quando.
 
-## Re-review: continue the agent, do not re-dispatch it
+## Re-review: continue o agente, não faça um novo dispatch
 
-| Situation | Do this |
+| Situação | Faça isto |
 |---|---|
-| First pass on an artifact | fresh dispatch |
-| Second, third pass on the **same** artifact | **continue the live agent** (`SendMessage`) |
+| Primeira passada num artefato | dispatch novo |
+| Segunda, terceira passada no **mesmo** artefato | **continue o agente vivo** (`SendMessage`) |
 
-A fresh dispatch re-reads the artifact from zero and has no memory of what it already flagged. A continuation costs a fraction and the reviewer still remembers its own findings — which is exactly what a re-review needs.
+Um dispatch novo relê o artefato do zero e não tem memória do que já sinalizou. Uma continuação custa uma fração e o reviewer ainda lembra dos próprios achados, que é exatamente o que um re-review precisa.
 
-Measured: a spec reviewer ran **three times on the same spec in 12 minutes**, each a fresh dispatch on the expensive model, ~57k tokens per pass. Two of those three were continuations wearing a dispatch's costume.
+Medido: um spec reviewer rodou **três vezes na mesma spec em 12 minutos**, cada uma um dispatch novo no modelo caro, ~57k tokens por passada. Duas dessas três eram continuações fantasiadas de dispatch.
 
-## Concurrency ceiling
+## Teto de concorrência
 
-Keep a wave to a handful of agents. Past that, they contend for the same files and you spend more time reconciling than you saved. If a wave wants to be large, it is usually two waves.
+Mantenha uma wave numa dúzia de agentes. Além disso, eles disputam os mesmos arquivos e você gasta mais tempo reconciliando do que economizou. Se uma wave quer ser grande, geralmente são duas waves.
 
-If you bound coverage — top-N, no retry, sampling — **say what you dropped**. Silent truncation reads as "covered everything" when it did not.
+Se você limitar cobertura, top-N, sem retry, amostragem, **diga o que você deixou de fora**. Truncamento silencioso lê como "cobri tudo" quando não cobriu.
 
-## Diversity beats redundancy
+## Diversidade supera redundância
 
-Five copies of the same reviewer find the same thing five times. Reviewers with **different lenses** — correctness, security, tests, performance — find five different things for the same cost. When a wave's review phase fans out, fan out by lens.
+Cinco cópias do mesmo reviewer encontram a mesma coisa cinco vezes. Reviewers com **lentes diferentes**, correção, segurança, testes, performance, encontram cinco coisas diferentes pelo mesmo custo. Quando a fase de review de uma wave faz fan-out, faça fan-out por lente.
 
-A cheap narrow specialist often beats an expensive broad one: a focused security pass can cost a tenth of a full code review and catch what the full review structurally cannot.
+Um especialista estreito e barato muitas vezes supera um amplo e caro: uma passada focada em segurança pode custar um décimo de uma code review completa e pegar o que a review completa estruturalmente não consegue.
 
-## Agent memory
+## Memória de agente
 
-An agent whose frontmatter declares `memory:` has a durable notebook across runs. The scope decides where it lands: `memory: project` writes to `.claude/agent-memory/<agent>/`, versioned and reviewed with the PR like any other file; `memory: user` writes to `~/.claude/agent-memory/<agent>/`, personal and shared across every project on the machine; `memory: local` writes to `.claude/agent-memory-local/<agent>/`, project-specific but gitignored. Declaring it is not using it — the agent has to choose to write.
+Um agente cujo frontmatter declara `memory:` tem um caderno duradouro entre execuções. O escopo decide onde ele fica: `memory: project` escreve em `.claude/agent-memory/<agent>/`, versionado e revisado com o PR como qualquer outro arquivo; `memory: user` escreve em `~/.claude/agent-memory/<agent>/`, pessoal e compartilhado por todo projeto na máquina; `memory: local` escreve em `.claude/agent-memory-local/<agent>/`, específico do projeto mas ignorado pelo git. Declará-lo não é usá-lo, o agente precisa escolher escrever.
 
-Worth persisting: conventions the agent re-derives every run, gotchas that already bit once, the shape of the area it owns. **Not** worth persisting: anything re-readable from the repo in one grep (see "re-fetchable beats stored" in the context doc).
+Vale a pena persistir: convenções que o agente rederiva toda execução, pegadinhas que já morderam uma vez, a forma da área que ele possui. **Não** vale a pena persistir: qualquer coisa relegível do repositório num único grep (veja "refazível supera armazenado" no documento de contexto).
 
-When you dispatch a repeat-visit specialist, tell it to check its memory first and to append what it learned. Otherwise the folder stays empty and the config is decoration.
+Quando você despachar um especialista de visita recorrente, diga a ele para checar a própria memória primeiro e acrescentar o que aprendeu. Do contrário a pasta fica vazia e a configuração é decoração.
 
-## Cost shape (order of magnitude, from real runs)
+## Formato de custo (ordem de grandeza, de execuções reais)
 
-| Agent kind | Tool calls / run | Note |
+| Tipo de agente | Chamadas de tool / execução | Nota |
 |---|---:|---|
-| Narrow specialist (security, single-layer) | ~15–20 | cheapest useful pass |
-| Stack specialist (implements in its layer) | ~45 | knows the conventions already |
-| Full code review | ~58 | broad by design |
-| **General-purpose, no stack specialist** | **~122** | re-discovers the repo every run |
+| Especialista estreito (segurança, camada única) | ~15–20 | passada útil mais barata |
+| Especialista de stack (implementa na sua camada) | ~45 | já conhece as convenções |
+| Code review completa | ~58 | ampla por design |
+| **General-purpose, sem especialista de stack** | **~122** | redescobre o repositório toda execução |
 
-That last row is the price of a missing agent in the stack plugin. If you see it, the fix is to write the specialist, not to keep paying.
+Essa última linha é o preço de um agente faltando no plugin de stack. Se você a vir, a correção é escrever o especialista, não continuar pagando.

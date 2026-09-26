@@ -1,25 +1,26 @@
-# Initial setup: adopting this template
+# Setup inicial: adotando este template
 
-Step-by-step walkthrough for using the template on a new or existing project. Read this once before you start.
+Passo a passo para usar o template num projeto novo ou existente. Leia isto
+uma vez antes de começar.
 
-## Prerequisites
+## Pré-requisitos
 
-- Git (any recent version), Bash, and Python 3 (all standard on any dev machine; the repo map and the harness's own checks use only these)
-- Node.js 20+, optional: only needed if you use the manual `refresh-snapshot` skill (Repomix v1.16+ requires Node 20; older Node produces an empty export)
-- At least one AI coding agent installed. Claude Code recommended, but the template works with Codex, Cursor, Copilot, and Gemini too.
+- Git (qualquer versão recente), Bash, e Python 3 (padrão em qualquer máquina de dev; o repo map e as próprias verificações do harness usam só isso)
+- Node.js 20+, opcional: só necessário se você usar a skill manual `refresh-snapshot` (Repomix v1.16+ exige Node 20; Node mais antigo produz uma exportação vazia)
+- Ao menos um agente de codificação de IA instalado. Claude Code é recomendado, mas o template funciona com Codex, Cursor, Copilot e Gemini também.
 
-## Path 1: New project (greenfield)
+## Caminho 1: Projeto novo (greenfield)
 
-You're starting a project from scratch.
+Você está começando um projeto do zero.
 
-### 1. Create the repo from the template
+### 1. Crie o repositório a partir do template
 
-If browsing on GitHub:
+Se estiver navegando no GitHub:
 
-1. Click "Use this template" > "Create a new repository"
-2. Name it, pick visibility, click Create
+1. Clique em "Use this template" > "Create a new repository"
+2. Dê um nome, escolha a visibilidade, clique em Create
 
-If cloning locally:
+Se estiver clonando localmente:
 
 ```bash
 git clone https://github.com/dashdanilo/claude-spec-driven-template my-project
@@ -28,215 +29,237 @@ rm -rf .git
 git init
 ```
 
-### 2. Personalize AGENTS.md (source of truth)
+### 2. Personalize o AGENTS.md (fonte da verdade)
 
-Open `AGENTS.md`. Replace:
+Abra `AGENTS.md`. Substitua:
 
-- Project name at the top
-- Tech stack section with your actual stack
-- Build/test/lint commands with the actual commands
-- Structure section with your actual folder layout
-- Conventions to match your team's preferences
+- O nome do projeto no topo
+- A seção de stack de tecnologia pela sua stack real
+- Os comandos de build/test/lint pelos comandos reais
+- A seção de estrutura pelo layout real de pastas
+- As convenções para casar com as preferências do seu time
 
-This is the file every AI agent will read. Take your time.
+Este é o arquivo que todo agente de IA vai ler. Dedique tempo a isso.
 
-### 3. Personalize CLAUDE.md (stub)
+### 3. Personalize o CLAUDE.md (stub)
 
-Open `CLAUDE.md`. Only update the project name at the top. The rest is auto-configured based on the skills, subagents, and hooks in `.claude/`.
+Abra `CLAUDE.md`. Só atualize o nome do projeto no topo. O resto é
+auto-configurado com base nas skills, subagentes e hooks em `.claude/`.
 
-### 4. Update README.md
+### 4. Atualize o README.md
 
-Replace the project name and description. Keep the structural sections (they explain the template's design and are useful for contributors).
+Substitua o nome do projeto e a descrição. Mantenha as seções estruturais
+(elas explicam o design do template e são úteis para contribuidores).
 
-### 5. Clean up examples
+### 5. Limpe os exemplos
 
-Once you understand the patterns:
+Depois de entender os padrões:
 
-- Delete or replace `src/example-module/CLAUDE.md`
-- Rename `.claude/skills/example-skill/` to your first real skill (or delete)
-- Rename `.claude/rules/example-rule.md` to your first real rule (or delete)
-- Delete `docs/decisions/0001-example.md` (replace with your first ADR)
-- Delete `.claude/docs/libs/example-lib.md` when you add your first real lib doc
-- Rename `docs/CONSTITUTION.md.example` to `docs/CONSTITUTION.md` and fill in
+- Delete ou substitua `src/example-module/CLAUDE.md`
+- Renomeie `.claude/skills/example-skill/` para sua primeira skill real (ou delete)
+- Renomeie `.claude/rules/example-rule.md` para sua primeira regra real (ou delete)
+- Delete `docs/decisions/0001-example.md` (substitua pela sua primeira ADR)
+- Delete `.claude/docs/libs/example-lib.md` quando adicionar sua primeira doc de lib real
+- Renomeie `docs/CONSTITUTION.md.example` para `docs/CONSTITUTION.md` e preencha
 
-### 6. Optional: add `script/setup` and `script/test`
+### 6. Opcional: adicione `script/setup` e `script/test`
 
-If your team wants one command that takes a clone (or worktree) to "ready to
-work in", and one command that is the verification gate, add executable
-`script/setup` and `script/test` at the repo root. The harness only *calls*
-these when they exist — `spec-worktree` runs `script/setup` after creating a
-worktree, and `verify-before-done` uses `script/test` as the gate instead of
-guessing commands. It does not generate them for you, and a repo without them
-loses nothing: the step is a no-op. See
+Se seu time quer um comando que leve um clone (ou worktree) a "pronto para
+trabalhar", e um comando que seja o gate de verificação, adicione
+`script/setup` e `script/test` executáveis na raiz do repositório. O harness
+só *chama* esses scripts quando existem (o `spec-worktree` executa
+`script/setup` depois de criar um worktree, e o `verify-before-done` usa
+`script/test` como gate em vez de adivinhar comandos). Ele não os gera para
+você, e um repositório sem eles não perde nada: o passo é um no-op. Veja
 [`docs/guides/script-setup-and-test.md`](./script-setup-and-test.md).
 
-### 7. Commit the baseline
+### 7. Faça commit da baseline
 
 ```bash
 git add .
 git commit -m "chore: adopt claude-spec-driven-template as v0.1 baseline"
 ```
 
-### 8. Start using it
+### 8. Comece a usar
 
-For your first feature:
+Para sua primeira feature:
 
 ```
-/skill explore                        # discuss what to build
-/skill write-spec my-first-feature    # creates specs/2026-07-04-my-first-feature/ with spec.md filled and plan.md, tasks.md scaffolded
+/skill explore                        # discuta o que construir
+/skill write-spec my-first-feature    # cria specs/2026-07-04-my-first-feature/ com spec.md preenchido e plan.md, tasks.md montados
 ```
 
-Then fill in `plan.md` (architecture, tech, phases) and `tasks.md` (atomic TDD checkboxes), and start building.
+Depois preencha `plan.md` (arquitetura, tecnologia, fases) e `tasks.md`
+(checkboxes atômicos de TDD), e comece a construir.
 
 ---
 
-## Path 2: Existing project (brownfield)
+## Caminho 2: Projeto existente (brownfield)
 
-You already have code and want to adopt this template.
+Você já tem código e quer adotar este template.
 
-### 1. Install the scaffolding
+### 1. Instale o scaffolding
 
-Use the installer. Run it from inside your repo (it pulls the template fresh):
+Use o instalador. Execute-o de dentro do seu repositório (ele busca o
+template atualizado):
 
 ```bash
 cd /path/to/your-project
 curl -fsSL https://raw.githubusercontent.com/dashdanilo/claude-spec-driven-template/main/install.sh | bash
 ```
 
-Or, from a local template clone, target your repo:
+Ou, a partir de um clone local do template, aponte para o seu repositório:
 
 ```bash
 ./install.sh --to /path/to/your-project
 ```
 
-The installer copies the agent scaffolding (`.claude/`, `docs/`, `specs/`, `AGENTS.md`, `CLAUDE.md`, `ECOSYSTEM.md`, `.claudeignore`, `.github/`, `CLAUDE.local.md.example`), and:
+O instalador copia o scaffolding do agente (`.claude/`, `docs/`, `specs/`,
+`AGENTS.md`, `CLAUDE.md`, `ECOSYSTEM.md`, `.claudeignore`, `.github/`,
+`CLAUDE.local.md.example`), e:
 
-- **Never overwrites** files that already exist in your repo - it skips and warns (use `--force` to override). Your `README.md`, `.gitignore`, and any existing `docs/` files are safe.
-- **Merges** the required entries into your `.gitignore` (appends what is missing).
-- Copies only git-tracked template files (no local/generated cruft) and makes the hooks executable.
+- **Nunca sobrescreve** arquivos que já existem no seu repositório (pula e
+  avisa; use `--force` para forçar). Seu `README.md`, `.gitignore`, e
+  qualquer arquivo `docs/` existente estão seguros.
+- **Mescla** as entradas necessárias no seu `.gitignore` (adiciona o que estiver faltando).
+- Copia só arquivos do template rastreados pelo git (sem lixo local/gerado) e torna os hooks executáveis.
 
-Preview without writing anything using `--dry-run`.
+Pré-visualize sem escrever nada usando `--dry-run`.
 
-### 2. Run `analyze-codebase` for the baseline
+### 2. Execute o `analyze-codebase` para a baseline
 
-This is the critical step for brownfield. Open Claude Code and run:
+Este é o passo crítico para brownfield. Abra o Claude Code e execute:
 
 ```
 /skill analyze-codebase
 ```
 
-The skill will:
+A skill vai:
 
-- Detect your tech stack from `package.json`, `tsconfig.json`, etc
-- Sample representative files to infer conventions
-- Generate `docs/CONSTITUTION.md`, `docs/CONVENTIONS.md`, `docs/architecture/overview.md`
-- Generate a repo map at `.claude/context/repo-map.md` (always, regardless of project size)
-- Update `AGENTS.md` and `CLAUDE.md` with the detected stack
+- Detectar sua stack de tecnologia a partir de `package.json`, `tsconfig.json`, etc
+- Amostrar arquivos representativos para inferir convenções
+- Gerar `docs/CONSTITUTION.md`, `docs/CONVENTIONS.md`, `docs/architecture/overview.md`
+- Gerar um repo map em `.claude/context/repo-map.md` (sempre, independente do tamanho do projeto)
+- Atualizar `AGENTS.md` e `CLAUDE.md` com a stack detectada
 
-### 3. Review generated docs
+### 3. Revise os docs gerados
 
-Look for `TODO` markers in the generated files. Those are where the analysis was uncertain. Fill them in with your knowledge.
+Procure por marcadores `TODO` nos arquivos gerados. É onde a análise ficou
+incerta. Preencha-os com seu conhecimento.
 
-Also review:
+Revise também:
 
-- The tech stack in `AGENTS.md` (may need adjustment)
-- The conventions in `docs/CONVENTIONS.md` (are these really your team's conventions?)
-- The architecture overview in `docs/architecture/overview.md` (does the diagram reflect reality?)
+- A stack de tecnologia em `AGENTS.md` (pode precisar de ajuste)
+- As convenções em `docs/CONVENTIONS.md` (são de fato as convenções do seu time?)
+- A visão de arquitetura em `docs/architecture/overview.md` (o diagrama reflete a realidade?)
 
-### 4. Commit the baseline
+### 4. Faça commit da baseline
 
 ```bash
 git add .
 git commit -m "chore: adopt claude-spec-driven-template with generated baseline"
 ```
 
-### 5. Optional: add `script/setup` and `script/test`
+### 5. Opcional: adicione `script/setup` e `script/test`
 
-If your team wants one command that takes a clone (or worktree) to "ready to
-work in", and one command that is the verification gate, add executable
-`script/setup` and `script/test` at the repo root. The harness only *calls*
-these when they exist — `spec-worktree` runs `script/setup` after creating a
-worktree, and `verify-before-done` uses `script/test` as the gate instead of
-guessing commands. It does not generate them for you, and a repo without them
-loses nothing: the step is a no-op. See
+Se seu time quer um comando que leve um clone (ou worktree) a "pronto para
+trabalhar", e um comando que seja o gate de verificação, adicione
+`script/setup` e `script/test` executáveis na raiz do repositório. O harness
+só *chama* esses scripts quando existem (o `spec-worktree` executa
+`script/setup` depois de criar um worktree, e o `verify-before-done` usa
+`script/test` como gate em vez de adivinhar comandos). Ele não os gera para
+você, e um repositório sem eles não perde nada: o passo é um no-op. Veja
 [`docs/guides/script-setup-and-test.md`](./script-setup-and-test.md).
 
-### 6. Optional: install recommended plugins
+### 6. Opcional: instale plugins recomendados
 
-- [Ponytail](https://github.com/DietrichGebert/ponytail) for cross-tool YAGNI enforcement
-- [Superpowers](https://github.com/obra/superpowers) for enforced spec-driven flow (Claude-only)
-- [OpenSpec](https://github.com/Fission-AI/OpenSpec) for cross-tool spec workflow
+- [Ponytail](https://github.com/DietrichGebert/ponytail) para reforço de YAGNI entre ferramentas
+- [Superpowers](https://github.com/obra/superpowers) para fluxo guiado por spec forçado (só Claude)
+- [OpenSpec](https://github.com/Fission-AI/OpenSpec) para fluxo de spec entre ferramentas
 
-### 7. First feature using the template
+### 7. Primeira feature usando o template
 
 ```
-/skill explore                    # discuss what to build
-/skill find-existing-first        # check if similar code exists
-/skill write-spec <slug>          # create the spec
+/skill explore                    # discuta o que construir
+/skill find-existing-first        # verifique se código semelhante já existe
+/skill write-spec <slug>          # crie a spec
 ```
 
 ---
 
-## Maintaining the template over time
+## Mantendo o template com o tempo
 
-### The repo map, and when you'd ever touch Repomix
+### O repo map, e quando você tocaria no Repomix
 
-The repo map regenerates fresh every time `codebase-explorer` runs. There is
-nothing to refresh and nothing to think about.
+O repo map regenera do zero a cada vez que o `codebase-explorer` executa. Não
+há nada para atualizar e nada para pensar sobre isso.
 
-The Repomix export is a different, separate thing: manual, opt-in, and only
-useful if you need a single-file dump of the codebase for a tool that can't
-read the filesystem itself. Most sessions never need it:
+A exportação Repomix é uma coisa diferente e separada: manual, opcional, e só
+útil se você precisar de um dump de arquivo único do codebase para uma
+ferramenta que não pode ler o sistema de arquivos por conta própria. A
+maioria das sessões nunca precisa dela:
 
 ```
 /skill refresh-snapshot
 ```
 
-See `docs/decisions/0003-repo-map-over-snapshot.md` for why these are two
-different mechanisms now instead of one.
+Veja `docs/decisions/0003-repo-map-over-snapshot.md` para entender por que
+agora são dois mecanismos diferentes em vez de um.
 
-### When to add a new subagent
+### Quando adicionar um novo subagente
 
-When you find yourself invoking a specific pattern repeatedly ("check auth handling here", "profile this code path"). Create a subagent with a narrow role and a triggering description.
+Quando você se pegar invocando um padrão específico repetidamente ("verifique
+o tratamento de autenticação aqui", "faça profiling deste caminho de
+código"). Crie um subagente com um papel restrito e uma descrição de gatilho.
 
-### When to add a new ADR
+### Quando adicionar uma nova ADR
 
-When someone asks "why did we do X?" more than twice. Turn the answer into an ADR in `docs/decisions/`.
+Quando alguém perguntar "por que fizemos X?" mais de duas vezes. Transforme a
+resposta numa ADR em `docs/decisions/`.
 
-### When to update `docs/CONVENTIONS.md`
+### Quando atualizar `docs/CONVENTIONS.md`
 
-When you notice code review comments repeating the same feedback. That's a convention worth documenting.
+Quando você notar comentários de code review repetindo o mesmo feedback. Isso
+é uma convenção que vale documentar.
 
-### When to update `AGENTS.md`
+### Quando atualizar `AGENTS.md`
 
-When the stack changes (framework upgrade, new external service, major dependency swap). Update it once, all agents see the change.
+Quando a stack mudar (upgrade de framework, novo serviço externo, troca de
+dependência importante). Atualize uma vez, todos os agentes veem a mudança.
 
 ---
 
 ## Troubleshooting
 
-### The SessionStart hook shows warnings I don't want
+### O hook de SessionStart mostra avisos que eu não quero
 
-Edit `.claude/context/config.json` to adjust thresholds, or disable the hook by removing it from `.claude/settings.json`.
+Edite `.claude/context/config.json` para ajustar os limiares, ou desative o
+hook removendo-o de `.claude/settings.json`.
 
-### `refresh-snapshot` seems to hang
+### `refresh-snapshot` parece travar
 
-Only relevant if you're using the manual Repomix export - `analyze-codebase` itself no longer runs Repomix at all, so it should never hang on this. The Repomix step in `refresh-snapshot` can take 30-60 seconds on large repos. If it's still going after 2 minutes, cancel and add a `.repomixignore` to reduce scope.
+Só relevante se você estiver usando a exportação Repomix manual (o próprio
+`analyze-codebase` não executa mais o Repomix de forma alguma, então nunca
+deveria travar por causa disso). O passo do Repomix dentro de
+`refresh-snapshot` pode levar de 30 a 60 segundos em repositórios grandes. Se
+ainda estiver rodando depois de 2 minutos, cancele e adicione um
+`.repomixignore` para reduzir o escopo.
 
-### Claude doesn't seem to know about the skills
+### O Claude parece não saber sobre as skills
 
-Verify:
+Verifique:
 
-- The skill file exists at `.claude/skills/<name>/SKILL.md`
-- The frontmatter has valid `name` and `description`
-- The description starts with a triggering condition (`Use when...`)
+- O arquivo da skill existe em `.claude/skills/<name>/SKILL.md`
+- O frontmatter tem `name` e `description` válidos
+- A descrição começa com uma condição de gatilho (`Use when...`)
 
-Descriptions are the auto-invocation trigger, not documentation.
+Descrições são o gatilho de auto-invocação, não documentação.
 
-### Cross-tool concerns
+### Preocupações entre ferramentas
 
-- Codex, Cursor, Gemini read `AGENTS.md` natively (or via config)
-- Copilot reads `.github/copilot-instructions.md`
-- Only Claude Code reads `.claude/` - other tools ignore it
+- Codex, Cursor e Gemini leem `AGENTS.md` nativamente (ou via configuração)
+- Copilot lê `.github/copilot-instructions.md`
+- Só o Claude Code lê `.claude/`, as outras ferramentas o ignoram
 
-Update `AGENTS.md` for cross-tool changes. Update `CLAUDE.md` only for Claude-specific things.
+Atualize `AGENTS.md` para mudanças entre ferramentas. Atualize `CLAUDE.md` só
+para coisas específicas do Claude.

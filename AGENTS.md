@@ -1,150 +1,150 @@
 # claude-spec-driven-template
 
-> Cross-tool source of truth. Read by any AI coding agent: Codex, Cursor, Gemini CLI, GitHub Copilot, Windsurf, Aider, Claude Code, and others that support the AGENTS.md convention.
+> Fonte de verdade entre ferramentas. Lido por qualquer agent de codificação de IA: Codex, Cursor, Gemini CLI, GitHub Copilot, Windsurf, Aider, Claude Code, e outros que suportam a convenção AGENTS.md.
 >
-> Tool-specific additions live in their own files:
-> - Claude Code: [`CLAUDE.md`](./CLAUDE.md) (stub pointing here + Claude-specific extras)
-> - GitHub Copilot: [`.github/copilot-instructions.md`](./.github/copilot-instructions.md) (stub pointing here + Copilot-specific extras)
-> - Gemini CLI: `GEMINI.md` (when present)
-> - Cursor: `.cursor/rules/` (when present)
+> Adições específicas de cada ferramenta vivem em seus próprios arquivos:
+> - Claude Code: [`CLAUDE.md`](./CLAUDE.md) (stub apontando para aqui + extras específicos do Claude)
+> - GitHub Copilot: [`.github/copilot-instructions.md`](./.github/copilot-instructions.md) (stub apontando para aqui + extras específicos do Copilot)
+> - Gemini CLI: `GEMINI.md` (quando presente)
+> - Cursor: `.cursor/rules/` (quando presente)
 
-A stack-agnostic template repository for structuring AI-enabled projects around spec-driven development. Provides folder layout, agent configuration, skills, subagents, hooks, and workflow patterns that work across Claude Code, GitHub Copilot, and other AGENTS.md-compatible tools.
+Um repositório template agnóstico de stack para estruturar projetos habilitados por IA em torno de desenvolvimento guiado por spec. Fornece layout de pastas, configuração de agent, skills, subagents, hooks e padrões de workflow que funcionam em Claude Code, GitHub Copilot e outras ferramentas compatíveis com AGENTS.md.
 
-The repo you are working in **is the template itself**, not an application built from it. There is no runtime code to execute, no server to run, no build to compile. Contributions to this repo evolve the template that others clone and adopt.
+O repo em que você está trabalhando **é o próprio template**, não uma aplicação construída a partir dele. Não há código de runtime para executar, nenhum servidor para rodar, nenhum build para compilar. Contribuições a este repo evoluem o template que outros clonam e adotam.
 
-## Nature of this repository
+## Natureza deste repositório
 
-This is a documentation-heavy, code-light repository. Most files are markdown or configuration. Shell scripts implement lifecycle hooks. No source code beyond illustrative examples.
+Este é um repositório pesado em documentação e leve em código. A maioria dos arquivos é markdown ou configuração. Shell scripts implementam hooks de ciclo de vida. Nenhum código-fonte além de exemplos ilustrativos.
 
-Read [`docs/CONSTITUTION.md`](./docs/CONSTITUTION.md) for the full philosophy, principles, and boundaries of this project.
+Leia [`docs/CONSTITUTION.md`](./docs/CONSTITUTION.md) para a filosofia completa, os princípios e os limites deste projeto.
 
-## Tech stack
+## Stack técnica
 
-- **Documentation:** Markdown
-- **Shell scripts:** Bash (POSIX-compatible where possible)
+- **Documentação:** Markdown
+- **Shell scripts:** Bash (compatível com POSIX quando possível)
 - **Config:** JSON (`.claude/settings.json`)
-- **Diagrams:** Mermaid (renders natively on GitHub)
-- **Optional adopter tools tested against:** Repomix, Ponytail, OpenSpec, Superpowers
+- **Diagramas:** Mermaid (renderiza nativamente no GitHub)
+- **Ferramentas opcionais testadas por quem adota:** Repomix, Ponytail, OpenSpec, Superpowers
 
 ## Build, test, lint
 
-No build step and no linter: this is a template repository. There **is** a test
-suite, and CI runs it on every push.
+Sem etapa de build e sem linter: isto é um repositório template. **Existe** uma
+suíte de testes, e o CI a roda em todo push.
 
-- `baseline/hooks/tests/*.test.sh` and `baseline/scripts/tests/*.test.sh`, one
-  suite per hook and per script, plus `tests/install-harness.test.sh` for the
-  installer. Each is a standalone bash script: run one directly, or all of them
-  the way `.github/workflows/test.yml` does.
-- CI runs the whole set on **ubuntu-latest and macos-latest**. The two matter:
-  a hook that passes on macOS can fail on Linux over BSD versus GNU `stat`,
-  `date` and `awk`, and that has already happened here.
-- `baseline/scripts/check-index.sh --strict` gates the index in `CLAUDE.md`
-  against what is actually on disk, and `harness-score --min-level 2` gates the
-  harness itself.
+- `baseline/hooks/tests/*.test.sh` e `baseline/scripts/tests/*.test.sh`, uma
+  suíte por hook e por script, mais `tests/install-harness.test.sh` para o
+  instalador. Cada um é um script bash independente: rode um direto, ou todos
+  do jeito que `.github/workflows/test.yml` faz.
+- O CI roda o conjunto inteiro em **ubuntu-latest e macos-latest**. Os dois
+  importam: um hook que passa no macOS pode falhar no Linux por causa de
+  `stat`, `date` e `awk` BSD versus GNU, e isso já aconteceu aqui.
+- `baseline/scripts/check-index.sh --strict` trava o índice em `CLAUDE.md`
+  contra o que de fato está no disco, e `harness-score --min-level 2` trava o
+  harness em si.
 
-Contributions are also validated by:
+Contribuições também são validadas por:
 
-- Manual review against `CONTRIBUTING.md` checklist
-- Cross-checking directory tree in `README.md` against actual filesystem
-- Verifying internal links resolve
+- Revisão manual contra o checklist de `CONTRIBUTING.md`
+- Checagem cruzada da árvore de diretórios em `README.md` contra o filesystem real
+- Verificação de que os links internos resolvem
 
 ```bash
-# Verify shell scripts run without syntax errors
+# Verifica que os shell scripts rodam sem erro de sintaxe
 bash -n baseline/hooks/*.sh
 bash -n baseline/scripts/*.sh
 
-# Verify JSON is valid
+# Verifica que o JSON é válido
 python3 -m json.tool .claude/settings.json > /dev/null && echo "settings.json valid"
 
-# List all skill and agent files to spot missing pieces
+# Lista todos os arquivos de skill e agent para achar peças faltando
 find baseline/skills -name "SKILL.md" | sort
 find baseline/agents -name "*.md" | sort
 ```
 
-## Structure
+## Estrutura
 
-- `.claude/` Claude Code configuration (skills, agents, hooks, rules, docs, scripts, context)
-- `.github/` GitHub-facing files (issue templates, PR template, Copilot instructions)
-- `docs/` human-facing project documentation
-- `specs/` spec-driven artifacts (one folder per feature; the `spec.md`/`plan.md`/`tasks.md` templates ship with the `write-spec` skill)
-- `src/example-module/` shows the nested CLAUDE.md pattern
-- Root: cross-tool config (`AGENTS.md`, `CLAUDE.md`, `ECOSYSTEM.md`) and standard docs (`README.md`, `LEARN.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `LICENSE`)
+- `.claude/` configuração do Claude Code (skills, agents, hooks, rules, docs, scripts, context)
+- `.github/` arquivos voltados ao GitHub (templates de issue, template de PR, instruções do Copilot)
+- `docs/` documentação do projeto voltada a humanos
+- `specs/` artefatos guiados por spec (uma pasta por feature; os templates `spec.md`/`plan.md`/`tasks.md` vêm com a skill `write-spec`)
+- `src/example-module/` mostra o padrão de CLAUDE.md aninhado
+- Raiz: config entre ferramentas (`AGENTS.md`, `CLAUDE.md`, `ECOSYSTEM.md`) e docs padrão (`README.md`, `LEARN.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `LICENSE`)
 
-See the tree diagram in `README.md` for the complete layout.
+Veja o diagrama de árvore em `README.md` para o layout completo.
 
-## Conventions
+## Convenções
 
-Applied both to the template's own content and recommended for adopters:
+Aplicadas tanto ao conteúdo próprio do template quanto recomendadas para quem adota:
 
-- Markdown for all files (no MDX, no preprocessing)
-- No NEW em-dashes in copy, enforced by a hook; existing ones are debt and do not block edits near them
-- One H1 per file, used as the title
-- Code blocks have language tags
-- File paths in inline code with backticks
-- Directory paths end with slash (`docs/`, not `docs`)
-- Dates in ISO format (`YYYY-MM-DD`)
+- Markdown para todos os arquivos (sem MDX, sem preprocessamento)
+- Nenhum em-dash NOVO no texto, reforçado por um hook; os existentes são débito e não bloqueiam edições ao lado deles
+- Um H1 por arquivo, usado como título
+- Blocos de código têm tag de linguagem
+- Caminhos de arquivo em código inline com backtick
+- Caminhos de diretório terminam com barra (`docs/`, não `docs`)
+- Datas em formato ISO (`YYYY-MM-DD`)
 
-## Feature workflow
+## Workflow de feature
 
-Even though this repo has no application code, feature additions to the template itself follow the same spec-driven flow that the template teaches:
+Mesmo que este repo não tenha código de aplicação, adições de feature ao próprio template seguem o mesmo fluxo guiado por spec que o template ensina:
 
-1. Discuss the change in an issue or discussion
-2. Optionally write `specs/YYYY-MM-DD-<slug>/spec.md` for larger changes
-3. Optionally break into `plan.md` (architecture) and `tasks.md` (atomic steps)
-4. Implement changes, updating relevant files
-5. Update `README.md` tree, `CHANGELOG.md`, and any affected docs
-6. Open PR referencing the spec or issue
+1. Discuta a mudança numa issue ou discussion
+2. Opcionalmente escreva `specs/YYYY-MM-DD-<slug>/spec.md` para mudanças maiores
+3. Opcionalmente separe em `plan.md` (arquitetura) e `tasks.md` (passos atômicos)
+4. Implemente as mudanças, atualizando os arquivos relevantes
+5. Atualize a árvore do `README.md`, o `CHANGELOG.md`, e qualquer doc afetado
+6. Abra um PR referenciando a spec ou a issue
 
-For small changes (typo fix, single doc improvement), skip the spec and open the PR directly.
+Para mudanças pequenas (correção de typo, melhoria isolada de doc), pule a spec e abra o PR direto.
 
-## Before writing new code
+## Antes de escrever código novo
 
-For this repo specifically, "new code" almost always means new markdown or shell scripts:
+Para este repo especificamente, "código novo" quase sempre significa novo markdown ou shell scripts:
 
-- Search for existing similar files (`grep`, `find`)
-- Look for related patterns in `docs/patterns/` and `LEARN.md`
-- Check the tree diagram in `README.md` to see if the location already exists
-- Prefer extending existing skills or agents over creating parallel ones
-- If creating a new skill, subagent, hook, or rule, follow the "Adding a new..." sections in `CONTRIBUTING.md`
+- Procure arquivos semelhantes já existentes (`grep`, `find`)
+- Procure padrões relacionados em `docs/patterns/` e `LEARN.md`
+- Confira o diagrama de árvore em `README.md` para ver se o lugar já existe
+- Prefira estender skills ou agents existentes em vez de criar paralelos
+- Se for criar uma skill, subagent, hook ou rule nova, siga as seções "Adicionando..." em `CONTRIBUTING.md`
 
-## Where to look
+## Onde procurar
 
-| Need | Place |
+| Necessidade | Lugar |
 |---|---|
-| Constitution and philosophy | `docs/CONSTITUTION.md` |
-| Guided course through the structure | `LEARN.md` |
-| Contribution rules and checklists | `CONTRIBUTING.md` |
-| Version history | `CHANGELOG.md` |
-| Adoption walkthrough | `docs/guides/initial-setup.md` |
-| `script/setup` / `script/test` contract | `docs/guides/script-setup-and-test.md` |
-| Recommended external tools | `README.md` section "Recommended ecosystem" |
-| Architecture decision records | `docs/decisions/` |
+| Constituição e filosofia | `docs/CONSTITUTION.md` |
+| Curso guiado pela estrutura | `LEARN.md` |
+| Regras de contribuição e checklists | `CONTRIBUTING.md` |
+| Histórico de versões | `CHANGELOG.md` |
+| Passo a passo de adoção | `docs/guides/initial-setup.md` |
+| Contrato de `script/setup` / `script/test` | `docs/guides/script-setup-and-test.md` |
+| Ferramentas externas recomendadas | seção "Recommended ecosystem" do `README.md` |
+| Registros de decisão de arquitetura | `docs/decisions/` |
 
-## Non-negotiables
+## Inegociáveis
 
-Documented in full in `docs/CONSTITUTION.md`. The short version:
+Documentado por completo em `docs/CONSTITUTION.md`. A versão curta:
 
-- **Stack agnosticism.** No file may assume a specific framework, database, or vendor. Placeholders and examples only.
-- **Cross-tool compatibility.** Every workflow must be executable by any AGENTS.md-compatible agent.
-- **Documentation over code.** Structural decisions are described, not implemented.
-- **Attribution preserved.** Community contributions keep their author attribution inline.
-- **Context economy.** What loads always must be small. What is detailed must load on demand.
-- **Delegation.** The main thread coordinates; specialists implement. Never write feature code from the main thread — dispatch it. Full rule (with the narrow exceptions) in `baseline/rules/delegation.md`.
+- **Agnosticismo de stack.** Nenhum arquivo pode assumir um framework, banco de dados ou fornecedor específico. Só placeholders e exemplos.
+- **Compatibilidade entre ferramentas.** Todo workflow precisa ser executável por qualquer agent compatível com AGENTS.md.
+- **Documentação antes de código.** Decisões estruturais são descritas, não implementadas.
+- **Atribuição preservada.** Contribuições da comunidade mantêm a atribuição de autoria inline.
+- **Economia de contexto.** O que carrega sempre precisa ser pequeno. O que é detalhado precisa carregar sob demanda.
+- **Delegação.** A thread principal coordena; especialistas implementam. Nunca escreva código de feature na thread principal — dispare para um especialista. Regra completa (com as exceções restritas) em `baseline/rules/delegation.md`.
 
-## Files agents should not touch
+## Arquivos que agents não devem tocar
 
-- `.env*` and any file matching `**/secrets/**` (blocked by `block-secrets.sh` hook)
-- `node_modules/` (if any adopter creates it locally)
-- `CLAUDE.local.md`, `.claude/settings.local.json`, and `.claude/agent-memory-local/` (personal, gitignored)
-- `.claude/context/` (the generated repo map, an optional Repomix export, and other generated state, gitignored)
-- Applied migrations, lockfiles, generated code, except files ending in `.example` (blocked by `protect-critical.sh` hook)
-- The governance surface — `.claude/settings.json`/`settings.local.json`, `baseline/hooks/*.sh`, `.claude/hooks/*.sh`, `baseline/rules/**`, `.claude/rules/**` — when the edit reaches into another repo's checkout, or when the target is gitignored and so would never appear in a review. Editing this repo's own, in a file that lands in its diff, is allowed (blocked by `protect-harness.sh` hook)
+- `.env*` e qualquer arquivo que combine com `**/secrets/**` (bloqueado pelo hook `block-secrets.sh`)
+- `node_modules/` (se algum adotante criar localmente)
+- `CLAUDE.local.md`, `.claude/settings.local.json`, e `.claude/agent-memory-local/` (pessoais, no gitignore)
+- `.claude/context/` (o repo map gerado, um export opcional do Repomix, e outro estado gerado, no gitignore)
+- Migrações aplicadas, lockfiles, código gerado, exceto arquivos terminados em `.example` (bloqueado pelo hook `protect-critical.sh`)
+- A superfície de governança — `.claude/settings.json`/`settings.local.json`, `baseline/hooks/*.sh`, `.claude/hooks/*.sh`, `baseline/rules/**`, `.claude/rules/**` — quando a edição alcança o checkout de outro repo, ou quando o alvo está no gitignore e por isso nunca apareceria num review. Editar a própria deste repo, num arquivo que aparece no diff dele, é permitido (bloqueado pelo hook `protect-harness.sh`)
 
-## More context
+## Mais contexto
 
-- [`README.md`](./README.md) human entry point with tree, layers, brownfield, ecosystem
-- [`LEARN.md`](./LEARN.md) 12-chapter guided course
-- [`CONTRIBUTING.md`](./CONTRIBUTING.md) how to contribute without breaking teaching value
-- [`docs/CONSTITUTION.md`](./docs/CONSTITUTION.md) project DNA
-- [`docs/guides/initial-setup.md`](./docs/guides/initial-setup.md) adoption walkthrough
-- [`CHANGELOG.md`](./CHANGELOG.md) release history
+- [`README.md`](./README.md) ponto de entrada para humanos, com árvore, camadas, brownfield, ecosystem
+- [`LEARN.md`](./LEARN.md) curso guiado de 12 capítulos
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md) como contribuir sem quebrar o valor didático
+- [`docs/CONSTITUTION.md`](./docs/CONSTITUTION.md) DNA do projeto
+- [`docs/guides/initial-setup.md`](./docs/guides/initial-setup.md) passo a passo de adoção
+- [`CHANGELOG.md`](./CHANGELOG.md) histórico de releases

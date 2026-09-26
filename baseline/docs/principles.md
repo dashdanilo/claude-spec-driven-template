@@ -1,10 +1,10 @@
-# Three principles
+# Três princípios
 
-These are the rules behind how `.claude/`'s layers (agents, skills, rules,
-hooks, commands, docs — see the layer table in the harness repo's own
-`README.md`) relate to each other, referenced by name elsewhere (e.g.
-`orchestrate`'s "Document ownership" step).
+Estas são as regras por trás de como as camadas do `.claude/` (agents, skills, rules,
+hooks, commands, docs, veja a tabela de camadas no próprio `README.md` do repositório
+do harness) se relacionam entre si, referenciadas pelo nome em outros lugares (ex.:
+o passo "Document ownership" do `orchestrate`).
 
-1. **One home per topic.** A fact lives in exactly one skill/rule; others cross-link, never copy.
-2. **Rule vs skill.** A **rule** states *what* (one line, path-scoped, always in context for that path). A **skill** shows *how + why + example* (loads by task). Project-specific conventions are rules; the richer teaching is skills.
-3. **One owner per document.** When `/orchestrate` or `/wave` runs specialists in parallel, each writes only its own outputs — `tasks.md` belongs to the orchestrator (it checks the boxes), `spec.md`/`plan.md` to the author, and a specialist never edits another wave's files. ADRs are append-only (`.claude/rules/harness/adr.md`). This is what keeps parallel agents from clobbering each other.
+1. **Um lar por tópico.** Um fato vive em exatamente uma skill/rule; as outras fazem cross-link, nunca copiam.
+2. **Rule vs skill.** Uma **rule** declara *o quê* (uma linha, com escopo de caminho, sempre no contexto para aquele caminho). Uma **skill** mostra *como + por quê + exemplo* (carrega por tarefa). Convenções específicas do projeto são rules; o ensino mais rico é skills.
+3. **Um dono por documento.** Quando `/orchestrate` ou `/wave` roda especialistas em paralelo, cada um escreve só suas próprias saídas — o `tasks.md` pertence ao orquestrador (ele marca as caixas), `spec.md`/`plan.md` ao autor, e um especialista nunca edita os arquivos de outra wave. ADRs são somente para acréscimo (`.claude/rules/harness/adr.md`). É isso que impede agentes paralelos de se atropelarem.
