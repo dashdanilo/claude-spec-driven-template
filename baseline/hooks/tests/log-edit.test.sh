@@ -283,17 +283,117 @@ _run_case "24: tee with two targets — one line per target" \
   "main${TAB}Bash:tee${TAB}sub/t1.txt${TAB}
 main${TAB}Bash:tee${TAB}sub/t2.txt${TAB}"
 
+# ------------------------------------------ redirect operands are not command args
+# A WORD immediately following a redirect operator is that redirect's OWN
+# operand (a target file, an input file, a heredoc delimiter, a here-string,
+# or a bare fd reference) — never one of the command's own positional
+# arguments. Before REDIRECT_OPERAND_OPS existed in bash-write-targets.py,
+# `tee`/`sed -i`'s own "positional words" list was built straight from the
+# token stream with no notion of this, so each shape below invented a
+# phantom write target that never actually gets written to. These cases are
+# the log-level proof that the fix holds; see that file's own
+# REDIRECT_OPERAND_OPS comment for the reasoning behind each operator.
+HEREDOC_TEE=$'tee sub/heredoc-tee.txt <<\'E2\'\nbody\nE2'
+_run_case "25: tee <file> <<'DELIM' — file logged, heredoc DELIMITER not logged" \
+  "$(_bash_payload "$HEREDOC_TEE")" \
+  "main${TAB}Bash:tee${TAB}sub/heredoc-tee.txt${TAB}"
+
+_run_case "26: tee <file> < <input> — only the tee target logged, input file is not" \
+  "$(_bash_payload 'tee sub/tee-target.txt < sub/tee-input.txt')" \
+  "main${TAB}Bash:tee${TAB}sub/tee-target.txt${TAB}"
+
+_run_case "27: tee <file> 2>&1 — only the tee target logged, bare fd ref is not" \
+  "$(_bash_payload 'tee sub/tee-target.txt 2>&1')" \
+  "main${TAB}Bash:tee${TAB}sub/tee-target.txt${TAB}"
+
+_run_case "28: here-string tee <file> <<< text — only the tee target logged, here-string text is not" \
+  "$(_bash_payload 'tee sub/tee-target.txt <<< hello')" \
+  "main${TAB}Bash:tee${TAB}sub/tee-target.txt${TAB}"
+
+_run_case "29: sed -i with an input redirect — only the real file logged, input file is not" \
+  "$(_bash_payload "sed -i 's/a/b/' sub/file.txt < sub/input.txt")" \
+  "main${TAB}Bash:sed-i${TAB}sub/file.txt${TAB}"
+
+# Negative controls — added explicitly rather than trusting the cases above
+# alone, since a test that only proves "the new bug is gone" without also
+# proving "the old correct behaviour survived" is worthless (a fix that
+# happens to also swallow legitimate targets would still turn this section
+# green).
+_run_case "30: tee a b, no pipe — still logs BOTH targets" \
+  "$(_bash_payload 'tee sub/t1.txt sub/t2.txt')" \
+  "main${TAB}Bash:tee${TAB}sub/t1.txt${TAB}
+main${TAB}Bash:tee${TAB}sub/t2.txt${TAB}"
+
+# A heredoc's OPENING line can carry a real redirect of its own (see
+# HEREDOC_RE's own comment in bash-write-targets.py) — the operand-filtering
+# fix above must not swallow it: the "PY" delimiter word right after `<<` is
+# correctly dropped as the heredoc's own operand, but the LATER `>` on that
+# same line is a completely different redirect and still gets its target.
+HEREDOC_REAL_REDIRECT=$'python3 - <<\'PY\' > sub/out.txt\nprint(1)\nPY'
+_run_case "31: heredoc opener carrying a REAL redirect — still logged" \
+  "$(_bash_payload "$HEREDOC_REAL_REDIRECT")" \
+  "main${TAB}Bash:redirect${TAB}sub/out.txt${TAB}"
+
+_run_case "32: redirect between command and its argument — redirect target once, tee target still logged" \
+  "$(_bash_payload 'tee > sub/out.txt sub/b.txt')" \
+  "main${TAB}Bash:redirect${TAB}sub/out.txt${TAB}
+main${TAB}Bash:tee${TAB}sub/b.txt${TAB}"
+
+# `_command_words` drops a redirect operator's own operand WORD by skipping
+# exactly that one word (index += 2) and then CONTINUING to scan the rest
+# of the segment — it does not stop there. A plausible-looking alternative
+# implementation ("a heredoc eats the rest of the segment": break out of the
+# loop entirely on `<<` instead of skipping just the delimiter) survives
+# every OTHER case in this suite, because every other heredoc case here has
+# its target BEFORE the `<<` operator in the same segment (`tee b.md
+# <<'E2'`) — the target is already appended to the filtered list before a
+# break would ever fire, so continue-vs-break makes no visible difference.
+# This is the one case that tells them apart: the heredoc operator comes
+# FIRST, and the real tee target sits AFTER it in the same segment (`tee
+# <<'E' target` is valid shell — a redirect may sit anywhere in a simple
+# command, including before its first argument). A "break" implementation
+# would discard "target" along with the delimiter and report nothing at
+# all; the real fix keeps scanning past the dropped delimiter and still
+# finds it.
+HEREDOC_FIRST_THEN_TARGET=$'tee <<\'E\' sub/heredoc-first.txt\nbody\nE'
+_run_case "33: heredoc operator BEFORE the tee target in the same segment — target still logged" \
+  "$(_bash_payload "$HEREDOC_FIRST_THEN_TARGET")" \
+  "main${TAB}Bash:tee${TAB}sub/heredoc-first.txt${TAB}"
+
+# `2<` (a glued fd-digit prefix on plain input redirection) used to leak the
+# digit itself as a second positional WORD: `tokenize()`'s `<` branch never
+# consumed a leading digit the way its `>` branch already does for `2>`, so
+# `cur` ("2") fell through to the ordinary "flush cur as a WORD" path right
+# before the `<` operator token, instead of being swallowed as part of the
+# operator the same way "2" before `>` already is. `in.txt` is correctly
+# dropped as `2<`'s own operand (same REDIRECT_OPERAND_OPS filtering as
+# every other case above); the bare "2" was not, and got reported as a
+# second tee argument.
+_run_case "34: tee <file> 2< <input> — only the tee target logged, no phantom '2'" \
+  "$(_bash_payload 'tee sub/tee-target.txt 2< sub/tee-input.txt')" \
+  "main${TAB}Bash:tee${TAB}sub/tee-target.txt${TAB}"
+
+# Negative control: a bare digit GLUED to `|` is NOT a redirect fd-
+# duplication prefix at all — that shape only ever means something in front
+# of `<`/`>` — and must stay a real, ordinary positional WORD. `|;()` share
+# the very same tokenizer branch `<` does (`if c in "|;()<":`); a digit-
+# swallowing fix scoped to that whole branch instead of to `<` alone would
+# wrongly eat "2" here too, silently dropping tee's own write target.
+_run_case "35: tee 2|cat — digit glued to a pipe is a real tee target, not swallowed" \
+  "$(_bash_payload 'tee 2|cat')" \
+  "main${TAB}Bash:tee${TAB}2${TAB}"
+
 # -------------------------------------------------------------- Edit/Write — no regression
-_run_case "25: Write, main thread — unchanged behaviour" \
+_run_case "36: Write, main thread — unchanged behaviour" \
   "$(_edit_payload "Write" "$REPO/written.txt" "main")" \
   "main${TAB}Write${TAB}written.txt${TAB}"
 
-_run_case "26: Edit, sub thread (agent_id present) — unchanged behaviour" \
+_run_case "37: Edit, sub thread (agent_id present) — unchanged behaviour" \
   "$(_edit_payload "Edit" "$REPO/edited.txt" "sub")" \
   "sub${TAB}Edit${TAB}edited.txt${TAB}implementer"
 
 # -------------------------------------------------------------- malformed payload
-_run_case "27: malformed JSON payload — exit 0, nothing written" \
+_run_case "38: malformed JSON payload — exit 0, nothing written" \
   "not json at all" \
   "" \
   "0"
