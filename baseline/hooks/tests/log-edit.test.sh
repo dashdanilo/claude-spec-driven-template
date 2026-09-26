@@ -339,17 +339,61 @@ _run_case "32: redirect between command and its argument — redirect target onc
   "main${TAB}Bash:redirect${TAB}sub/out.txt${TAB}
 main${TAB}Bash:tee${TAB}sub/b.txt${TAB}"
 
+# `_command_words` drops a redirect operator's own operand WORD by skipping
+# exactly that one word (index += 2) and then CONTINUING to scan the rest
+# of the segment — it does not stop there. A plausible-looking alternative
+# implementation ("a heredoc eats the rest of the segment": break out of the
+# loop entirely on `<<` instead of skipping just the delimiter) survives
+# every OTHER case in this suite, because every other heredoc case here has
+# its target BEFORE the `<<` operator in the same segment (`tee b.md
+# <<'E2'`) — the target is already appended to the filtered list before a
+# break would ever fire, so continue-vs-break makes no visible difference.
+# This is the one case that tells them apart: the heredoc operator comes
+# FIRST, and the real tee target sits AFTER it in the same segment (`tee
+# <<'E' target` is valid shell — a redirect may sit anywhere in a simple
+# command, including before its first argument). A "break" implementation
+# would discard "target" along with the delimiter and report nothing at
+# all; the real fix keeps scanning past the dropped delimiter and still
+# finds it.
+HEREDOC_FIRST_THEN_TARGET=$'tee <<\'E\' sub/heredoc-first.txt\nbody\nE'
+_run_case "33: heredoc operator BEFORE the tee target in the same segment — target still logged" \
+  "$(_bash_payload "$HEREDOC_FIRST_THEN_TARGET")" \
+  "main${TAB}Bash:tee${TAB}sub/heredoc-first.txt${TAB}"
+
+# `2<` (a glued fd-digit prefix on plain input redirection) used to leak the
+# digit itself as a second positional WORD: `tokenize()`'s `<` branch never
+# consumed a leading digit the way its `>` branch already does for `2>`, so
+# `cur` ("2") fell through to the ordinary "flush cur as a WORD" path right
+# before the `<` operator token, instead of being swallowed as part of the
+# operator the same way "2" before `>` already is. `in.txt` is correctly
+# dropped as `2<`'s own operand (same REDIRECT_OPERAND_OPS filtering as
+# every other case above); the bare "2" was not, and got reported as a
+# second tee argument.
+_run_case "34: tee <file> 2< <input> — only the tee target logged, no phantom '2'" \
+  "$(_bash_payload 'tee sub/tee-target.txt 2< sub/tee-input.txt')" \
+  "main${TAB}Bash:tee${TAB}sub/tee-target.txt${TAB}"
+
+# Negative control: a bare digit GLUED to `|` is NOT a redirect fd-
+# duplication prefix at all — that shape only ever means something in front
+# of `<`/`>` — and must stay a real, ordinary positional WORD. `|;()` share
+# the very same tokenizer branch `<` does (`if c in "|;()<":`); a digit-
+# swallowing fix scoped to that whole branch instead of to `<` alone would
+# wrongly eat "2" here too, silently dropping tee's own write target.
+_run_case "35: tee 2|cat — digit glued to a pipe is a real tee target, not swallowed" \
+  "$(_bash_payload 'tee 2|cat')" \
+  "main${TAB}Bash:tee${TAB}2${TAB}"
+
 # -------------------------------------------------------------- Edit/Write — no regression
-_run_case "33: Write, main thread — unchanged behaviour" \
+_run_case "36: Write, main thread — unchanged behaviour" \
   "$(_edit_payload "Write" "$REPO/written.txt" "main")" \
   "main${TAB}Write${TAB}written.txt${TAB}"
 
-_run_case "34: Edit, sub thread (agent_id present) — unchanged behaviour" \
+_run_case "37: Edit, sub thread (agent_id present) — unchanged behaviour" \
   "$(_edit_payload "Edit" "$REPO/edited.txt" "sub")" \
   "sub${TAB}Edit${TAB}edited.txt${TAB}implementer"
 
 # -------------------------------------------------------------- malformed payload
-_run_case "35: malformed JSON payload — exit 0, nothing written" \
+_run_case "38: malformed JSON payload — exit 0, nothing written" \
   "not json at all" \
   "" \
   "0"

@@ -379,7 +379,26 @@ def tokenize(cmd):
             i += ln
             continue
         if c in "|;()<":
-            if cur:
+            if c == "<" and cur.isdigit():
+                # A glued fd-digit prefix on input redirection (`2<`,
+                # `0<&3`) is part of the REDIRECT ITSELF, exactly like `2>`'s
+                # own fd prefix in the `>` branch above — never a positional
+                # word. Before this, `cur` fell straight through to the
+                # generic "flush cur as a WORD" line below, regardless of
+                # which of `|;()<` triggered it, so `tee out.txt 2< in.txt`
+                # invented a SECOND tee argument out of the bare "2":
+                # `in.txt` was already dropped as `<`'s own operand (see
+                # REDIRECT_OPERAND_OPS), but the digit glued in FRONT of `<`
+                # leaked straight past that filter as its own WORD token one
+                # position earlier. In protect-critical.sh this was a real
+                # false BLOCK whenever that invented "2" happened to resolve
+                # under a protected directory (`cd node_modules && tee
+                # out.txt 2< in.txt`). Scoped to `<` alone, not to the whole
+                # `|;()<` branch it shares: a digit glued to `|`/`;`/`(`/`)`
+                # (`tee 2|cat`) has no fd meaning at all and must stay a
+                # real word — only `<` and `>` ever take an fd prefix.
+                cur = ""
+            elif cur:
                 tokens.append(("WORD", cur)); cur = ""
             if cmd[i:i+2] == "((" and c == "(":
                 op, ln = "((", 2
