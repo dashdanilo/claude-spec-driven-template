@@ -5,7 +5,8 @@
 # with two commits so `git merge-base --is-ancestor` has real revisions),
 # feeds the hook the same JSON-on-stdin shape Claude Code sends
 # (`{"tool_name":"Bash","tool_input":{"command":"..."}}`, per CONTRIBUTING.md),
-# and asserts the exit code (2 = blocked, 0 = passes). 41 cases. Self-contained:
+# and asserts the exit code (2 = blocked, 0 = passes). 48 cases, numbered
+# through 49 (case 45 is a pointer to case 8, not a separate run). Self-contained:
 # no dependency on the developer's cwd, fixtures live under a mktemp dir
 # removed on exit via trap.
 #
@@ -310,6 +311,67 @@ _run_case "40: [defect 4 control] git push --force origin --delete feature/x, cw
 # push in the same command — each invocation is still checked on its own.
 _run_case "41: [defect 4] compound: delete-only push, then a real push" \
   "$MAIN_REPO" 'git push origin --delete feature/x && git push origin main' 2
+
+# 42-48: defect 5, a heredoc BODY read as a real command. See the defect note
+# at the top of protect-main.sh: a heredoc body is text handed to a file or
+# another program, never executed, so a dangerous-looking line inside one
+# must not trip either check below it.
+
+# 42. [MANDATORY] positive control: a heredoc body that merely MENTIONS
+# git cherry-pick/push/commit as prose, written to a harmless path, cwd on
+# main -> must pass. This is the exact false positive that was reproduced.
+_run_case "42: [defect 5, MANDATORY] heredoc body mentions dangerous git commands as prose" \
+  "$MAIN_REPO" "cat > notes.md <<'EOF'"$'\n''git cherry-pick os commits do topo'$'\n''git commit -am "nunca fazer isso direto"'$'\n''git push origin main'$'\n''EOF' 0
+
+# 43. [MANDATORY] positive control: a heredoc body whose text trips BOTH
+# halves of the separate `gh pr merge --admin` check (a line starting with
+# `gh pr merge ... --delete-branch`, plus the word `--admin` elsewhere in the
+# same body) -> must pass, same reproduction against that check specifically.
+_run_case "43: [defect 5, MANDATORY] heredoc body mentions gh pr merge --admin as prose" \
+  "$MAIN_REPO" "cat > notes.md <<'EOF'"$'\n''gh pr merge 5 --squash --delete-branch'$'\n''Nunca use --admin num repo compartilhado.'$'\n''EOF' 0
+
+# 44. negative control: a real `git cherry-pick <sha>`, no heredoc involved
+# at all -> still blocked. Without this, the fix could have disarmed the
+# whole hook instead of just the heredoc misreading, and nothing above would
+# have noticed (cherry-pick was in dangerous_patterns from the start, but had
+# no case of its own until now).
+_run_case "44: [defect 5 control] real git cherry-pick <sha>, cwd on main" \
+  "$MAIN_REPO" 'git cherry-pick abc123' 2
+
+# 45. negative control: real `gh pr merge --admin` — already covered by case
+# 8 above; not duplicated here.
+
+# 46. negative control: a real dangerous git command on the line right AFTER
+# a heredoc's closing delimiter -> still blocked. Proves the stripping
+# removes only the body and the delimiter line, not what follows them.
+_run_case "46: [defect 5 control] real git commit right after a heredoc closes" \
+  "$MAIN_REPO" "cat > notes.md <<'EOF'"$'\n''just some prose'$'\n''EOF'$'\n''git commit -m "x"' 2
+
+# 47. negative control: `git commit -F - <<'EOF'` with a real message body -
+# still blocked. Note what this case does NOT prove: the `git commit` sits
+# BEFORE the `<<`, and HEREDOC_RE's match starts at the `<<`, so this case
+# stays green even if the stripping wrongly swallowed the opener too. Case 49
+# is the one that discriminates on opener retention; this one covers the
+# separate, plausible shape of a commit message arriving as a heredoc body.
+_run_case "47: [defect 5 control] git commit -F - <<'EOF' with a message body" \
+  "$MAIN_REPO" "git commit -F - <<'EOF'"$'\n''a real commit message'$'\n''EOF' 2
+
+# 48. negative control: an UNTERMINATED heredoc (opener with no closing
+# delimiter line) followed by a real git commit -> still blocked. Nothing
+# matches HEREDOC_RE without a closing delimiter, so nothing is stripped —
+# conservative by construction.
+_run_case "48: [defect 5 control] unterminated heredoc, real git commit follows" \
+  "$MAIN_REPO" "cat > notes.md <<EOF"$'\n''no closing delimiter below this line'$'\n''git commit -m "x"' 2
+
+# 49. negative control, the one that discriminates on opener retention: a
+# real dangerous git command sitting on the heredoc's OWN opening line, after
+# the `<<`. Only the body and the closing delimiter line may be removed; drop
+# the opener along with them and this `git commit` vanishes with it, which is
+# how a heredoc would become a way to smuggle a commit onto a protected
+# branch. Proven by mutation: stripping the opener too turns this case red
+# while cases 42-48 all stay green.
+_run_case "49: [defect 5 control] real git commit on the heredoc's own opening line" \
+  "$MAIN_REPO" "cat <<'EOF' > notes.md && git commit -m \"docs: notes\""$'\n''ordinary prose body'$'\n''EOF' 2
 
 echo ""
 echo "Results: $PASS_COUNT passed, $FAIL_COUNT failed (of $((PASS_COUNT + FAIL_COUNT)))"

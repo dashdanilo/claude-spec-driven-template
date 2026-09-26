@@ -251,6 +251,25 @@ HEREDOC_RE = re.compile(
 PYTHON_PRECEDES_RE = re.compile(r"(^|[\s;&|(])python3?(\s|$)")
 
 
+def strip_heredoc_bodies(command):
+    # Public: the single owner of "remove every heredoc BODY and its closing
+    # delimiter line from `command`, keeping each heredoc's OPENER line
+    # intact". Originally inline inside extract_targets below (see HEREDOC_RE's
+    # own comment for exactly why the opener stays and the body/delimiter
+    # line goes); pulled out on its own so a caller that only needs the
+    # stripped text — protect-main.sh's git-invocation walk, which must not
+    # mistake a heredoc BODY line for a real `git cherry-pick`/`git push`/
+    # `gh pr merge --admin` any more than this file's own tokenizer should —
+    # can reuse the exact same semantics instead of growing a second,
+    # inevitably drifting copy. Matches are found against the ORIGINAL text
+    # and removed back-to-front so earlier offsets stay valid while later
+    # ones are being cut out.
+    stripped = command
+    for m in reversed(list(HEREDOC_RE.finditer(command))):
+        stripped = stripped[: m.start()] + stripped[m.start() : m.end("opener")] + stripped[m.end() :]
+    return stripped
+
+
 def resolve_absolute(path, cwd):
     p = path
     if p == "~":
@@ -552,19 +571,18 @@ def extract_targets(command, cwd):
     # redirect sitting on the heredoc's own opening line is still seen by
     # the general tokenizer below. Dropping the opener too (an earlier
     # version did) silently erased that redirect's target along with the
-    # heredoc syntax around it.
-    stripped_command = command
+    # heredoc syntax around it. The actual stripping is strip_heredoc_bodies
+    # (above); this loop keeps its own, separate reason to walk the same
+    # matches — scanning a python3/python heredoc's body for write-mode
+    # open() calls — which is specific to what THIS function reports and has
+    # no business living inside the shared stripping helper.
     for m in reversed(list(HEREDOC_RE.finditer(command))):
         line_start = command.rfind("\n", 0, m.start())
         line_start = 0 if line_start == -1 else line_start + 1
         preceding = command[line_start:m.start()]
         if PYTHON_PRECEDES_RE.search(preceding):
             handle_open_calls("Bash:python-heredoc", m.group("body"))
-        stripped_command = (
-            stripped_command[:m.start()]
-            + stripped_command[m.start():m.end("opener")]
-            + stripped_command[m.end():]
-        )
+    stripped_command = strip_heredoc_bodies(command)
 
     def process_segment(seg):
         # Arithmetic/test context: "((" / "))" (anywhere in the segment) or
