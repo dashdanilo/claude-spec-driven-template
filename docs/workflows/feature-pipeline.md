@@ -1,19 +1,26 @@
-# Feature pipeline
+# Pipeline de feature
 
-The end-to-end path from an idea to an open PR: the spec-driven flow, specialist agents, the `verify-before-done` gate, and one worktree per feature. **Supervised-autonomous** — drive it step by step, or hand the loop to the `/orchestrate` command to work through `tasks.md` on its own, stopping on any red gate.
+O caminho de ponta a ponta de uma ideia até uma PR aberta: o fluxo guiado por
+spec, agentes especialistas, o gate `verify-before-done`, e um worktree por
+feature. **Autônomo supervisionado** (dirija passo a passo, ou entregue o
+loop ao comando `/orchestrate` para percorrer `tasks.md` por conta própria,
+parando em qualquer gate vermelho).
 
-> **Portable spine.** The pipeline (spec → worktree → implement → gate → review → PR) is stack-agnostic. A **stack plugin** fills in the specialist agents and the exact build/test commands; `verify-before-done` discovers those commands from `AGENTS.md`.
+> **Espinha dorsal portátil.** O pipeline (spec → worktree → implementar →
+> gate → review → PR) é agnóstico de stack. Um **plugin de stack** preenche
+> os agentes especialistas e os comandos exatos de build/test;
+> `verify-before-done` descobre esses comandos a partir do `AGENTS.md`.
 
-## Agents and responsibilities
+## Agentes e responsabilidades
 
-| Agent | Does |
+| Agente | Faz |
 |---|---|
-| `codebase-explorer` | read-only recon before writing a spec |
-| `spec-reviewer` | audits `spec.md` before it becomes plan/tasks |
-| stack specialists (from a plugin) | implement the change in their layer (e.g. data / API / UI) |
-| `tester` | writes and runs tests, discovers the framework |
-| `code-reviewer` | review vs the active spec/plan/tasks — per cluster under `/orchestrate`, per phase when worked by hand |
-| `reviewer` | whole-branch review, runs the gate, opens the PR |
+| `codebase-explorer` | reconhecimento somente leitura antes de escrever uma spec |
+| `spec-reviewer` | audita `spec.md` antes de ele se tornar plan/tasks |
+| especialistas de stack (de um plugin) | implementam a mudança na própria camada (ex.: dados / API / UI) |
+| `tester` | escreve e executa testes, descobre o framework |
+| `code-reviewer` | revisa contra a spec/plan/tasks ativos (por cluster sob o `/orchestrate`, por fase quando trabalhado manualmente) |
+| `reviewer` | revisão da branch inteira, executa o gate, abre a PR |
 
 ## Pipeline
 
@@ -34,28 +41,43 @@ The end-to-end path from an idea to an open PR: the spec-driven flow, specialist
 10. human merges (protect-main blocks direct merge) ─▶ cleanup worktree
 ```
 
-## Gates (must be green to advance)
+## Gates (precisam estar verdes para avançar)
 
-1. **Spec gate** — `spec-reviewer` approves `spec.md` (scope, clarity, out-of-scope). `write-spec` runs it automatically.
-2. **Build gate** — `verify-before-done` green: install → codegen → typecheck → build → tests, discovered from `AGENTS.md`.
-3. **Test gate** — the repo's tests green for the touched area (`tester`).
-4. **Review gate** — `code-reviewer` (auto per cluster under `/orchestrate`, per phase when worked by hand) and `reviewer` (branch) have no blocking findings.
+1. **Gate de spec** (`spec-reviewer` aprova `spec.md`: escopo, clareza,
+   fora-de-escopo). O `write-spec` o executa automaticamente.
+2. **Gate de build** (`verify-before-done` verde: install → codegen →
+   typecheck → build → tests, descoberto a partir do `AGENTS.md`).
+3. **Gate de teste** (os testes do repositório verdes para a área tocada, via `tester`).
+4. **Gate de review** (`code-reviewer`, automático por cluster sob o
+   `/orchestrate`, por fase quando trabalhado manualmente, e `reviewer`,
+   da branch, não têm nenhum achado bloqueante).
 
-A red gate never advances. The loop fixes the root cause and re-runs. **The pipeline ends at an open PR — never auto-merge** (`protect-main` blocks direct merges to protected branches).
+Um gate vermelho nunca avança. O loop corrige a causa raiz e roda de novo.
+**O pipeline termina numa PR aberta, nunca em auto-merge**
+(`protect-main` bloqueia merges diretos em branches protegidas).
 
-## Variants
+## Variantes
 
-- **Full feature** — all steps (explore → spec → worktree → loop → PR).
-- **Quick fix** — skip the spec: branch → reproduce the bug as a failing test (`tester`) → fix → build + test gates → `reviewer` → PR.
-- **Docs-only** — skip the build/test gates; `reviewer` for correctness of the docs, then PR.
+- **Feature completa** (todos os passos: explore → spec → worktree → loop → PR).
+- **Correção rápida** (pula a spec: branch → reproduzir o bug como um teste
+  falhando via `tester` → corrigir → gates de build + test → `reviewer` → PR).
+- **Só docs** (pula os gates de build/test; `reviewer` verifica a correção
+  dos docs, depois PR).
 
-## The loop (supervised, and autonomous)
+## O loop (supervisionado, e autônomo)
 
-- **Supervised (`/loop`):** `/loop implement the next unchecked task in specs/<slug>/tasks.md; run verify-before-done; if green check the box, else fix and retry` — one task per pass.
-- **Orchestrated (`/orchestrate <spec folder>`):** the command reconciles `tasks.md` against the code, classifies each task to pick its gates, plans waves, then runs **one wave at a time** — the whole wave dispatched in a single message to the stack specialists, collected, built-and-tested once with `verify-before-done` + `tester`, then `code-reviewer` **once per cluster** scoped to that cluster's files, boxes ticked, next wave — halting on a red gate or anything ambiguous.
+- **Supervisionado (`/loop`):** `/loop implement the next unchecked task in specs/<slug>/tasks.md; run verify-before-done; if green check the box, else fix and retry` (uma tarefa por passagem).
+- **Orquestrado (`/orchestrate <spec folder>`):** o comando reconcilia
+  `tasks.md` contra o código, classifica cada tarefa para escolher seus
+  gates, planeja ondas, depois roda **uma onda por vez** (a onda inteira
+  despachada numa única mensagem para os especialistas de stack, coletada,
+  construída e testada uma vez com `verify-before-done` + `tester`, depois
+  `code-reviewer` **uma vez por cluster**, escopado aos arquivos daquele
+  cluster, checkboxes marcados, próxima onda), interrompendo num gate
+  vermelho ou em qualquer coisa ambígua.
 
-## Non-negotiables
+## Não negociáveis
 
-- Never commit to a protected branch — branch (`<type>/<slug>`) and open a PR.
-- Don't advance a red gate, and never claim "done" without `verify-before-done`.
-- One worktree per feature (`spec-worktree`), shared across the feature's tasks.
+- Nunca faça commit numa branch protegida (crie uma branch `<type>/<slug>` e abra uma PR).
+- Não avance um gate vermelho, e nunca declare "concluído" sem `verify-before-done`.
+- Um worktree por feature (`spec-worktree`), compartilhado entre as tarefas da feature.

@@ -1,15 +1,15 @@
 # Architecture
 
-> Last reviewed: YYYY-MM-DD
-> Replace this template with your actual architecture.
+> Revisado por último em: YYYY-MM-DD
+> Substitua este template pela sua arquitetura real.
 
-## Overview
+## Visão geral
 
-One paragraph describing the system at a high level. What does it do, who uses it, what is the deployment model.
+Um parágrafo descrevendo o sistema em alto nível. O que ele faz, quem usa, qual é o modelo de deploy.
 
-## High-level diagram
+## Diagrama de alto nível
 
-ASCII or mermaid diagram showing the major components and how they communicate.
+Diagrama ASCII ou mermaid mostrando os componentes principais e como eles se comunicam.
 
 ```
 ┌──────────────┐         ┌──────────────┐
@@ -25,35 +25,35 @@ ASCII or mermaid diagram showing the major components and how they communicate.
         └───────────┘   └───────────┘   └───────────┘
 ```
 
-## Trust model
+## Modelo de confiança
 
-Describe what runs where and what has access to what.
+Descreva o que executa onde e o que tem acesso a quê.
 
-- **Client (browser):** zero secrets, only `NEXT_PUBLIC_*` env vars
-- **Server:** has DB credentials, internal service tokens
-- **Orchestration layer:** has all external API keys
-- **External services:** isolated, each with own rate limits
+- **Client (browser):** zero segredos, só variáveis de ambiente `NEXT_PUBLIC_*`
+- **Server:** tem credenciais de banco, tokens de serviços internos
+- **Camada de orquestração:** tem todas as chaves de API externas
+- **Serviços externos:** isolados, cada um com seus próprios rate limits
 
-## Main data flows
+## Principais fluxos de dados
 
-### Flow 1: <name>
+### Fluxo 1: <nome>
 1. ...
 2. ...
 
-### Flow 2: <name>
+### Fluxo 2: <nome>
 1. ...
 2. ...
 
-## Decisions
+## Decisões
 
-Major architectural decisions live in `docs/decisions/` as numbered ADRs. Examples:
+Decisões arquiteturais importantes vivem em `docs/decisions/` como ADRs numeradas. Exemplos:
 
-- `0001-example.md` summarizes the format
+- `0001-example.md` resume o formato
 
-## Constraints
+## Restrições
 
-- Budget, performance, compliance, or other hard limits
+- Orçamento, performance, compliance ou outros limites rígidos
 
-## Open questions
+## Questões abertas
 
-Decisions that are not yet made but will need to be soon.
+Decisões que ainda não foram tomadas mas vão precisar ser tomadas em breve.

@@ -1,32 +1,32 @@
-# Where does this instruction go?
+# Onde essa instrução vai?
 
-> Moved out of `README.md` to keep the front door short. Linked from there.
+> Movido para fora do `README.md` para manter a porta de entrada curta. Linkado a partir de lá.
 
-## Decision table: where does this instruction go?
+## Tabela de decisão: onde essa instrução vai?
 
-| Question | Place |
+| Pergunta | Lugar |
 |---|---|
-| Cross-tool guidance for any agent (stack, commands, conventions)? | `AGENTS.md` |
-| Claude-specific extras (which skills/agents/hooks ship here)? | `CLAUDE.md` (stub + Claude-only content) |
-| Shared schemas across services? | `ECOSYSTEM.md` |
-| Project DNA and non-negotiable principles? | `docs/CONSTITUTION.md` |
-| Style, naming, structure conventions? | `docs/CONVENTIONS.md` |
-| System architecture overview? | `docs/architecture/overview.md` |
-| Only applies inside a specific folder? | `src/<folder>/CLAUDE.md` (nested, full content) |
-| Applies when editing a file type? | `baseline/rules/*.md` with `paths:` |
-| Long reference doc, AI-only? | `baseline/docs/` |
-| Human-facing project docs? | `docs/` |
-| Repeatable multi-step process? | `baseline/skills/<name>/SKILL.md` |
-| Specialist with its own perspective? | `baseline/agents/<name>.md` |
-| Knowledge that grows over time? | Subagent with `memory:` field |
-| What to build for this feature? | `specs/YYYY-MM-DD-<slug>/spec.md` |
-| Architecture and phases for it? | `specs/YYYY-MM-DD-<slug>/plan.md` |
-| Where did I stop? Atomic tasks? | `specs/YYYY-MM-DD-<slug>/tasks.md` |
-| Operational procedure (deploy, incident)? | `docs/runbooks/` |
-| Tutorial or onboarding guide? | `docs/guides/` |
-| "How we solved X" pattern? | `docs/patterns/<pattern>.md` |
-| Permanent architectural choice? | `docs/decisions/NNNN-*.md` |
-| External lib docs that change often? | Context7 MCP, do not duplicate here |
-| Personal preferences? | `CLAUDE.local.md` (gitignored) |
+| Orientação entre ferramentas para qualquer agente (stack, comandos, convenções)? | `AGENTS.md` |
+| Extras específicos do Claude (quais skills/agentes/hooks vêm aqui)? | `CLAUDE.md` (stub + conteúdo só do Claude) |
+| Schemas compartilhados entre serviços? | `ECOSYSTEM.md` |
+| DNA do projeto e princípios não negociáveis? | `docs/CONSTITUTION.md` |
+| Convenções de estilo, nomenclatura, estrutura? | `docs/CONVENTIONS.md` |
+| Visão geral da arquitetura do sistema? | `docs/architecture/overview.md` |
+| Só se aplica dentro de uma pasta específica? | `src/<folder>/CLAUDE.md` (aninhado, conteúdo completo) |
+| Se aplica ao editar um tipo de arquivo? | `baseline/rules/*.md` com `paths:` |
+| Doc de referência longo, só para IA? | `baseline/docs/` |
+| Docs de projeto voltados a humanos? | `docs/` |
+| Processo repetível de várias etapas? | `baseline/skills/<name>/SKILL.md` |
+| Especialista com perspectiva própria? | `baseline/agents/<name>.md` |
+| Conhecimento que cresce com o tempo? | Subagente com o campo `memory:` |
+| O que construir para esta feature? | `specs/YYYY-MM-DD-<slug>/spec.md` |
+| Arquitetura e fases para ela? | `specs/YYYY-MM-DD-<slug>/plan.md` |
+| Onde eu parei? Tarefas atômicas? | `specs/YYYY-MM-DD-<slug>/tasks.md` |
+| Procedimento operacional (deploy, incidente)? | `docs/runbooks/` |
+| Tutorial ou guia de onboarding? | `docs/guides/` |
+| Pattern "como resolvemos X"? | `docs/patterns/<pattern>.md` |
+| Escolha arquitetural permanente? | `docs/decisions/NNNN-*.md` |
+| Docs de lib externa que mudam com frequência? | Context7 MCP, não duplicar aqui |
+| Preferências pessoais? | `CLAUDE.local.md` (fora do git) |
 
 ---

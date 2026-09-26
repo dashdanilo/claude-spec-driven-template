@@ -1,56 +1,56 @@
-# 0001 - Example ADR (rename and adapt)
+# 0001 - Example ADR (renomeie e adapte)
 
 **Status:** Accepted
 **Date:** YYYY-MM-DD
-**Decider:** <name or team>
+**Decider:** <nome ou time>
 
-> This is a template for Architecture Decision Records. Number them sequentially (0001, 0002, ...).
-> Once accepted, an ADR is **immutable**. If a decision changes later, open a new ADR that supersedes this one.
+> Este é um template para Architecture Decision Records. Numere-as sequencialmente (0001, 0002, ...).
+> Depois de aceita, uma ADR é **imutável**. Se uma decisão mudar depois, abra uma nova ADR que supersede esta.
 
-## Context
+## Contexto
 
-What motivated this decision? What problem were we solving? What constraints (budget, deadline, technical) applied?
+O que motivou esta decisão? Que problema estávamos resolvendo? Quais restrições (orçamento, prazo, técnicas) se aplicavam?
 
-Write 1-3 paragraphs of factual context. Avoid editorializing.
+Escreva 1 a 3 parágrafos de contexto factual. Evite opinar.
 
-## Options considered
+## Opções consideradas
 
-1. **Option A** - short description
-   - Pros: ...
-   - Cons: ...
-2. **Option B** - short description
-   - Pros: ...
-   - Cons: ...
-3. **Option C** - short description
-   - Pros: ...
-   - Cons: ...
+1. **Opção A** - descrição curta
+   - Prós: ...
+   - Contras: ...
+2. **Opção B** - descrição curta
+   - Prós: ...
+   - Contras: ...
+3. **Opção C** - descrição curta
+   - Prós: ...
+   - Contras: ...
 
-## Decision
+## Decisão
 
-We chose **Option X** because:
+Escolhemos a **Opção X** porque:
 
-- Primary reason
-- Secondary reason
-- Trade-off accepted
+- Razão principal
+- Razão secundária
+- Trade-off aceito
 
-## Consequences
+## Consequências
 
-### Positive
+### Positivas
 - ...
 - ...
 
-### Negative
+### Negativas
 - ...
 - ...
 
-### Risks accepted
+### Riscos aceitos
 - ...
 - ...
 
-## Revisit when
+## Revisitar quando
 
-Conditions that would trigger reopening this decision:
+Condições que disparariam a reabertura desta decisão:
 
-- (e.g., volume exceeds X)
-- (e.g., team grows beyond N people)
-- (e.g., the underlying assumption no longer holds)
+- (ex.: volume exceder X)
+- (ex.: o time crescer além de N pessoas)
+- (ex.: a premissa subjacente deixar de valer)

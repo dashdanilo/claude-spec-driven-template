@@ -1,100 +1,102 @@
-# `script/setup` and `script/test`: Scripts to Rule Them All
+# `script/setup` e `script/test`: Scripts to Rule Them All
 
-For anyone who needs to go from a fresh clone (or a fresh worktree) to a
-working, verified environment, without re-deriving the steps from prose.
+Para quem precisa ir de um clone recém-feito (ou um worktree recém-feito) até
+um ambiente funcional e verificado, sem precisar rededuzir os passos a partir de prosa.
 
-## Prerequisites
+## Pré-requisitos
 
-None beyond the repo itself. This guide describes two scripts you write
-**once, per project** — the harness does not ship them and does not generate
-them. It only calls them when they exist.
+Nenhum além do próprio repositório. Este guia descreve dois scripts que você
+escreve **uma vez, por projeto** (o harness não os distribui e não os gera).
+Ele só os chama quando existem.
 
-## Why
+## Por quê
 
-Environment setup written only as prose (`AGENTS.md`, a README section) has
-to be rediscovered by every human and every agent that needs it — read, then
-translated into commands, every single time. On one project that meant
-re-explaining the same ~15 lines of environment (runtime version, which lint
-command only checks vs. also rewrites files, which command is the actual
-gate) in dozens of subagent briefings, despite all of it already being
-written down. The documentation was not the problem; nothing executed it.
+Configuração de ambiente escrita apenas como prosa (`AGENTS.md`, uma seção do
+README) precisa ser redescoberta por todo humano e todo agente que precisa
+dela: lida, e depois traduzida em comandos, todas as vezes. Em um projeto,
+isso significou reexplicar as mesmas ~15 linhas de ambiente (versão do
+runtime, qual comando de lint só verifica versus também reescreve arquivos,
+qual comando é de fato o gate) em dezenas de briefings de subagente, apesar
+de tudo isso já estar escrito em algum lugar. A documentação não era o
+problema; nada a executava.
 
-The fix, borrowed from GitHub's [Scripts to Rule Them All](https://github.com/github/scripts-to-rule-them-all)
-convention, is two executable scripts, committed at the repo root, that
-humans, CI, and agents all run the same way:
+A correção, tomada de empréstimo da convenção [Scripts to Rule Them All](https://github.com/github/scripts-to-rule-them-all)
+do GitHub, é dois scripts executáveis, commitados na raiz do repositório, que
+humanos, CI e agentes todos executam da mesma forma:
 
-- **`script/setup`** — takes a clone or worktree from zero to "ready to work
-  in". Idempotent: safe to run again on an already-set-up checkout.
-- **`script/test`** — the verification this repo considers a gate. The one
-  command that must be green before a change counts as done.
+- **`script/setup`**: leva um clone ou worktree de zero a "pronto para
+  trabalhar". Idempotente: seguro de executar de novo num checkout já configurado.
+- **`script/test`**: a verificação que este repositório considera um gate. O
+  único comando que precisa estar verde antes de uma mudança contar como concluída.
 
-The harness's own `spec-worktree` skill runs `script/setup` automatically
-after creating a worktree (skip with `--no-setup`), and `verify-before-done`
-runs `script/test` instead of rediscovering commands, when either exists. A
-project without either script is unaffected — both are no-ops.
+A própria skill `spec-worktree` do harness executa `script/setup`
+automaticamente depois de criar um worktree (pule com `--no-setup`), e o
+`verify-before-done` executa `script/test` em vez de redescobrir comandos,
+quando qualquer um dos dois existe. Um projeto sem nenhum dos dois scripts não
+é afetado: ambos são no-ops.
 
-## What a good `script/setup` does
+## O que um bom `script/setup` faz
 
-- Fixes the runtime version first, before installing anything — `.nvmrc`,
-  `.tool-versions`, whatever the repo pins. Installing dependencies under the
-  wrong runtime is a common source of failures that look unrelated to the
-  actual cause.
-- Installs dependencies.
-- Creates the local environment file **from a versioned example, only if it
-  does not already exist** — never overwrites a file that has real local
-  values in it. If the example lists variables the script cannot fill in
-  (secrets, per-developer credentials), it lists exactly which ones are
-  missing and where to get them; it never invents a value.
-- Runs codegen, if the repo has any (ORM client, generated API types).
-- Ends by running `script/test` and recording the result (e.g. "42 passing")
-  somewhere visible — so the first green run is a known, reproducible
-  baseline, not an assumption.
+- Fixa a versão do runtime primeiro, antes de instalar qualquer coisa
+  (`.nvmrc`, `.tool-versions`, o que o repositório fixar). Instalar
+  dependências sob o runtime errado é uma fonte comum de falhas que parecem
+  não ter relação com a causa real.
+- Instala dependências.
+- Cria o arquivo de ambiente local **a partir de um exemplo versionado, só se
+  ele ainda não existir** (nunca sobrescreve um arquivo que tenha valores
+  locais reais). Se o exemplo lista variáveis que o script não pode
+  preencher (segredos, credenciais por desenvolvedor), ele lista exatamente
+  quais estão faltando e onde obtê-las; nunca inventa um valor.
+- Executa codegen, se o repositório tiver algum (client de ORM, tipos de API gerados).
+- Termina executando `script/test` e registrando o resultado (ex.: "42
+  passing") em algum lugar visível, para que a primeira execução verde seja
+  uma baseline conhecida e reprodutível, não uma suposição.
 
-Minimal example (Node project):
+Exemplo mínimo (projeto Node):
 
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# 1. Runtime version
+# 1. Versão do runtime
 if [ -f .nvmrc ] && command -v nvm >/dev/null; then
   nvm install >/dev/null
   nvm use
 fi
 
-# 2. Dependencies
+# 2. Dependências
 yarn install
 
-# 3. Local env file — from example, only if missing, never overwritten
+# 3. Arquivo de ambiente local, a partir do exemplo, só se estiver faltando, nunca sobrescrito
 if [ -f .env.example ] && [ ! -f .env ]; then
   cp .env.example .env
-  echo "Created .env from .env.example — fill in the values it needs."
+  echo "Created .env from .env.example - fill in the values it needs."
 fi
 
-# 4. Codegen (if applicable)
+# 4. Codegen (se aplicável)
 [ -f prisma/schema.prisma ] && npx prisma generate
 
-# 5. Baseline: run the gate once, know what green looks like
+# 5. Baseline: executa o gate uma vez, sabe como é o verde
 ./script/test
 ```
 
-## What a good `script/test` does
+## O que um bom `script/test` faz
 
-- Runs the same commands a human or CI would run — typecheck, build, the test
-  suite, lint. It IS the gate; nothing downstream should need to rediscover
-  what "verified" means for this repo.
-- Never uses a command that rewrites files as a side effect (e.g. lint with
-  `--fix`, a formatter run in write mode). A gate that can silently change
-  the code it is checking is not a gate — it is an editor with a confusing
-  exit code. Use the check-only variant.
-- Runs the suite at least once under a cheap environment variation — a
-  different timezone (`TZ=UTC`), a different locale — when the stack supports
-  it easily. A suite that only ever runs in the machine's own timezone can be
-  green by accident of that machine, and the accident does not travel to CI
-  or to a teammate's laptop.
+- Executa os mesmos comandos que um humano ou o CI executariam (typecheck,
+  build, a suíte de testes, lint). ELE É o gate; nada downstream deveria
+  precisar redescobrir o que "verificado" significa para este repositório.
+- Nunca usa um comando que reescreve arquivos como efeito colateral (ex.:
+  lint com `--fix`, um formatador em modo de escrita). Um gate que pode mudar
+  silenciosamente o código que está verificando não é um gate, é um editor
+  com um código de saída confuso. Use a variante somente-verificação.
+- Executa a suíte ao menos uma vez sob uma variação barata de ambiente (um
+  timezone diferente, `TZ=UTC`, um locale diferente) quando a stack suporta
+  isso facilmente. Uma suíte que só roda no próprio timezone da máquina pode
+  estar verde por acidente daquela máquina, e o acidente não viaja para o CI
+  ou para o laptop de um colega.
 
-Minimal example:
+Exemplo mínimo:
 
 ```bash
 #!/usr/bin/env bash
@@ -103,15 +105,15 @@ cd "$(dirname "$0")/.."
 
 npx tsc --noEmit
 TZ=UTC yarn test
-yarn lint          # check-only; never --fix here
+yarn lint          # só verificação; nunca --fix aqui
 ```
 
-## Next steps
+## Próximos passos
 
-- If this repo doesn't have these scripts yet, `analyze-codebase` flags the
-  gap in its report when you adopt the harness on an existing project — it
-  does not write them for you, since only the team knows what "ready" and
-  "verified" mean here.
-- See `.claude/scripts/harness/spec-worktree.sh` (via the `spec-worktree`
-  skill) for where `script/setup` gets called automatically, and the
-  `verify-before-done` skill for where `script/test` becomes the gate.
+- Se este repositório ainda não tem esses scripts, o `analyze-codebase`
+  aponta essa lacuna no relatório dele ao adotar o harness num projeto
+  existente (ele não os escreve para você, já que só o time sabe o que
+  "pronto" e "verificado" significam aqui).
+- Veja `.claude/scripts/harness/spec-worktree.sh` (via a skill
+  `spec-worktree`) para onde `script/setup` é chamado automaticamente, e a
+  skill `verify-before-done` para onde `script/test` se torna o gate.

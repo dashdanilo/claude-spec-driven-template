@@ -4,221 +4,228 @@
 **Date:** 2026-09-23
 **Decider:** Danilo Rodrigues
 
-## Context
+## Contexto
 
-This directory held only [`0001-example.md`](./0001-example.md) until now. The
-real decisions about how this harness is distributed and consumed were made
-and recorded in the private `njord-app/marketplace` repo instead, because that
-is where the multi-repo consequences first showed up:
+Este diretório continha apenas [`0001-example.md`](./0001-example.md) até agora. As
+decisões reais sobre como este harness é distribuído e consumido foram tomadas
+e registradas no repositório privado `njord-app/marketplace`, porque foi lá
+que as consequências multi-repo apareceram primeiro:
 
-- **ADR 0001** (marketplace) chose symlinks over copies, a plugin, or a git
-  submodule, so a harness change is written once and is live everywhere it is
-  linked, with nothing namespaced and nothing excluded.
-- **ADR 0003** (marketplace) moved that symlinking to be per-project and
-  opt-in, with absolute paths and **nothing committed**: the links live in
-  `.git/info/exclude`, never `git ls-files`. This is explicitly what makes it
-  safe to link a repo other people share: "a teammate cloning it sees no
-  dangling symlink, and CI sees nothing at all."
-- **ADR 0004** (marketplace) changed the link granularity from one link per
-  whole `skills/`/`agents/` folder to one link per item
-  (`.claude/skills/<name> -> <checkout>/baseline/skills/<name>`), so an
-  adopting repo's own skills and agents keep working alongside the harness.
+- **ADR 0001** (marketplace) escolheu symlinks em vez de cópias, um plugin, ou um
+  submódulo git, de forma que uma mudança no harness é escrita uma vez e fica ativa
+  em todo lugar onde está linkada, sem nada em namespace e sem nada excluído.
+- **ADR 0003** (marketplace) tornou esse symlinking por projeto e opcional,
+  com caminhos absolutos e **nada commitado**: os links vivem em
+  `.git/info/exclude`, nunca em `git ls-files`. Isso é explicitamente o que torna
+  seguro linkar um repositório que outras pessoas compartilham: "um colega de time
+  que clona o repo não vê nenhum symlink pendurado, e o CI não vê nada."
+- **ADR 0004** (marketplace) mudou a granularidade do link, de um link por
+  pasta inteira `skills/`/`agents/` para um link por item
+  (`.claude/skills/<name> -> <checkout>/baseline/skills/<name>`), de forma que
+  as próprias skills e agentes de um repo adotante continuam funcionando junto com o harness.
 
-That split is wrong for a public template: a reader of this repo cannot see
-the reasoning behind its own harness delivery mechanism unless they also have
-access to a private org repo. This ADR is the first one written here about the
-harness's own visibility, and it treats the three marketplace ADRs above as
-the prior record rather than re-litigating them.
+Essa divisão é errada para um template público: quem lê este repositório não
+consegue ver o raciocínio por trás do próprio mecanismo de entrega do harness, a menos
+que também tenha acesso a um repositório privado da organização. Esta ADR é a primeira
+escrita aqui sobre a visibilidade do próprio harness, e trata as três ADRs do
+marketplace acima como o registro anterior, em vez de reabrir a discussão.
 
-The immediate trigger: running [`harness-score`](https://github.com/paladini/harness-score)
-(a deterministic, zero-network, zero-LLM CLI that scores a repo's agent
-harness 0-108 across six dimensions and maps it to a maturity level L0-L4)
-against `njord-back`, `njord-front`, `website`, `sales-funnel`, and this
-template itself, on 2026-09-23, produced two distortions:
+O gatilho imediato: executar o [`harness-score`](https://github.com/paladini/harness-score)
+(uma CLI determinística, sem rede e sem LLM, que pontua o harness de agentes de um
+repositório de 0 a 108 em seis dimensões e mapeia isso para um nível de maturidade
+L0-L4) contra `njord-back`, `njord-front`, `website`, `sales-funnel`, e este
+próprio template, em 2026-09-23, produziu duas distorções:
 
-1. **Skills & Commands scores 0/17 on four of the five repos**, including
-   this template's own committed, in-root `.claude/skills -> ../baseline/skills`
-   symlink, despite the harness being fully present and working in a live
-   Claude Code session in every one of them.
-2. **`njord-back` instead scored a misleadingly high L4, 99/108.** A stale
-   `.claude/worktrees/<name>/` directory left over from an earlier harness
-   run still holds an old, fully vendored (real files, not symlinks) copy of
-   48 skills and 20 agents, unrelated to the repo's actual, current, symlinked
-   harness state.
+1. **Skills & Commands pontua 0/17 em quatro dos cinco repositórios**, incluindo
+   o symlink deste próprio template, commitado, na raiz, `.claude/skills -> ../baseline/skills`,
+   apesar do harness estar totalmente presente e funcionando numa sessão viva do
+   Claude Code em todos eles.
+2. **`njord-back`, em vez disso, pontuou um L4 enganosamente alto, 99/108.** Um
+   diretório `.claude/worktrees/<name>/` obsoleto, deixado de uma execução
+   anterior do harness, ainda guarda uma cópia antiga, totalmente vendorizada
+   (arquivos reais, não symlinks) de 48 skills e 20 agentes, sem relação com o
+   estado real e atual do harness symlinkado do repositório.
 
-### What the mechanism actually is (read from the tool's own source, not guessed)
+### O que o mecanismo realmente é (lido do próprio código da ferramenta, não deduzido)
 
-`harness-score`'s file walker (`packages/cli/src/scan.ts`) does follow
-symlinks, but only up to a point, and the point matters:
+O varredor de arquivos do `harness-score` (`packages/cli/src/scan.ts`) segue
+symlinks, mas só até certo ponto, e esse ponto importa:
 
-- A symlinked directory whose realpath resolves **outside the scan root** is
-  excluded from the file list, and the code marks the **entire scan**
-  `incomplete` (`outside-root-symlink`) rather than silently scoring it as if
-  the harness were not there. The tool's own README says an incomplete
-  scan's score should not be "publish[ed] ... as authoritative." This is
-  exactly ADR 0003/0004's convention: `.claude/skills/<name>` and
-  `.claude/agents/<name>.md` are absolute symlinks into a checkout that lives
-  elsewhere on disk, deliberately never committed.
-- More surprising: an **in-root** symlinked directory does not help either.
-  This template's own `.claude/skills -> ../baseline/skills` is git-tracked
-  (mode `120000`), relative, and resolves inside the repo. `harness-score`
-  still scores it 0/17, because the walker de-duplicates by canonical
-  realpath and always keeps the first-encountered **physical** directory over
-  any symlink alias to the same target (the code's own comment: "a lexically
+- Um diretório symlinkado cujo realpath resolve **fora da raiz do escaneamento** é
+  excluído da lista de arquivos, e o código marca **todo o escaneamento** como
+  `incomplete` (`outside-root-symlink`), em vez de simplesmente pontuá-lo como se
+  o harness não estivesse lá. O próprio README da ferramenta diz que a pontuação de
+  um escaneamento incompleto não deve ser "publish[ed] ... as authoritative" ("publicada
+  ... como autoritativa"). Isso é exatamente a convenção das ADRs 0003/0004:
+  `.claude/skills/<name>` e `.claude/agents/<name>.md` são symlinks absolutos para
+  um checkout que vive em outro lugar no disco, deliberadamente nunca commitado.
+- Mais surpreendente: um diretório symlinkado **na própria raiz** também não ajuda.
+  O próprio `.claude/skills -> ../baseline/skills` deste template está rastreado pelo git
+  (modo `120000`), é relativo, e resolve dentro do repositório. O `harness-score`
+  ainda assim pontua 0/17, porque o varredor deduplica pelo realpath canônico e sempre
+  mantém o primeiro diretório **físico** encontrado, em vez de qualquer alias
+  symlink para o mesmo destino (o próprio comentário do código: "a lexically
   earlier symlink cannot hide the canonical repository path for the same
-  target"). `baseline/skills/` gets walked and claimed as the canonical path
-  before `.claude/skills` is ever expanded, so every file under it is
-  attributed only to `baseline/skills/...`, never to `.claude/skills/...`.
-  The individual checks (`SKL-01`..`04`, `AGT-01`..`02`, matched in
-  `packages/cli/src/harness/registry.ts` against patterns such as
-  `/(^|\/)\.claude\/skills\/[^/]+\/SKILL\.md$/`) require that literal
-  `.claude/skills/`, `.cursor/skills/`, or `.agents/skills/` path segment;
-  `baseline/skills/` never matches any of them, symlink or not.
-- We checked for an escape hatch before concluding there was not one:
-  `--help`, the README's "Team customization" section, and the config parser
-  (`packages/cli/src/config.ts`). `.harness-score.json` supports `extends`
-  (named presets), `rules` (per-check severity `off`/`error`, with three
-  credential-leak checks that can never be turned off), and
-  `extraRoots`/`scopes` (adds a wholly separate, independently-rooted scan
-  that only feeds the `effective` gate, not the default `maturity` gate,
-  meant for `~/.claude` user/system scope). None of these remap or alias a
-  path for check-matching purposes, and none changes the two behaviors above.
-  There is no `--follow-symlinks` flag. This is how the scanner is built, not
-  a bug to file or a flag we missed.
-- The registry's path patterns are also **unanchored**
-  (`(^|\/)\.claude\/skills\/...` matches that segment anywhere in the tree),
-  which is the other half of the `njord-back` story: its stale
-  `.claude/worktrees/<name>/.claude/skills/...` directory held real files (an
-  old full vendor copy, not a symlink), so it counted in full, regardless of
-  whether the top-level repo's current harness setup is visible at all.
+  target", ou seja, "um symlink lexicamente anterior não pode esconder o caminho
+  canônico do repositório para o mesmo destino"). `baseline/skills/` é varrido e
+  reivindicado como o caminho canônico antes que `.claude/skills` seja expandido,
+  então todo arquivo dentro dele é atribuído somente a `baseline/skills/...`, nunca a
+  `.claude/skills/...`. As verificações individuais (`SKL-01`..`04`, `AGT-01`..`02`,
+  casadas em `packages/cli/src/harness/registry.ts` contra padrões como
+  `/(^|\/)\.claude\/skills\/[^/]+\/SKILL\.md$/`) exigem esse segmento literal de
+  caminho `.claude/skills/`, `.cursor/skills/`, ou `.agents/skills/`;
+  `baseline/skills/` nunca casa com nenhum deles, symlink ou não.
+- Verificamos se havia uma válvula de escape antes de concluir que não havia:
+  `--help`, a seção "Team customization" do README, e o parser de configuração
+  (`packages/cli/src/config.ts`). O `.harness-score.json` suporta `extends`
+  (presets nomeados), `rules` (severidade por verificação `off`/`error`, com três
+  verificações de vazamento de credenciais que nunca podem ser desligadas), e
+  `extraRoots`/`scopes` (adiciona um escaneamento totalmente separado e com raiz
+  independente, que alimenta só o gate `effective`, não o gate `maturity` padrão,
+  pensado para o escopo de usuário/sistema `~/.claude`). Nenhuma dessas opções
+  remapeia ou cria alias de caminho para fins de casamento das verificações, e
+  nenhuma muda os dois comportamentos acima. Não existe flag `--follow-symlinks`.
+  É assim que o scanner foi construído, não é um bug para reportar nem uma flag
+  que deixamos passar.
+- Os padrões de caminho do registry também são **sem âncora**
+  (`(^|\/)\.claude\/skills\/...` casa esse segmento em qualquer lugar da árvore),
+  que é a outra metade da história do `njord-back`: seu diretório obsoleto
+  `.claude/worktrees/<name>/.claude/skills/...` guardava arquivos reais (uma cópia
+  antiga, totalmente vendorizada, não um symlink), então ele contou por completo,
+  independentemente de a configuração atual do harness do repositório de nível
+  superior estar visível ou não.
 
-Net effect: the harness is invisible to `harness-score`, to CI, and to a
-fresh clone that has not run `install-harness.sh` locally. Not because of a
-bug in the scanner and not because of anything specific to this template, but
-because a symlink-delivered harness and a canonical-realpath, in-root-only
-file walker are structurally incompatible. `harness-score`'s own score on
-this repo therefore understates its harness; it can never overstate it.
+Efeito líquido: o harness é invisível para o `harness-score`, para o CI, e para um
+clone recém-feito que não executou `install-harness.sh` localmente. Não por causa de
+um bug no scanner e não por nada específico deste template, mas porque um harness
+entregue por symlink e um varredor de arquivos que só olha realpath canônico e raiz
+interna são estruturalmente incompatíveis. A própria pontuação do `harness-score`
+para este repositório, portanto, subestima o harness; ela nunca pode sobrestimá-lo.
 
-## Options considered
+## Opções consideradas
 
-1. **Do nothing, ignore the score.**
-   - Pros: no work.
-   - Cons: a wrong 99/108 on `njord-back` and a wrong 0/17-on-skills
-     everywhere else both get treated as fact by anyone who does not know the
-     mechanism above, including this template's own new CI job.
-2. **Accept and document.** State plainly, here and in a guide, that the
-   score is a floor and name both distortions with the concrete evidence
-   above, so nobody re-derives it and nobody trusts a 99 or a 0 at face
-   value. Point at `install-harness.sh --status`, an existing, already
-   uncommitted, always-current command, as how a human actually checks
-   what is linked, rather than adding a new artifact.
-3. **`install-harness.sh` writes a small, committed marker** (for example
-   `.claude/HARNESS.md`) listing the linked skills/agents and the checkout
-   path, so a fresh clone, CI, or a human without the harness linked can at
-   least see that a harness exists.
+1. **Não fazer nada, ignorar a pontuação.**
+   - Prós: nenhum trabalho.
+   - Contras: um 99/108 errado no `njord-back` e um 0/17 errado em skills
+     em todo o resto são tratados como fato por qualquer um que não conheça o
+     mecanismo acima, incluindo o novo job de CI deste próprio template.
+2. **Aceitar e documentar.** Declarar claramente, aqui e em um guia, que a
+   pontuação é um piso e nomear as duas distorções com a evidência concreta
+   acima, para que ninguém precise deduzir isso de novo e ninguém confie em um
+   99 ou um 0 pelo valor de face. Apontar para `install-harness.sh --status`, um
+   comando já existente, já não commitado e sempre atual, como a forma real de um
+   humano checar o que está linkado, em vez de adicionar um novo artefato.
+3. **`install-harness.sh` escreve um marcador pequeno e commitado** (por exemplo
+   `.claude/HARNESS.md`) listando as skills/agentes linkadas e o caminho do
+   checkout, para que um clone recém-feito, o CI, ou um humano sem o harness
+   linkado possa ao menos ver que um harness existe.
 
-### Why option 3 does not pay for itself
+### Por que a opção 3 não se paga
 
-Before choosing, we weighed exactly what committing a marker would buy:
+Antes de escolher, pesamos exatamente o que commitar um marcador compraria:
 
-- **It does not move the score.** `harness-score`'s skills/agents checks
-  require a literal `SKILL.md` (or agent frontmatter file) at a recognized
-  path; a prose marker file does not match any `pathRegex`. The dimension
-  stays 0/17 regardless. The scanner's design (prefer the canonical
-  realpath, exclude out-of-root symlinks) cannot see delegated content by
-  construction, and a marker is delegated content read about, not files at,
-  the recognized path.
-- **It reintroduces the exact cost ADR 0003 spent an ADR removing.** ADR
-  0003's decision rests on "nothing is committed ... safe to link a repo
-  other people share." A committed marker in an adopting repo would record
-  one developer's machine-specific absolute checkout path, differ across
-  every teammate who runs the installer from a different location, and turn
-  "one command, no diff" into "one command, plus a commit, plus a merge
-  conflict the next time a teammate runs it from their own path." ADR 0003's
-  own "Negative" section already accepts that a teammate without the harness
-  linked "does not have it, and CI never does"; a marker does not change
-  that fact, it only makes one developer's local path visible in git history
-  for everyone else, which is the specific risk 0003 was written to avoid.
-- **The one place a marker could help, this template's own dogfood
-  config, already has a committed link** (mode `120000`, relative, in-root),
-  making a marker redundant with `git ls-tree` and with `check-index.sh`,
-  which already verifies linked names against `baseline/` and would catch
-  drift a hand-written marker could silently fall out of sync with.
+- **Não move a pontuação.** As verificações de skills/agentes do `harness-score`
+  exigem um `SKILL.md` literal (ou arquivo de frontmatter de agente) num caminho
+  reconhecido; um arquivo de marcador em prosa não casa com nenhum `pathRegex`. A
+  dimensão continua 0/17 mesmo assim. O design do scanner (preferir o realpath
+  canônico, excluir symlinks fora da raiz) não consegue ver conteúdo delegado por
+  construção, e um marcador é conteúdo delegado descrito em texto, não arquivos no
+  caminho reconhecido.
+- **Reintroduz exatamente o custo que a ADR 0003 gastou uma ADR inteira para remover.**
+  A decisão da ADR 0003 se apoia em "nada é commitado ... seguro linkar um
+  repositório que outras pessoas compartilham." Um marcador commitado num repositório
+  adotante registraria o caminho absoluto de checkout específico da máquina de um
+  desenvolvedor, diferiria entre cada colega que roda o instalador de um lugar
+  diferente, e transformaria "um comando, sem diff" em "um comando, mais um commit,
+  mais um conflito de merge na próxima vez que um colega rodar a partir do próprio
+  caminho." A própria seção "Negative" da ADR 0003 já aceita que um colega sem o
+  harness linkado "não o tem, e o CI nunca tem"; um marcador não muda esse fato, ele
+  só torna o caminho local de um desenvolvedor visível no histórico do git para
+  todo o resto, que é exatamente o risco que a 0003 foi escrita para evitar.
+- **O único lugar onde um marcador poderia ajudar, a própria configuração de dogfood
+  deste template, já tem um link commitado** (modo `120000`, relativo, na raiz),
+  tornando um marcador redundante com `git ls-tree` e com `check-index.sh`, que já
+  verifica os nomes linkados contra `baseline/` e detectaria uma divergência com a
+  qual um marcador escrito à mão poderia silenciosamente perder sincronia.
 
-## Decision
+## Decisão
 
-**Option 2: accept and document.**
+**Opção 2: aceitar e documentar.**
 
-- This ADR is the durable record of the mechanism, for any reader of this
-  public repo.
-- [`docs/guides/harness-score.md`](../guides/harness-score.md) is the
-  operational guide: how to run the scanner per repo, how to read the six
-  dimensions, and the two distortions above with the exact `njord-back`
-  example, so nobody trusts a 99 again.
-- A `harness-score` CI job is added to this repo's own pipeline, gated at
-  `--min-level 2`, the level this repo's own harness actually holds today on
-  a clean clone, so the job passes now and fails only on a real regression,
-  never on the pre-existing skills/agents undercount.
-- We do **not** change `install-harness.sh` or add any new committed
-  artifact. The existing, uncommitted `install-harness.sh --status` remains
-  the correct way for a human to see what is actually linked in a given
-  checkout, and it is always current because it reads the filesystem instead
-  of a snapshot that can drift.
+- Esta ADR é o registro durável do mecanismo, para qualquer leitor deste
+  repositório público.
+- [`docs/guides/harness-score.md`](../guides/harness-score.md) é o guia
+  operacional: como executar o scanner por repositório, como ler as seis
+  dimensões, e as duas distorções acima com o exemplo exato do `njord-back`,
+  para que ninguém confie num 99 de novo.
+- Um job de CI do `harness-score` é adicionado ao próprio pipeline deste
+  repositório, com gate em `--min-level 2`, o nível que o próprio harness deste
+  repositório realmente mantém hoje num clone limpo, para que o job passe agora
+  e falhe só numa regressão real, nunca na subcontagem preexistente de
+  skills/agentes.
+- Nós **não** mudamos o `install-harness.sh` nem adicionamos nenhum novo
+  artefato commitado. O já existente, não commitado, `install-harness.sh --status`
+  continua sendo a forma correta de um humano ver o que está de fato linkado num
+  determinado checkout, e ele está sempre atual porque lê o sistema de arquivos
+  em vez de um snapshot que pode divergir.
 
-## Consequences
+## Consequências
 
-### Positive
+### Positivas
 
-- No reader of this repo, human or CI, is left to independently rediscover
-  why `harness-score` disagrees with reality; the ADR and the guide say it
-  plainly, with file:line-level evidence.
-- CI now gates on a real, deterministic number for this repo instead of
-  either ignoring `harness-score` entirely or silently accepting an
-  unexplained low score.
-- No new committed artifact, no new drift surface, no risk of reintroducing
-  ADR 0003's "nothing is committed" cost into any adopting repo. This
-  decision touches nothing about the delivery mechanism itself.
-- Public record: the njord repos' own future PRs (not part of this change)
-  can point at this ADR instead of re-deriving the same investigation.
+- Nenhum leitor deste repositório, humano ou CI, precisa redescobrir por conta
+  própria por que o `harness-score` diverge da realidade; a ADR e o guia dizem
+  isso claramente, com evidência no nível de arquivo e linha.
+- O CI agora usa como gate um número real e determinístico para este
+  repositório, em vez de ignorar o `harness-score` totalmente ou aceitar
+  silenciosamente uma pontuação baixa sem explicação.
+- Nenhum artefato novo commitado, nenhuma nova superfície de divergência, nenhum
+  risco de reintroduzir o custo do "nada é commitado" da ADR 0003 em nenhum
+  repositório adotante. Esta decisão não toca em nada do mecanismo de entrega em si.
+- Registro público: as próprias PRs futuras dos repositórios njord (fora do
+  escopo desta mudança) podem apontar para esta ADR em vez de refazer a mesma
+  investigação.
 
-### Negative
+### Negativas
 
-- The skills/agents undercount is permanent as long as `harness-score`
-  canonicalizes by realpath and this harness is delivered by symlink;
-  nothing in this repo can fix it locally. Every future reading of the score
-  needs the same caveat, forever, until the upstream tool changes or this
-  harness stops being symlink-delivered.
-- `--min-level 2` only proves this repo has not regressed below what it
-  holds today; it does not prove the skills/agents dimension is healthy,
-  because the tool cannot see it either way. A real regression in
-  `baseline/skills/` (a broken `SKILL.md`, a missing description) would not
-  be caught by this gate.
-- A future contributor unfamiliar with this ADR could still see "L2, 62/108"
-  in CI and assume it means something it does not; the guide mitigates this
-  but does not eliminate it.
+- A subcontagem de skills/agentes é permanente enquanto o `harness-score`
+  canonicalizar por realpath e este harness for entregue por symlink; nada neste
+  repositório pode corrigir isso localmente. Toda leitura futura da pontuação
+  precisa da mesma ressalva, para sempre, até a ferramenta upstream mudar ou este
+  harness deixar de ser entregue por symlink.
+- `--min-level 2` só prova que este repositório não regrediu para abaixo do que
+  ele mantém hoje; não prova que a dimensão de skills/agentes está saudável,
+  porque a ferramenta não consegue vê-la de qualquer forma. Uma regressão real em
+  `baseline/skills/` (um `SKILL.md` quebrado, uma descrição faltando) não seria
+  pega por este gate.
+- Um futuro contribuidor sem familiaridade com esta ADR ainda poderia ver "L2, 62/108"
+  no CI e assumir que isso significa algo que não significa; o guia reduz esse
+  risco mas não o elimina.
 
-### Risks accepted
+### Riscos aceitos
 
-- If `harness-score` ever changes its symlink-canonicalization behavior (see
-  "Revisit when"), this repo's documented score would jump, and the ADR's
-  explanation would need a superseding note rather than a silent edit.
-- The pinned `harness-score` version in CI (see the guide) can go stale;
-  bumping it is a deliberate, reviewed step, not automatic, precisely because
-  the tool's own semver policy allows the maturity model itself to change in
-  a minor version.
+- Se o `harness-score` algum dia mudar seu comportamento de canonicalização de
+  symlink (ver "Revisitar quando"), a pontuação documentada deste repositório
+  saltaria, e a explicação da ADR precisaria de uma nota supersedente, em vez de
+  uma edição silenciosa.
+- A versão fixada do `harness-score` no CI (ver o guia) pode ficar obsoleta;
+  atualizá-la é um passo deliberado e revisado, não automático, precisamente
+  porque a própria política de semver da ferramenta permite que o modelo de
+  maturidade em si mude numa versão minor.
 
-## Revisit when
+## Revisitar quando
 
-- `harness-score` gains a documented way to alias or remap a path for check
-  matching (an `overlay`/`alias` config key, or a `--follow-symlinks` mode
-  that keeps every reachable relative path instead of one canonical one).
-  At that point option 3 becomes worth re-costing, since the objection above
-  is about payoff, not principle.
-- The harness delivery mechanism itself changes away from symlinks (tracked
-  in the marketplace ADRs' own "Revisit when" sections, for example a `rules`
-  field landing in the Claude Code plugin manifest). A copy- or plugin-based
-  harness would not have this blind spot and this ADR would need a
-  superseding note.
-- `njord-back`'s stale worktree (or any repo's) is cleaned up and its score
-  drops to reflect reality. Worth a one-line addendum here rather than
-  silently letting the next reader assume the 99 was ever real.
+- O `harness-score` ganhar uma forma documentada de criar alias ou remapear um
+  caminho para fins de casamento das verificações (uma chave de configuração
+  `overlay`/`alias`, ou um modo `--follow-symlinks` que mantenha todo caminho
+  relativo alcançável em vez de só um canônico). Nesse ponto, a opção 3 volta a
+  valer a pena recalcular o custo, já que a objeção acima é sobre retorno, não
+  sobre princípio.
+- O próprio mecanismo de entrega do harness deixar de usar symlinks (rastreado
+  nas próprias seções "Revisit when" das ADRs do marketplace, por exemplo um
+  campo `rules` chegando no manifesto de plugin do Claude Code). Um harness
+  baseado em cópia ou plugin não teria esse ponto cego e esta ADR precisaria de
+  uma nota supersedente.
+- O worktree obsoleto do `njord-back` (ou de qualquer repositório) for limpo e sua
+  pontuação cair para refletir a realidade. Vale um adendo de uma linha aqui, em
+  vez de deixar silenciosamente o próximo leitor assumir que o 99 algum dia foi real.
