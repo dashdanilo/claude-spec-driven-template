@@ -62,6 +62,25 @@
 #     flag this check doesn't recognize as harmless, is still blocked exactly
 #     as before — the parser is conservative on purpose: an unrecognized flag
 #     is treated as unsafe rather than assumed harmless.
+#   - heredoc BODY read as a real command: `cat > notes.md <<'EOF'` whose
+#     body lines merely MENTIONED `git cherry-pick`, `git push`, or `gh pr
+#     merge ... --admin` as prose — someone documenting a command, not
+#     running one — got blocked, because this hook had its own pure-bash
+#     walker and never stripped heredoc bodies before either the `gh pr
+#     merge --admin` check or the per-invocation git walk saw the command
+#     text; the same false-positive shape lib/bash-write-targets.py's own
+#     header already names for the write guards, and which that file's
+#     `strip_heredoc_bodies` already solves for them. Fixed: this hook now
+#     calls that SAME function, inside the one python3 process it already
+#     spends extracting `tool_input.command`, before either check runs, so
+#     only the heredoc's OPENER line (where a real redirect or a real `git
+#     commit -F - <<'EOF'` can legitimately sit) is still read as a command —
+#     the body and the closing delimiter line are not. Accepted residual,
+#     shared with that same function: a fake heredoc opener inside a quoted
+#     string, followed by a line that is only the delimiter, can still strip
+#     a real command — the same heuristic limit `strip_heredoc_bodies`
+#     already accepts for the write guards, now shared by one owner instead
+#     of risking two copies drifting apart.
 #
 # Accepted gap: when a cd target is not a literal path — built from a
 # variable, command substitution, or a glob, e.g. `W=<path>` then `cd $W` —
@@ -118,8 +137,58 @@ if [[ -z "$PYTHON_BIN" ]]; then
   exit 0
 fi
 
-# Extract the command from JSON
-command=$(printf '%s' "$input" | "$PYTHON_BIN" -c "import sys,json;d=json.load(sys.stdin);ti=d.get('tool_input') or {};print(d.get('command') or ti.get('command') or '')" 2>/dev/null || echo "")
+# lib/bash-write-targets.py, next to this hook, owns strip_heredoc_bodies —
+# see the defect note at the top of this file. Resolved the same way
+# protect-critical.sh resolves its own LIB, from this hook's own location,
+# not the caller's cwd.
+LIB="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)/lib/bash-write-targets.py"
+
+# Extract the command from JSON, then, in the SAME python3 process, strip any
+# heredoc BODY out of it before this hook ever looks for a dangerous git/gh
+# invocation — a heredoc body is text handed to a file or another program,
+# never executed, so it must not be read as a real command (see the defect
+# note at the top of this file). Only attempted when the raw command actually
+# contains a heredoc operator; degrades to the raw command, with a one-line
+# stderr warning, if the shared lib is missing or the strip itself raises —
+# conservative direction, matching this hook's stated posture everywhere
+# else, and never a reason to exit non-zero. importlib is imported INSIDE
+# that try, not at the top of the script: this hook deliberately falls back
+# to `python` where `python3` is missing, and on a python2 interpreter a
+# top-level `import importlib.util` fails the whole -c script, which would
+# leave `command` empty and disarm this guard entirely instead of merely
+# giving up on the stripping. The shared lib is python3-only anyway (it uses
+# f-strings), so on python2 the raw-command fallback is the only option, and
+# it is the conservative one.
+command=$(printf '%s' "$input" | "$PYTHON_BIN" -c "
+import sys, json, os
+
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    d = {}
+ti = d.get('tool_input') or {}
+cmd = d.get('command') or ti.get('command') or ''
+
+stripped = cmd
+lib_path = sys.argv[1] if len(sys.argv) > 1 else ''
+if '<<' in cmd:
+    try:
+        import importlib.util
+        if not lib_path or not os.path.isfile(lib_path):
+            raise RuntimeError('lib not found: ' + lib_path)
+        spec = importlib.util.spec_from_file_location('bash_write_targets', lib_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        stripped = mod.strip_heredoc_bodies(cmd)
+    except Exception as e:
+        sys.stderr.write(
+            'WARNING: protect-main.sh: could not strip heredoc bodies (' +
+            type(e).__name__ + ': ' + str(e) + ') -- checking the raw command '
+            'text, including any heredoc body, instead.\n'
+        )
+
+print(stripped)
+" "$LIB" || echo "")
 
 # --- gh pr merge --admin: blocked everywhere, on any branch -------------------
 # Bypassing branch protection is never something to do on someone else's behalf.
