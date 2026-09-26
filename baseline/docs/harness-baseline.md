@@ -1,63 +1,63 @@
-# Harness baseline — the numbers to beat
+# Baseline do harness, os números a bater
 
-Reference measurements for `/harness-report`. Without a baseline a report is a
-number with no opinion; this file is what makes it a verdict.
+Medições de referência para o `/harness-report`. Sem uma baseline um relatório é um
+número sem opinião; este arquivo é o que o transforma num veredito.
 
-## Where these came from
+## De onde vieram
 
-Measured on 2026-08-03 from the transcripts of a real project running this
-template: **22 sessions, 54 subagent dispatches, ~11.5M tokens**. Not a
-simulation and not a target pulled from intuition — this is what the harness
-actually did before the corrections listed below.
+Medido em 03/08/2026 a partir das transcrições de um projeto real rodando este
+template: **22 sessões, 54 dispatches de subagente, ~11,5M tokens**. Não é uma
+simulação nem uma meta tirada da intuição, é o que o harness de fato fez antes
+das correções listadas abaixo.
 
-## The baseline
+## A baseline
 
-| metric | measured | what it means | good direction |
+| métrica | medido | o que significa | direção boa |
 |---|---:|---|:---:|
-| **Edit delegated** | **29%** | 777 `Edit` calls in the main thread against 316 in specialists, while `Grep`/`Glob` were 100% delegated — exploration was delegated and implementation was not, exactly backwards | ↑ |
-| **Main-thread token share** | **71%** | 8.19M of 11.5M, in a system whose own `context-engineering.md` says to keep the main thread lean | ↓ |
-| **Dispatches per message** | **1.0** | 54 of 54 went out one per message, so no wave plan ever fanned out | ↑ |
-| `/orchestrate` runs | **2** | against 729 free human prompts — the pipeline was executed by hand | ↑ |
-| Unattributed dispatches | **77%** | `log-agent.sh` recorded `agent=?` in 183 of 238 events | ↓ |
-| Uncollected background agents | **2** | left open for 16 days across a suspended session | 0 |
+| **Edit delegado** | **29%** | 777 chamadas de `Edit` na thread principal contra 316 em especialistas, enquanto `Grep`/`Glob` foram 100% delegadas, a exploração estava sendo delegada e a implementação não, exatamente ao contrário | ↑ |
+| **Participação de tokens da thread principal** | **71%** | 8,19M de 11,5M, num sistema cujo próprio `context-engineering.md` diz para manter a thread principal magra | ↓ |
+| **Dispatches por mensagem** | **1,0** | 54 de 54 saíram um por mensagem, então nenhum plano de wave chegou a fazer fan-out | ↑ |
+| Execuções de `/orchestrate` | **2** | contra 729 prompts humanos livres, o pipeline foi executado na mão | ↑ |
+| Dispatches não atribuídos | **77%** | `log-agent.sh` registrou `agent=?` em 183 de 238 eventos | ↓ |
+| Agentes em background não coletados | **2** | deixados abertos por 16 dias numa sessão suspensa | 0 |
 
-## What changed after it, and what that means for reading a new report
+## O que mudou depois disso, e o que isso significa para ler um novo relatório
 
-Between the baseline and now, four corrections landed. **None of them has been
-re-measured** — they are hypotheses with reasoning behind them, not verified
-outcomes. Reading a fresh report is how they get judged:
+Entre a baseline e agora, quatro correções foram aplicadas. **Nenhuma delas foi
+remedida** — são hipóteses com raciocínio por trás, não resultados verificados.
+Ler um relatório novo é como elas são julgadas:
 
-| change | the claim it makes | the number that would confirm it |
+| mudança | a afirmação que faz | o número que a confirmaria |
 |---|---|---|
-| `rules/delegation.md` (always loaded) | stating the rule raises delegation | Edit delegated well above 29% |
-| `/orchestrate` Step 3 rewritten per-wave | waves actually fan out | dispatches per message above 1.0 |
-| `/orchestrate` Step 0 + class-to-gates matrix | less ceremony means the command gets used | `/orchestrate` runs above 2 |
-| `log-agent.sh` reading the subagent transcript | dispatches become attributable | unattributed near 0 |
+| `rules/delegation.md` (sempre carregada) | declarar a regra aumenta a delegação | Edit delegado bem acima de 29% |
+| `/orchestrate` Step 3 reescrito por wave | as waves de fato fazem fan-out | dispatches por mensagem acima de 1,0 |
+| `/orchestrate` Step 0 + matriz classe-para-gates | menos cerimônia significa que o comando é mais usado | execuções de `/orchestrate` acima de 2 |
+| `log-agent.sh` lendo a transcrição do subagente | dispatches se tornam atribuíveis | não atribuídos perto de 0 |
 
-The honest possibility is that the delegation number **does not move**. The rule
-already existed inside `/orchestrate` before it was promoted to an always-loaded
-rule, and the 29% was measured with it in place. If a fresh report still shows
-roughly 29%, the conclusion is that prose does not fix this and the next step is
-a different mechanism, not a better sentence.
+A possibilidade honesta é que o número de delegação **não se mova**. A regra
+já existia dentro do `/orchestrate` antes de ser promovida a regra sempre
+carregada, e os 29% foram medidos com ela em vigor. Se um relatório novo ainda
+mostrar cerca de 29%, a conclusão é que prosa não resolve isso e o próximo
+passo é um mecanismo diferente, não uma frase melhor.
 
-## Imported hypotheses — not ours, not measured here
+## Hipóteses importadas, não nossas, não medidas aqui
 
-Numbers this harness now acts on that came from **someone else's benchmark**. They are flagged so a future reader knows which figures are earned and which are borrowed.
+Números pelos quais este harness agora age que vieram do **benchmark de outra pessoa**. Eles são sinalizados para que um leitor futuro saiba quais números são ganhos e quais são emprestados.
 
-**~3 cohesive clusters, 5-7 tasks each** — the grouping rule in `/orchestrate` Step 1 and `/wave`.
+**~3 clusters coesos, 5-7 tarefas cada** — a regra de agrupamento no `/orchestrate` Step 1 e no `/wave`.
 
-| source | [Tech Leads Club](https://agent-skills.techleads.club/tlc-spec-driven/), an 18-task Stripe epic |
+| fonte | [Tech Leads Club](https://agent-skills.techleads.club/tlc-spec-driven/), um épico Stripe de 18 tarefas |
 |---|---|
-| method | one codebase, one run per architecture, four architectures |
-| what it showed | one-agent-per-task is worst on every axis (25M tokens, 43m, 0.81); ~3 clusters best (10.5M, 18m, 0.95) and finishes at 26% of the window instead of 74% |
-| what is solid | the **shape** — granularity destroys quality, and more workers can leave the main thread fatter because every summary returns to it |
-| what is not | the **number**. n=1 per cell, and its own authors call the 0.93 vs 0.95 quality gap statistically indistinguishable |
+| método | uma base de código, uma execução por arquitetura, quatro arquiteturas |
+| o que mostrou | um agente por tarefa é o pior em todos os eixos (25M tokens, 43m, 0,81); ~3 clusters é o melhor (10,5M, 18m, 0,95) e termina com 26% da janela em vez de 74% |
+| o que é sólido | a **forma**, granularidade destrói qualidade, e mais workers pode deixar a thread principal mais gorda porque todo resumo volta para ela |
+| o que não é | o **número**. n=1 por célula, e os próprios autores chamam a diferença de qualidade 0,93 vs 0,95 de estatisticamente indistinguível |
 
-**What would confirm or refute it here:** run `/orchestrate` on a real spec of roughly this size and compare a `/harness-report` against the rows above. The figures that matter are tokens, wall time, and how much of the window is left at the end — that last one is the actual claim, since the token cost at 18 tasks is a wash.
+**O que confirmaria ou refutaria isso aqui:** rode o `/orchestrate` numa spec real de tamanho aproximado a esse e compare um `/harness-report` contra as linhas acima. As cifras que importam são tokens, tempo de relógio e quanto da janela resta no final, esse último é a afirmação de fato, já que o custo em tokens em 18 tarefas é neutro.
 
-**Why adopt before measuring.** Our own baseline says the opposite failure: 1.0 dispatches per message and 29% of `Edit` delegated, meaning we sit near the *inline* row while `/orchestrate` as written would have produced the *per-task* row. Both directions are wrong and the correction points the same way, so the shape is worth adopting now. If our own numbers land elsewhere, the number changes and the shape stays.
+**Por que adotar antes de medir.** Nossa própria baseline mostra a falha oposta: 1,0 dispatch por mensagem e 29% de `Edit` delegado, o que significa que estamos perto da linha *inline* enquanto o `/orchestrate` como estava escrito teria produzido a linha *por tarefa*. As duas direções estão erradas e a correção aponta para o mesmo lado, então a forma vale a pena ser adotada agora. Se nossos próprios números caírem em outro lugar, o número muda e a forma permanece.
 
-## 2026-09-09 — the instrument was broken; no report before this date is usable
+## 09/09/2026 — o instrumento estava quebrado; nenhum relatório antes desta data é utilizável
 
 <!-- instrument-epoch: 2026-09-09 -->
 <!-- harness-report.sh reads this marker to know where "current" data starts;
@@ -68,243 +68,259 @@ Numbers this harness now acts on that came from **someone else's benchmark**. Th
      latest one it finds, so this file is the only place that needs editing. -->
 
 
-The first attempt to re-measure the four claims above found that the two hooks
-producing the data were wrong in three ways. All three were caught by capturing
-real hook payloads and comparing them against what the hooks logged, in one
-session on this repository.
+A primeira tentativa de remedir as quatro afirmações acima descobriu que os dois
+hooks que produzem os dados estavam errados de três formas. As três foram
+pegas capturando payloads reais de hooks e comparando contra o que os hooks
+registraram, numa única sessão neste repositório.
 
-| bug | effect on the numbers | direction |
+| bug | efeito nos números | direção |
 |---|---|:---:|
-| `log-edit.sh` inferred the thread from `transcript_path`, which points at the **main** session even inside a subagent | every specialist edit counted as a main-thread edit; a session with two active `implementer` dispatches reported **`DELEGATED 0%`** | understates delegation |
-| `log-agent.sh` summed only `input_tokens + output_tokens` | a dispatch that created 20,347 cache tokens and read 18,592 more logged **`tokens=169`**, ~120x low | understates subagent cost |
-| `log-agent.sh` picked the subagent transcript by newest **mtime** | in a parallel wave every `SubagentStop` resolved to the same file, so N agents produced N lines carrying the last one's identity and cost | destroys attribution exactly in the wave case |
+| `log-edit.sh` inferia a thread a partir de `transcript_path`, que aponta para a sessão **principal** mesmo dentro de um subagente | toda edição de especialista contava como edição da thread principal; uma sessão com dois dispatches ativos do `implementer` reportou **`DELEGATED 0%`** | subestima delegação |
+| `log-agent.sh` somava só `input_tokens + output_tokens` | um dispatch que criou 20.347 tokens de cache e leu mais 18.592 registrou **`tokens=169`**, ~120x abaixo | subestima o custo do subagente |
+| `log-agent.sh` escolhia a transcrição do subagente pelo **mtime** mais novo | numa wave paralela cada `SubagentStop` resolvia para o mesmo arquivo, então N agentes produziam N linhas carregando a identidade e o custo do último | destrói a atribuição justamente no caso de wave |
 
-All three are fixed. Verified live: two subagents dispatched in the same
-message, one second apart, were attributed to their own types with their own
-costs and zero `approx=1`; and `.claude/tool-log.txt` recorded the same
-`implementer` as `main` at 03:13:34 and as `sub` at 03:13:45, across the edit
-that landed the fix.
+Os três estão corrigidos. Verificado em produção: dois subagentes despachados
+na mesma mensagem, um segundo de diferença, foram atribuídos aos seus próprios
+tipos com seus próprios custos e zero `approx=1`; e o `.claude/tool-log.txt`
+registrou o mesmo `implementer` como `main` às 03:13:34 e como `sub` às
+03:13:45, através da edição que consolidou a correção.
 
-**What this means for the four claims in the table above.** None of them has
-been judged yet. The delegation row in particular cannot be read from any
-report produced before today: the detector answered `main` regardless of the
-truth, so a low percentage measured with it is evidence about the detector and
-nothing else. The 29% baseline itself survives — it was computed from
-transcripts in 2026-08-03, not from these hooks — but every comparison against
-it since the hooks landed was invalid.
+**O que isso significa para as quatro afirmações na tabela acima.** Nenhuma
+delas foi julgada ainda. A linha de delegação em particular não pode ser lida
+de nenhum relatório produzido antes de hoje: o detector respondia `main`
+independente da verdade, então uma porcentagem baixa medida com ele é
+evidência sobre o detector e mais nada. A baseline de 29% em si sobrevive, foi
+calculada a partir de transcrições em 03/08/2026, não a partir desses hooks,
+mas toda comparação contra ela desde que os hooks entraram em vigor era
+inválida.
 
-**What is still not measured.** The delegation ratio in a real implementation
-session. `.claude/tool-log.txt` is empty in every njord checkout, because the
-hooks were never registered there — the harness has never been adopted in a
-repository while real feature work ran through it. That run is still the open
-item, and it is now the *first* one that can produce a number worth reading.
+**O que ainda não foi medido.** A taxa de delegação numa sessão de
+implementação real. O `.claude/tool-log.txt` está vazio em todo checkout do
+njord, porque os hooks nunca foram registrados lá, o harness nunca foi
+adotado num repositório enquanto trabalho de feature real corria através dele.
+Essa execução ainda é o item aberto, e agora é a *primeira* que pode produzir
+um número que vale a pena ler.
 
-## 2026-09-10 — A/B: the current driver against the one it replaced
+## 10/09/2026 — A/B: o driver atual contra o que ele substituiu
 
-The first run instrumented correctly, and the first real comparison. Same spec
-(16 unit-test tasks for pure helpers in njord-back), same 16 targets, same
-baseline (14 suites / 190 tests), same fixed instrument. One variable changed:
-the driver. Run 1 used the current `orchestrate` skill (132 lines). Run 2 used
-the 53-line `commands/orchestrate.md` that njord-back's `develop` still ships.
+A primeira execução instrumentada corretamente, e a primeira comparação real. Mesma
+spec (16 tarefas de teste unitário para helpers puros no njord-back), mesmos 16
+alvos, mesma baseline (14 suítes / 190 testes), mesmo instrumento fixo. Uma
+variável mudou: o driver. A execução 1 usou a skill `orchestrate` atual (132
+linhas). A execução 2 usou o `commands/orchestrate.md` de 53 linhas que o
+`develop` do njord-back ainda distribui.
 
-| | run 1 (current) | run 2 (old) | |
+| | execução 1 (atual) | execução 2 (antigo) | |
 |---|---:|---:|---|
-| tasks delivered | 16 | 16 | |
-| dispatches | 8 | 53 | 6.6x |
-| new tokens | 1,776,741 | 7,708,367 | **4.34x** |
-| cache reads | 26.3M | 68.4M | 2.6x |
-| implementation tokens per task | ~52k | ~164k | 3.2x |
-| tests produced | 220 | 548 | 2.5x |
-| production findings | 2 | 17 | |
+| tarefas entregues | 16 | 16 | |
+| dispatches | 8 | 53 | 6,6x |
+| tokens novos | 1.776.741 | 7.708.367 | **4,34x** |
+| leituras de cache | 26,3M | 68,4M | 2,6x |
+| tokens de implementação por tarefa | ~52k | ~164k | 3,2x |
+| testes produzidos | 220 | 548 | 2,5x |
+| findings de produção | 2 | 17 | |
 
-**Where the old driver's money went:** `code-reviewer` 40.8%, implementation
-34.0%, `tester` 23.9%. The `tester` wrote **nothing in 16 of 16 dispatches** —
-each time it audited the coverage, found no gap, and returned. With no
-class-to-gates matrix the old driver dispatches it even on tasks whose
-deliverable is a test file. That waste alone cost more than the whole of run 1.
+**Onde foi o dinheiro do driver antigo:** `code-reviewer` 40,8%, implementação
+34,0%, `tester` 23,9%. O `tester` não escreveu **nada em 16 de 16 dispatches**,
+a cada vez ele auditou a cobertura, não achou lacuna, e retornou. Sem uma
+matriz classe-para-gates o driver antigo o despacha até em tarefas cujo
+entregável é um arquivo de teste. Esse desperdício sozinho custou mais do que
+a execução 1 inteira.
 
-**Against the claims table above.** Dispatches per message: run 1 sent its wave
-three-in-one, the first fan-out on record — confirmed. Unattributed dispatches:
-0% in both runs — confirmed. Edit delegated: run 1 measured 92% (37 of 40),
-confirmed in direction but weakly, because every task created a new file, the
-easiest possible class to delegate. Run 2's 100% is an artifact (see below).
+**Contra a tabela de afirmações acima.** Dispatches por mensagem: a execução 1
+enviou sua wave três-em-um, o primeiro fan-out registrado, confirmado. Dispatches
+não atribuídos: 0% nas duas execuções, confirmado. Edit delegado: a execução 1
+mediu 92% (37 de 40), confirmado na direção mas fracamente, porque toda tarefa
+criou um arquivo novo, a classe mais fácil possível de delegar. Os 100% da
+execução 2 são um artefato (veja abaixo).
 
-**Against the imported TLC hypothesis.** Implementation alone cost 3.2x per task
-under one-dispatch-per-task, against TLC's ~2.4x between the same two shapes.
-Different codebase, different work, different tool — the ratio reproduced. The
-shape stays established; the number is now ours, not borrowed.
+**Contra a hipótese importada da TLC.** A implementação sozinha custou 3,2x por
+tarefa sob um-dispatch-por-tarefa, contra o ~2,4x da TLC entre as mesmas duas
+formas. Base de código diferente, trabalho diferente, ferramenta diferente, a
+proporção se reproduziu. A forma permanece estabelecida; o número agora é
+nosso, não emprestado.
 
-**A second effect nobody had measured: coherence.** Run 2's 16 files came from
-16 independent contexts, and the branch review listed five different known-bug
-markers, two languages in test titles and three fixture-naming styles. Run 1
-produced the same 16 files from three clusters with one convention. Cohesion
-buys consistency, not only budget.
+**Um segundo efeito que ninguém tinha medido: coerência.** Os 16 arquivos da
+execução 2 vieram de 16 contextos independentes, e a review da branch listou
+cinco marcadores de bug conhecido diferentes, dois idiomas em títulos de teste
+e três estilos de nomenclatura de fixture. A execução 1 produziu os mesmos 16
+arquivos a partir de três clusters com uma convenção só. Coesão compra
+consistência, não só orçamento.
 
-**What the A/B does not prove.**
-- Run 2 produced more tests and more findings, and the main cause was the
-  orchestrator: from its fifth task on, the implementation briefing required
-  proving that central assertions kill a mutation — an instruction run 1 never
-  had. The bias runs in favour of the old driver, and it still cost 4.34x.
-- Run 2's delegation reads 100% because the orchestrator edited its own
-  documents through `Bash`, which `log-edit.sh` does not see. The two
-  percentages are not comparable. Instrumentation hole, **closed 2026-09-12**
-  — see that dated section below for what changed and why every number in
-  this file predates a wider definition of "edit" than any report produced
-  after that date.
-- Two run-2 dispatches were killed by a rate limit and never fired
-  `SubagentStop`; the log understates run 2 by at least 97,478 tokens.
-- n=1 per driver.
+**O que o A/B não prova.**
+- A execução 2 produziu mais testes e mais findings, e a causa principal foi o
+  orquestrador: a partir da sua quinta tarefa, o briefing de implementação
+  exigia provar que asserções centrais matavam uma mutação, uma instrução que
+  a execução 1 nunca teve. O viés favorece o driver antigo, e ele ainda custou
+  4,34x.
+- A delegação da execução 2 lê 100% porque o orquestrador editou os próprios
+  documentos através do `Bash`, que o `log-edit.sh` não vê. As duas
+  porcentagens não são comparáveis. Buraco de instrumentação, **fechado em
+  12/09/2026** — veja essa seção datada abaixo para o que mudou e por que todo
+  número neste arquivo antecede uma definição mais ampla de "edição" do que
+  qualquer relatório produzido depois dessa data.
+- Dois dispatches da execução 2 foram mortos por um rate limit e nunca
+  dispararam `SubagentStop`; o log subestima a execução 2 em pelo menos 97.478
+  tokens.
+- n=1 por driver.
 
-**Decision recorded.** The current driver is the one to adopt. What run 2 did
-better — per-task review found real assertion gaps in three of its first four
-tasks, and the mutation requirement stopped them — is ported into it rather
-than kept by keeping the old driver: review per cluster, falsifiability in the
-implementation handoff, an environment-variation checklist for the branch
-review, and no verification agent writing to a tracked file. Projection, not
-measurement: ~2.3M for the same spec, still ~3.3x under the old driver.
+**Decisão registrada.** O driver atual é o que deve ser adotado. O que a
+execução 2 fez melhor, a review por tarefa encontrou lacunas reais de asserção
+em três das suas quatro primeiras tarefas, e a exigência de mutação as
+impediu, é portado para ele em vez de mantido mantendo o driver antigo: review
+por cluster, testabilidade por falsificação no handoff de implementação, uma
+checklist de variação de ambiente para a review de branch, e nenhum agente de
+verificação escrevendo num arquivo rastreado. Projeção, não medição: ~2,3M
+para a mesma spec, ainda ~3,3x abaixo do driver antigo.
 
-## 2026-09-12 — the Bash write blind spot is closed; the delegation series has a new denominator
+## 12/09/2026 — o ponto cego de escrita via Bash está fechado; a série de delegação tem um novo denominador
 
-`log-edit.sh` was only ever registered on `PreToolUse` for
-`Edit|Write|MultiEdit|NotebookEdit`. A write done through `Bash` — a redirect,
-`sed -i`, `tee`, `cp`, `mv` — was invisible to it. The 2026-09-10 A/B above
-caught this in the act: run 2's orchestrator edited its own tracked documents
-through `Bash` and reported **100% delegated**, which was never a real number,
-only a blind spot reading as perfection. The error runs optimistic — the worst
-direction for a report whose whole job is "is this being used as designed."
+O `log-edit.sh` só era registrado em `PreToolUse` para
+`Edit|Write|MultiEdit|NotebookEdit`. Uma escrita feita através do `Bash`, um
+redirecionamento, `sed -i`, `tee`, `cp`, `mv`, era invisível para ele. O A/B de
+10/09/2026 acima pegou isso em flagrante: o orquestrador da execução 2 editou
+seus próprios documentos rastreados através do `Bash` e reportou **100%
+delegado**, o que nunca foi um número real, só um ponto cego lendo como
+perfeição. O erro é otimista, a piora direção para um relatório cujo trabalho
+inteiro é "isso está sendo usado como projetado."
 
-`log-edit.sh` now also runs on `PreToolUse`/`Bash`. It recovers a write from
-the command with a small character-level lexer (not a full shell parser —
-tracks quote state, recognizes `>`/`>>`, `sed -i`, `tee`, `cp`, `mv`, and
-explicitly skips `2>`/`&>`/`>&` and `[[ ]]`/`(( ))`), and logs the target only
-when it resolves **inside the repo** — `/dev/null`, `/tmp`, the session
-scratchpad and anything else outside the project are silently dropped, by one
-rule instead of a growing exclude list. A target it cannot resolve to a
-literal path (a shell variable, a command substitution) is not dropped either:
-it is logged with `path` equal to `?`, because the thread is still known and
-the delegation count still needs it — only the by-extension breakdown loses
-that row, and `harness-report.sh` says how many it dropped rather than doing
-it quietly.
+O `log-edit.sh` agora também roda em `PreToolUse`/`Bash`. Ele recupera uma
+escrita a partir do comando com um pequeno lexer em nível de caractere (não um
+parser de shell completo, rastreia estado de aspas, reconhece `>`/`>>`, `sed
+-i`, `tee`, `cp`, `mv`, e explicitamente pula `2>`/`&>`/`>&` e `[[ ]]`/`(( ))`),
+e registra o alvo só quando ele resolve **dentro do repositório**, `/dev/null`,
+`/tmp`, o scratchpad da sessão e qualquer outra coisa fora do projeto são
+descartados silenciosamente, por uma regra só em vez de uma lista de exclusão
+crescente. Um alvo que ele não consegue resolver para um caminho literal (uma
+variável de shell, uma substituição de comando) também não é descartado: é
+registrado com `path` igual a `?`, porque a thread ainda é conhecida e a
+contagem de delegação ainda precisa dela, só o detalhamento por extensão perde
+essa linha, e o `harness-report.sh` diz quantas descartou em vez de fazer isso
+silenciosamente.
 
-**This changes the denominator, not just the detector.** Every delegation
-percentage in this file — the 29% baseline, the 92%/100% A/B pair above — was
-computed over Edit/Write/MultiEdit/NotebookEdit only. A percentage measured
-after 2026-09-12 also counts Bash-recovered writes, so it can move for a
-reason that has nothing to do with how much work is actually delegated: the
-set of things being counted got bigger. **Do not compare a pre-2026-09-12
-delegation number against a post-2026-09-12 one as if they were the same
-series.** Read each on its own side of that date; a rise or fall across it is
-not yet evidence of anything.
+**Isso muda o denominador, não só o detector.** Toda porcentagem de delegação
+neste arquivo, os 29% da baseline, o par 92%/100% do A/B acima, foi calculada
+só sobre Edit/Write/MultiEdit/NotebookEdit. Uma porcentagem medida depois de
+12/09/2026 também conta escritas recuperadas via Bash, então ela pode se mover
+por um motivo que não tem nada a ver com quanto trabalho de fato é delegado: o
+conjunto do que está sendo contado ficou maior. **Não compare um número de
+delegação anterior a 12/09/2026 contra um posterior a essa data como se fossem
+a mesma série.** Leia cada um do seu próprio lado dessa data; uma subida ou
+queda através dela ainda não é evidência de nada.
 
-**What is still not measured.** How much of real delegation was previously
-uncounted because it happened through Bash — that requires a report from a
-real implementation session run after this fix, compared against one run
-before it on the same kind of work. No such pair exists yet.
+**O que ainda não foi medido.** Quanto da delegação real ficava sem contar
+antes porque acontecia via Bash, isso exige um relatório de uma sessão de
+implementação real rodada depois desse fix, comparado contra um rodado antes
+dele no mesmo tipo de trabalho. Esse par ainda não existe.
 
-## 2026-09-12 — subagent token totals were double-counted; the headline now only counts reliable metric
+## 12/09/2026 — os totais de tokens de subagente estavam duplicados; o resumo agora só conta a métrica confiável
 
-`log-agent.sh`'s degree-3 fallback (no `agent_transcript_path`, no `agent_id`
-in the payload — older clients only) picks the newest-by-mtime transcript in
-the session's `subagents/` directory and was always marked `approx=1` for
-that reason. What the comment did not account for: in a parallel wave, every
-`SubagentStop` in that wave resolves to the **same** newest file, and degree
-3 copied that file's metrics into every line, not just the first. The lines
-did not merely guess wrong — they summed the same transcript's tokens once
-per subagent in the wave.
+O fallback de grau 3 do `log-agent.sh` (sem `agent_transcript_path`, sem
+`agent_id` no payload, só clientes antigos) escolhe a transcrição mais nova
+por mtime no diretório `subagents/` da sessão e sempre foi marcado `approx=1`
+por esse motivo. O que o comentário não previa: numa wave paralela, todo
+`SubagentStop` daquela wave resolve para o **mesmo** arquivo mais novo, e o
+grau 3 copiava as métricas daquele arquivo em toda linha, não só na primeira.
+As linhas não só chutavam errado, elas somavam os tokens da mesma transcrição
+uma vez por subagente na wave.
 
-Measured on this machine's own `.claude/agent-log.txt` (135 lines) before the
-fix: 22 lines carried `approx=1`, all with the correct `agent=` (that part
-comes straight from the payload, not the guessed file, so attribution was
-never the problem — the metrics were). Three of those lines shared
-`tokens=486296`, two shared `tokens=293605`, two shared `tokens=115571` — six
-lines, three transcripts, charged as six. Total subagent tokens reported:
-11,718,022. Of that, 4,830,845 (41%) sat in `approx=1` lines — a number with
-the same weight in the total as every measured one, presented with no visual
-difference from it.
+Medido no próprio `.claude/agent-log.txt` desta máquina (135 linhas) antes do
+fix: 22 linhas carregavam `approx=1`, todas com o `agent=` correto (essa parte
+vem direto do payload, não do arquivo chutado, então a atribuição nunca foi o
+problema, as métricas eram). Três dessas linhas compartilhavam
+`tokens=486296`, duas compartilhavam `tokens=293605`, duas compartilhavam
+`tokens=115571`, seis linhas, três transcrições, cobradas como seis. Total de
+tokens de subagente reportado: 11.718.022. Desse total, 4.830.845 (41%)
+estavam em linhas `approx=1`, um número com o mesmo peso no total que qualquer
+um medido, apresentado sem nenhuma diferença visual dele.
 
-**The fix.** `log-agent.sh` now keeps an "already charged" registry
-(`.claude/.agent-log-consumed`, gitignored, keyed by session) and checks it
-before degree 3 reports a transcript's metrics. The first `SubagentStop` to
-land on a given file in a session gets its real tokens/cached/dur/tools; every
-later one that resolves to the *same* file gets `agent=` (still reliable) and
-`dup=1`, with no metric fields at all — a missing number, not someone else's
-number. `harness-report.sh` now excludes every `approx=1` line's tokens from
-the headline "subagent tokens" total (a `dup=1` line, having no `tokens=`
-field, already contributes 0) and reports the approximate share on its own
-line instead — see the report's own output for the shape.
+**A correção.** O `log-agent.sh` agora mantém um registro de "já cobrado"
+(`.claude/.agent-log-consumed`, ignorado pelo git, indexado por sessão) e o
+checa antes de o grau 3 reportar as métricas de uma transcrição. O primeiro
+`SubagentStop` a chegar num dado arquivo numa sessão recebe seus tokens/cache/duração/tools
+reais; todo posterior que resolve para o *mesmo* arquivo recebe `agent=`
+(ainda confiável) e `dup=1`, sem nenhum campo de métrica, um número faltando,
+não o número de outra pessoa. O `harness-report.sh` agora exclui os tokens de
+toda linha `approx=1` do total do resumo de "tokens de subagente" (uma linha
+`dup=1`, não tendo campo `tokens=`, já contribui com 0) e reporta a fração
+aproximada na própria linha, veja a saída do próprio relatório para o formato.
 
-**This changes comparability again, the same way the 2026-09-12 delegation
-entry above does for edits.** Every "subagent tokens" figure in this file —
-11.5M in the original baseline, 1,776,741 / 7,708,367 in the A/B — was read
-off a total that mixed reliable and (sometimes doubled) approximate metric
-with no way to tell them apart after the fact. A token total measured after
-this fix only counts lines with real, uniquely-attributed metric; a total
-measured before it does not, and the two are not the same series. Read each
-on its own side of this date.
+**Isso muda a comparabilidade de novo, do mesmo jeito que a entrada de
+delegação de 12/09/2026 acima faz para as edições.** Toda cifra de "tokens de
+subagente" neste arquivo, os 11,5M na baseline original, os 1.776.741 /
+7.708.367 no A/B, foi lida de um total que misturava métrica confiável e
+(às vezes duplicada) aproximada sem jeito de distinguir depois do fato. Um
+total de tokens medido depois desse fix só conta linhas com métrica real e
+atribuída de forma única; um total medido antes dele não conta, e as duas não
+são a mesma série. Leia cada um do seu próprio lado dessa data.
 
-**What is still not measured.** Whether degree 3 still fires at all against
-a current Claude Code client — the fallback exists for older clients that
-omit `agent_transcript_path`/`agent_id`, and if the current client always
-sends one of those, this whole path (and the bug in it) may already be
-dormant in practice. That requires checking a live payload from a current
-session, not a hook-log after the fact.
+**O que ainda não foi medido.** Se o grau 3 ainda dispara contra um cliente
+Claude Code atual, o fallback existe para clientes antigos que omitem
+`agent_transcript_path`/`agent_id`, e se o cliente atual sempre envia um dos
+dois, esse caminho inteiro (e o bug nele) já pode estar dormente na prática.
+Isso exige checar um payload real de uma sessão atual, não um log de hook
+depois do fato.
 
-## 2026-09-23 - A/B protocol for /lean against /orchestrate (not yet run)
+## 23/09/2026 - protocolo A/B para o /lean contra o /orchestrate (ainda não executado)
 
-`/lean` (`baseline/skills/lean/SKILL.md`) exists because per-task scaffolding
-is a hypothesis about cost, not a settled fact, once the model is strong
-enough to sequence its own work without a checkbox per step. This section is
-the protocol for judging that hypothesis, not a result: no run has happened
-yet, and the numbers below are deliberately absent rather than guessed.
+O `/lean` (`baseline/skills/lean/SKILL.md`) existe porque scaffolding por
+tarefa é uma hipótese sobre custo, não um fato definido, uma vez que o modelo
+seja forte o suficiente para sequenciar seu próprio trabalho sem um checkbox
+por passo. Esta seção é o protocolo para julgar essa hipótese, não um
+resultado: nenhuma execução aconteceu ainda, e os números abaixo estão
+deliberadamente ausentes em vez de chutados.
 
-**Design.** One real feature, sized so a single specialist's context can hold
-it (the same size class `/lean`'s "When to use which" table names as its
-fit), built twice from the same starting commit with the same model: once
-through `/lean`, once through `/orchestrate`. Same acceptance criteria for
-both runs, so the comparison is the driver, not the scope.
+**Design.** Uma feature real, do tamanho que o contexto de um único
+especialista aguenta (a mesma classe de tamanho que a tabela "Quando usar
+qual" do `/lean` nomeia como seu ajuste), construída duas vezes a partir do
+mesmo commit de partida com o mesmo modelo: uma vez pelo `/lean`, uma vez pelo
+`/orchestrate`. Mesmo critério de aceitação para as duas execuções, então a
+comparação é o driver, não o escopo.
 
-**What to read from `/harness-report` after each run:**
+**O que ler do `/harness-report` depois de cada execução:**
 
-- **Tokens.** Total, and the split between main-thread and subagent, same
-  breakdown the 2026-09-10 A/B used for the old and current `orchestrate`
-  drivers.
-- **Dispatches.** Count, and dispatches per message (`/lean` has exactly one
-  build dispatch and one verify dispatch by construction; `/orchestrate`'s
-  count depends on how many clusters it plans).
-- **Main-thread token share.** The number this file's own baseline (71%) and
-  the delegation rule were written to move.
-- **Wall clock.** Start to open PR, both runs.
-- **Rework.** How many times the gate went red before it stayed green, and
-  how many review rounds `code-reviewer` needed to reach zero open blockers.
-  This is the number that would show whether `/lean`'s lighter structure
-  actually costs more corrections later, the way one-agent-per-task did in
-  the imported TLC hypothesis above.
+- **Tokens.** Total, e a divisão entre thread principal e subagente, o mesmo
+  detalhamento que o A/B de 10/09/2026 usou para os drivers antigo e atual do
+  `orchestrate`.
+- **Dispatches.** Contagem, e dispatches por mensagem (o `/lean` tem exatamente
+  um dispatch de build e um de verify por construção; a contagem do
+  `/orchestrate` depende de quantos clusters ele planeja).
+- **Participação de tokens da thread principal.** O número que a própria
+  baseline deste arquivo (71%) e a regra de delegação foram escritas para
+  mover.
+- **Tempo de relógio.** Do início à abertura do PR, nas duas execuções.
+- **Retrabalho.** Quantas vezes o gate ficou vermelho antes de ficar verde de
+  forma estável, e quantas rodadas de review o `code-reviewer` precisou para
+  chegar a zero blockers abertos. Esse é o número que mostraria se a estrutura
+  mais leve do `/lean` de fato custa mais correções depois, do jeito que
+  um-agente-por-tarefa custou na hipótese importada da TLC acima.
 
-**Why this is a separate protocol and not a rerun of 2026-09-10.** That A/B
-compared two versions of the same driver (the current `orchestrate` against
-the 53-line one it replaced) on 16 unit-test tasks, n=1. It says nothing
-about `/lean`, which did not exist yet, and its own numbers are not
-comparable across it besides (see the 2026-09-12 entries above on the
-delegation and token-total denominators changing). A `/lean` vs `/orchestrate`
-comparison needs its own run, on work sized for `/lean`'s stated fit, read
-against this protocol, not folded into the existing table.
+**Por que isso é um protocolo separado e não uma reexecução de 10/09/2026.**
+Aquele A/B comparou duas versões do mesmo driver (o `orchestrate` atual contra
+o de 53 linhas que ele substituiu) em 16 tarefas de teste unitário, n=1. Ele
+não diz nada sobre o `/lean`, que ainda não existia, e seus próprios números
+não são comparáveis a ele além disso (veja as entradas de 12/09/2026 acima
+sobre os denominadores de delegação e total de tokens mudando). Uma
+comparação `/lean` vs `/orchestrate` precisa da sua própria execução, num
+trabalho do tamanho para o qual o `/lean` afirma servir, lida contra este
+protocolo, não encaixada na tabela existente.
 
-## Reading a report honestly
+## Lendo um relatório honestamente
 
-- **A small sample is not a trend.** A handful of edits in one session says
-  nothing. Compare across sessions, and prefer the direction over the value.
-- **`thread unknown` is not zero-cost.** Thread detection is a heuristic on the
-  hook payload. If unknowns dominate, the report is describing the detector, not
-  the behaviour.
-- **A good number in a session that did no implementation is meaningless.** A
-  session that only read files delegates nothing because there was nothing to
-  delegate.
-- The logs are gitignored and per-checkout. They measure *this* working copy,
-  not the team.
+- **Uma amostra pequena não é uma tendência.** Um punhado de edições numa
+  sessão não diz nada. Compare entre sessões, e prefira a direção ao valor.
+- **`thread unknown` não tem custo zero.** A detecção de thread é uma
+  heurística sobre o payload do hook. Se os desconhecidos dominam, o relatório
+  está descrevendo o detector, não o comportamento.
+- **Um número bom numa sessão que não fez implementação nenhuma não significa
+  nada.** Uma sessão que só leu arquivos não delega nada porque não havia nada
+  para delegar.
+- Os logs são ignorados pelo git e por checkout. Eles medem *esta* cópia de
+  trabalho, não o time.
 
-## Updating this file
+## Atualizando este arquivo
 
-When a measurement is taken that is broad enough to replace the baseline, add a
-new dated section rather than editing the table above. The trail of what the
-harness used to do is the point — the same reason `.claude/rules/harness/adr.md`
-makes decisions append-only.
+Quando uma medição for feita ampla o suficiente para substituir a baseline,
+adicione uma nova seção datada em vez de editar a tabela acima. O rastro do
+que o harness costumava fazer é o ponto, o mesmo motivo pelo qual o
+`.claude/rules/harness/adr.md` torna as decisões somente para acréscimo.

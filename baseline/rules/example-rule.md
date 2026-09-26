@@ -2,34 +2,34 @@
 paths: "**/*.{tsx,jsx,ts,js}"
 ---
 
-# Example rule (rename this file)
+# Regra de exemplo (renomeie este arquivo)
 
-> A rule is a path-scoped convention. The `paths:` glob in the frontmatter determines when this rule auto-loads.
-> Without `paths:`, the rule loads always (becoming a hidden CLAUDE.md). Always scope rules.
+> Uma regra é uma convenção com escopo de caminho. O glob `paths:` no frontmatter determina quando esta regra carrega automaticamente.
+> Sem `paths:`, a regra carrega sempre (tornando-se um CLAUDE.md escondido). Sempre dê escopo às regras.
 
-This is what a rule looks like. Replace the content with your actual conventions.
+Isto é o que uma regra parece. Substitua o conteúdo pelas suas convenções reais.
 
-## Example conventions
+## Convenções de exemplo
 
-- Named exports only, no default exports
-- Functional patterns over class-based
-- Async/await over .then() chains
-- Type imports separated: `import type { Foo } from './foo'`
-- Avoid `any`. Use `unknown` and narrow.
+- Só exports nomeados, sem export default
+- Padrões funcionais em vez de baseados em classe
+- Async/await em vez de cadeias .then()
+- Imports de tipo separados: `import type { Foo } from './foo'`
+- Evite `any`. Use `unknown` e restrinja o tipo.
 
-## What rules are for
+## Para que servem as regras
 
-- Path-scoped conventions that apply to multiple files of a type
-- Hard rules that a code-reviewer should enforce
-- Short, factual statements (not explanations)
+- Convenções com escopo de caminho que se aplicam a vários arquivos de um tipo
+- Regras rígidas que um code-reviewer deve aplicar
+- Declarações curtas e factuais (não explicações)
 
-## What rules are NOT for
+## Para que as regras NÃO servem
 
-- Long documentation (use `.claude/docs/`)
-- Folder-specific conventions (use nested `src/<folder>/CLAUDE.md`)
-- Reusable workflows (use `.claude/skills/`)
-- Reasoning about why (decisions go in `docs/decisions/`)
+- Documentação longa (use `.claude/docs/`)
+- Convenções específicas de pasta (use `src/<folder>/CLAUDE.md` aninhado)
+- Fluxos de trabalho reutilizáveis (use `.claude/skills/`)
+- Raciocínio sobre o porquê (decisões vão em `docs/decisions/`)
 
-## Keep it short
+## Mantenha curto
 
-A good rule is 20-50 lines. If yours is longer, it might be hiding three rules in one file, or it might be doc that belongs in `.claude/docs/`.
+Uma boa regra tem 20-50 linhas. Se a sua for mais longa, ela pode estar escondendo três regras num arquivo só, ou pode ser documentação que pertence a `.claude/docs/`.

@@ -1,62 +1,62 @@
-# Example Lib (rename this file)
+# Example Lib (renomeie este arquivo)
 
-> Last reviewed: YYYY-MM-DD
-> Lib version: X.Y.Z
-> Official docs: <url>
+> Última revisão: YYYY-MM-DD
+> Versão da lib: X.Y.Z
+> Docs oficiais: <url>
 
-> This is a template. Rename the file to the actual lib (e.g., the name of the service or package) and replace the content.
+> Isto é um template. Renomeie o arquivo para a lib real (ex.: o nome do serviço ou pacote) e substitua o conteúdo.
 
-## Why we use it
+## Por que a usamos
 
-One line. The role this lib plays in the system.
+Uma linha. O papel que essa lib desempenha no sistema.
 
-## How we authenticate
+## Como autenticamos
 
-- Env var names
-- Token storage location
-- Token rotation schedule
-- Who has access
+- Nomes de variáveis de ambiente
+- Local de armazenamento do token
+- Cronograma de rotação do token
+- Quem tem acesso
 
-## Endpoints / features we use
+## Endpoints / features que usamos
 
-| Method | Endpoint or feature | Used for |
+| Método | Endpoint ou feature | Usado para |
 |---|---|---|
-| POST | `/v1/example` | example operation |
-| GET | `/v1/example/:id` | fetch example |
+| POST | `/v1/example` | operação de exemplo |
+| GET | `/v1/example/:id` | busca de exemplo |
 
-## Custom configuration
+## Configuração customizada
 
-Configuration that is specific to this project, not the lib defaults:
+Configuração específica deste projeto, não os padrões da lib:
 
 - ...
 
-## Gotchas
+## Pegadinhas
 
-Things we have hit in production that are not obvious from the docs:
+Coisas que já pegamos em produção e não são óbvias pelos docs:
 
-- **Pagination behavior:** the API returns 100 items per page by default
-- **Rate limits:** 50 req/min on free tier, scales with tier
-- **Idempotency:** required for write operations to handle retries safely
-- **Timezone:** all timestamps are UTC, must convert at the boundary
+- **Comportamento de paginação:** a API retorna 100 itens por página por padrão
+- **Rate limits:** 50 req/min no tier gratuito, escala com o tier
+- **Idempotência:** obrigatória em operações de escrita para tratar retries com segurança
+- **Timezone:** todos os timestamps são UTC, é preciso converter na borda
 
 ## Troubleshooting
 
-| Symptom | Cause | Fix |
+| Sintoma | Causa | Correção |
 |---|---|---|
-| 401 Unauthorized | Token expired | Run token refresh |
-| 429 Rate Limit | Exceeded quota | Exponential backoff, consider upgrade |
-| Timeout | Network or backend slow | Retry with longer timeout |
+| 401 Unauthorized | Token expirado | Rode o refresh do token |
+| 429 Rate Limit | Cota excedida | Backoff exponencial, considere upgrade |
+| Timeout | Rede ou backend lento | Retry com timeout maior |
 
-## What NOT to do
+## O que NÃO fazer
 
-- Do not call this lib directly from the frontend
-- Do not log full payloads (may contain PII)
-- Do not hardcode IDs that should be configurable
+- Não chame esta lib direto do frontend
+- Não logue payloads completos (podem conter PII)
+- Não fixe IDs no código que deveriam ser configuráveis
 
-## When to update this doc
+## Quando atualizar este documento
 
-- Lib version bumps (even patches sometimes change behavior)
-- New gotcha discovered during debugging
-- New endpoint or feature added to project usage
+- Bumps de versão da lib (até patches às vezes mudam comportamento)
+- Nova pegadinha descoberta durante debugging
+- Novo endpoint ou feature adicionado ao uso do projeto
 
-Skim the official docs quarterly for breaking changes.
+Passe os olhos nos docs oficiais a cada trimestre em busca de breaking changes.

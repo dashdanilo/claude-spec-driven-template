@@ -2,11 +2,11 @@
 paths: "docs/decisions/**"
 ---
 
-# ADRs are append-only
+# ADRs são somente para acréscimo (append-only)
 
-An Architecture Decision Record is a historical record, not a living document.
+Um Architecture Decision Record (ADR) é um registro histórico, não um documento vivo.
 
-- Never rewrite the decision of an **accepted** ADR. If the decision changes, write a **new** ADR that supersedes it, and mark the old one `Superseded by ADR-NNNN`.
-- Decisions accumulate — the trail of why we changed our mind is the value.
-- A new ADR states **Context → Decision → Consequences** and a status (`Proposed` → `Accepted` → `Superseded`).
-- Fixing a typo or adding a link is fine; changing what was decided is not.
+- Nunca reescreva a decisão de um ADR **aceito** (`Accepted`). Se a decisão mudar, escreva um **novo** ADR que a substitui, e marque o antigo como `Superseded by ADR-NNNN`.
+- As decisões se acumulam, o rastro de por que mudamos de ideia é o valor.
+- Um novo ADR declara **Context → Decision → Consequences** e um status (`Proposed` → `Accepted` → `Superseded`).
+- Corrigir um erro de digitação ou adicionar um link é aceitável; mudar o que foi decidido não é.
