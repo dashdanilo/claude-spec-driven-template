@@ -1,49 +1,49 @@
-# Contributing
+# Contribuindo
 
-Thanks for considering a contribution. This template's value comes from being a clear, accurate reference. Contributions should preserve that quality.
+Obrigado por considerar contribuir. O valor deste template vem de ser uma referência clara e precisa. Contribuições devem preservar essa qualidade.
 
-## What kinds of contributions are welcome
+## Que tipos de contribuição são bem-vindos
 
-- **Corrections** to wrong or outdated information
-- **Improvements** to clarity in `README.md`, `LEARN.md`, or any explanatory text
-- **New examples** that illustrate a pattern not yet covered
-- **Bug reports** for inconsistencies between docs and structure
-- **Updates** when Claude Code releases features that change best practices
+- **Correções** de informação errada ou desatualizada
+- **Melhorias** de clareza em `README.md`, `LEARN.md`, ou qualquer texto explicativo
+- **Exemplos novos** que ilustram um padrão ainda não coberto
+- **Relatos de bug** para inconsistências entre docs e estrutura
+- **Atualizações** quando o Claude Code lança features que mudam boas práticas
 
-## What is out of scope
+## O que está fora de escopo
 
-- Project-specific opinions tied to a single stack (this template stays agnostic)
-- New layers or subsystems unless there is a clear teaching benefit
-- Cosmetic changes that do not improve clarity
+- Opiniões específicas de projeto amarradas a uma única stack (este template permanece agnóstico)
+- Camadas ou subsistemas novos, a menos que haja um benefício didático claro
+- Mudanças cosméticas que não melhoram a clareza
 
-## Before opening a pull request
+## Antes de abrir um pull request
 
-1. **Read `README.md` and `LEARN.md` end to end.** A change in one often requires a change in the other.
-2. **Check `CLAUDE.md` and `AGENTS.md`.** If your change affects conventions, both files may need updates.
-3. **Verify the decision table in `README.md`.** New subsystems or files should fit somewhere in it.
-4. **Make sure the directory tree comments in `README.md` still match the actual structure.** Run `tree` or `find` and compare.
+1. **Leia `README.md` e `LEARN.md` do início ao fim.** Uma mudança num deles muitas vezes exige mudança no outro.
+2. **Confira `CLAUDE.md` e `AGENTS.md`.** Se sua mudança afeta convenções, os dois arquivos podem precisar de atualização.
+3. **Verifique a tabela de decisão em `README.md`.** Subsistemas ou arquivos novos devem caber em algum lugar nela.
+4. **Garanta que os comentários da árvore de diretórios em `README.md` ainda combinam com a estrutura real.** Rode `tree` ou `find` e compare.
 
-## Style guide
+## Guia de estilo
 
-- **English** for all documentation
-- **Markdown** for all files (no MDX, no special preprocessing)
-- **No em-dashes** in copy
-- **One H1 per file**, used as the title
-- **Code blocks have language tags** (` ```bash `, ` ```markdown `, etc)
-- **File paths in inline code:** `baseline/skills/example-skill/SKILL.md`
-- **Directory paths end with slash:** `baseline/skills/` not `baseline/skills`
-- **Dates in ISO format:** `2026-06-21`
+- **Inglês** para toda a documentação
+- **Markdown** para todos os arquivos (sem MDX, sem preprocessamento especial)
+- **Nenhum em-dash** no texto
+- **Um H1 por arquivo**, usado como título
+- **Blocos de código têm tag de linguagem** (` ```bash `, ` ```markdown `, etc)
+- **Caminhos de arquivo em código inline:** `baseline/skills/example-skill/SKILL.md`
+- **Caminhos de diretório terminam com barra:** `baseline/skills/`, não `baseline/skills`
+- **Datas em formato ISO:** `2026-06-21`
 
-## Commit messages
+## Mensagens de commit
 
-Conventional Commits format:
+Formato Conventional Commits:
 
-- `docs:` for documentation changes
-- `feat:` for new examples or new subsystems
-- `fix:` for corrections
-- `chore:` for tooling, gitignore, etc
+- `docs:` para mudanças de documentação
+- `feat:` para exemplos novos ou subsistemas novos
+- `fix:` para correções
+- `chore:` para tooling, gitignore, etc
 
-Examples:
+Exemplos:
 
 ```
 docs: clarify when to use rules vs nested CLAUDE.md
@@ -51,65 +51,65 @@ feat: add example for hooks PostToolUse pattern
 fix: correct path in subagents section of LEARN.md
 ```
 
-## Validation checklist
+## Checklist de validação
 
-Before submitting:
+Antes de enviar:
 
-- [ ] All internal links work (relative paths)
-- [ ] Directory tree in `README.md` matches `find . -type d`
-- [ ] No project-specific stack assumptions (specific frameworks or vendors) leak into core files
-- [ ] Decision table in `README.md` includes any new file types you added
-- [ ] `LEARN.md` table of contents matches its sections
+- [ ] Todos os links internos funcionam (caminhos relativos)
+- [ ] A árvore de diretórios em `README.md` combina com `find . -type d`
+- [ ] Nenhuma suposição de stack específica de projeto (frameworks ou fornecedores específicos) vaza para os arquivos centrais
+- [ ] A tabela de decisão em `README.md` inclui qualquer tipo de arquivo novo que você adicionou
+- [ ] O sumário do `LEARN.md` combina com as seções dele
 
-## Adding a new example
+## Adicionando um exemplo novo
 
-If you add a new example (rule, skill, agent, etc), follow this pattern:
+Se você adicionar um exemplo novo (rule, skill, agent, etc), siga este padrão:
 
-1. Make the example **generic** but **realistic**. Avoid `foo` and `bar`. Use something like `example-skill` or `code-reviewer`.
-2. Add a short paragraph in `README.md` explaining what the example shows
-3. Reference the example in `LEARN.md` if it illustrates a concept
-4. Make sure the example file ITSELF teaches: comments inline that explain why the structure is the way it is
+1. Torne o exemplo **genérico**, mas **realista**. Evite `foo` e `bar`. Use algo como `example-skill` ou `code-reviewer`.
+2. Adicione um parágrafo curto em `README.md` explicando o que o exemplo mostra
+3. Referencie o exemplo em `LEARN.md` se ele ilustra um conceito
+4. Garanta que o próprio arquivo de exemplo ensina: comentários inline que explicam por que a estrutura é do jeito que é
 
-## Adding a new skill, subagent, or hook
+## Adicionando uma skill, subagent ou hook novo
 
-The template ships several ready-to-use skills and subagents. If you add new ones:
+O template traz várias skills e subagents prontos para usar. Se você adicionar novos:
 
-- Skills go in `baseline/skills/<name>/SKILL.md`. Descriptions must be triggering conditions (`Use when...`), not documentation.
-- Subagents go in `baseline/agents/<name>.md`. Set `tools:` narrowly to reduce surface area.
-- Hooks go in `baseline/hooks/<name>.sh` (or another executable). Register in `.claude/settings.json`.
-- Utility scripts shared by multiple hooks or agents go in `baseline/scripts/`.
-- Update the tree diagram in `README.md` to include the new file.
+- Skills vão em `baseline/skills/<name>/SKILL.md`. Descrições precisam ser condições de gatilho (`Use when...`), não documentação.
+- Subagents vão em `baseline/agents/<name>.md`. Defina `tools:` de forma estreita para reduzir a superfície.
+- Hooks vão em `baseline/hooks/<name>.sh` (ou outro executável). Registre em `.claude/settings.json`.
+- Scripts utilitários compartilhados por vários hooks ou agents vão em `baseline/scripts/`.
+- Atualize o diagrama de árvore em `README.md` para incluir o arquivo novo.
 
-## Changing paths
+## Mudando caminhos
 
-Paths appear in many places (READMEs, CLAUDE.md, AGENTS.md, skills, subagents, hooks). If you rename or move a file:
+Caminhos aparecem em muitos lugares (READMEs, CLAUDE.md, AGENTS.md, skills, subagents, hooks). Se você renomear ou mover um arquivo:
 
-1. Run `grep -rn "<old-path>" .` to find all references
-2. Update each one
-3. Update the tree diagrams in `README.md` and any relevant README
-4. Test that hooks and scripts still work in the new location
+1. Rode `grep -rn "<old-path>" .` para achar todas as referências
+2. Atualize cada uma
+3. Atualize os diagramas de árvore em `README.md` e qualquer README relevante
+4. Teste que hooks e scripts ainda funcionam no lugar novo
 
-## Testing shell scripts
+## Testando shell scripts
 
-Scripts in `baseline/scripts/` and `baseline/hooks/` should be tested standalone before merging:
+Scripts em `baseline/scripts/` e `baseline/hooks/` devem ser testados de forma independente antes do merge:
 
 ```bash
-# Simulate the JSON stdin a hook receives
+# Simula o JSON de stdin que um hook recebe
 echo '{"tool_name":"Bash","tool_input":{"command":"ls"}}' | ./baseline/hooks/block-secrets.sh
 echo "Exit: $?"
 
-# Utility scripts should be runnable directly
+# Scripts utilitários devem poder ser rodados direto
 ./baseline/scripts/check-snapshot.sh
 ```
 
-Both should be deterministic. Random flakiness means users get random behavior.
+Os dois devem ser determinísticos. Instabilidade aleatória significa que usuários têm comportamento aleatório.
 
-CI (`.github/workflows/test.yml`) runs every `*.test.sh` fixture suite under `baseline/hooks/tests/` and `baseline/scripts/tests/`, plus `tests/install-harness.test.sh` and `baseline/scripts/check-index.sh --strict`, on both Linux and macOS runners.
+CI (`.github/workflows/test.yml`) roda toda suíte de fixture `*.test.sh` dentro de `baseline/hooks/tests/` e `baseline/scripts/tests/`, mais `tests/install-harness.test.sh` e `baseline/scripts/check-index.sh --strict`, em runners de Linux e macOS.
 
-## Questions
+## Perguntas
 
-Open an issue with the `question` label. For larger discussions, open a discussion.
+Abra uma issue com a label `question`. Para discussões maiores, abra uma discussion.
 
-## License
+## Licença
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+Ao contribuir, você concorda que suas contribuições serão licenciadas sob a Licença MIT.
