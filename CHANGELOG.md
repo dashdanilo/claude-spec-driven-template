@@ -6,7 +6,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+**Documentation is now in Brazilian Portuguese.** `README.md`, `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `ECOSYSTEM.md`, `LEARN.md`, every file under `docs/`, and `baseline/rules/` plus `baseline/docs/` were translated. `ADOPTING.md` was already in Portuguese. This file stays in English, and so do commit messages, PR descriptions, file names and every identifier.
+- What was deliberately not translated: paths, file names, skill/agent/hook/script names, flags, environment variables, code blocks, markdown link targets, and the `paths:` globs in rule frontmatter (translating one of those breaks rule loading silently, with no error).
+- Git and Claude Code terms stay as loanwords the way `ADOPTING.md` already used them: commit, branch, merge, worktree, squash, hook, skill, subagent, harness, gate.
+- ADR numbers, titles, dates and statuses were preserved: translating is not superseding, and `baseline/rules/adr.md` keeps them append-only.
+- Side effect worth noting: the em-dash debt dropped instead of growing. `harness-baseline.md` went from 45 to 8, `dispatching.md` from 18 to 0.
+- Still in English, for a separate pass: the 23 `SKILL.md` files and the 8 agent definitions.
+
 ### Added
+
+**`check-index.sh` stopped reporting test fixtures as dangling pointers (#95), and stopped glob-expanding path components (#98).** The dangling-pointer scan reads every `*.md` and `*.sh` under the owned roots looking for `.claude/...`-shaped strings, and hook and script test suites write exactly those strings as fixture input, a fair number of them deliberately pointing at nothing. Any path with a directory component named `tests` now leaves that scan, on the same criterion `.pre-harness` already used: a directory shape rather than an enumerated list, so a new suite never needs a matching edit here. Separately, both exemption helpers split the path with `local IFS=/` and an unquoted `for part in $path`, which word-splits as intended but also glob-expands, since `set -f` is never set; a component holding `*`, `?` or `[...]` was resolved against the working directory instead of reaching the `case` literally.
+
+**The rule on stacked PRs was rewritten after the opposite failure fired (#99).** It used to say that merging the bottom PR with `--delete-branch` is what makes GitHub retarget the PRs above it. That holds only when the retarget succeeds. When it cannot, GitHub **closes** the top PR, and a closed PR whose base branch no longer exists refuses both `updatePullRequest` and `reopenPullRequest`. That is what happened to #97 on 2026-09-25, recovered by cherry-picking onto the updated `main` and reopening as #98. The rule now says to retarget the top PR first, while it is still open, and carries the recovery procedure for when it already happened.
 
 **"After opening a PR" in `git-workflow.md`, a single source of truth for turning on the host's PR auto-fix once a PR is up:** `/orchestrate` and `/lean` turn it on automatically (they count as autonomous delivery), other flows offer it in one line and wait for a yes.
 - Conditional on the session exposing a host tool for it (`mcp__ccd_pr__set_monitor`/`get_status` in Claude Code desktop); skipped silently everywhere else, since the harness is portable.
